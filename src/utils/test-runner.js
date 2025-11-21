@@ -74,6 +74,16 @@ export function expect(actual) {
             if (!(actual > expected)) {
                 throw new Error(`Expected ${actual} to be greater than ${expected}`);
             }
+        },
+        toBeLessThan: (expected) => {
+            if (!(actual < expected)) {
+                throw new Error(`Expected ${actual} to be less than ${expected}`);
+            }
+        },
+        toBeDefined: (expected) => {
+            if (typeof actual === 'undefined') {
+                throw new Error(`Expected ${actual} to be defined`);
+            }
         }
     };
 }
