@@ -1,4 +1,16 @@
 
+/**
+ * Discrete Cosine Transform (DCT)
+ * 
+ * The DCT is the heart of JPEG compression. It converts a block of spatial data (pixels)
+ * into the frequency domain.
+ * 
+ * - Low frequencies (large features, background) end up in the top-left corner.
+ * - High frequencies (fine details, noise) end up in the bottom-right corner.
+ * 
+ * This allows us to later discard (quantize) the high-frequency data which the human eye
+ * is less sensitive to, achieving compression.
+ */
 const COS_TABLE = new Float32Array(8 * 8);
 
 // Precompute cosines

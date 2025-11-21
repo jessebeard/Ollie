@@ -12,32 +12,39 @@ function init() {
         if (!file) return;
 
         const reader = new FileReader();
+        // FileReader is asynchronous. We define what happens when it finishes reading.
         reader.onload = (event) => {
             const img = new Image();
             img.onload = () => {
+                // We must wait for the image to load before we can draw it or get its dimensions.
                 originalCanvas.width = img.width;
                 originalCanvas.height = img.height;
                 const ctx = originalCanvas.getContext('2d');
+                // Draw the image onto the canvas so we can access its pixel data later.
                 ctx.drawImage(img, 0, 0);
                 statusDiv.textContent = 'Image loaded. Ready to encode.';
             };
             img.src = event.target.result;
         };
+        // Start reading the file as a Data URL (base64 string), which can be used as an image source.
         reader.readAsDataURL(file);
     });
 
     encodeBtn.addEventListener('click', async () => {
         statusDiv.textContent = 'Encoding...';
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise(r => setTimeout(r, 10)); //pause the browser for repaint
 
         try {
             const ctx = originalCanvas.getContext('2d');
+            // Extract raw RGBA pixel data from the canvas. This is what the encoder needs.
             const imageData = ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
 
             const encoder = new JpegEncoder();
             const jpegBytes = encoder.encode(imageData);
 
+            // Convert the raw JPEG bytes into a Blob (Binary Large Object).
             const blob = new Blob([jpegBytes.buffer], { type: 'image/jpeg' });
+            // Create a temporary URL pointing to this Blob so we can display it in an <img> tag.
             const url = URL.createObjectURL(blob);
 
             const resImg = new Image();
@@ -65,13 +72,16 @@ function init() {
             const data = new Uint8ClampedArray(width * height * 4);
 
             // Create a gradient
+            // Create a gradient pattern manually
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
+                    // Calculate the index in the 1D array for the pixel at (x, y).
+                    // Each pixel takes 4 bytes (R, G, B, A).
                     const idx = (y * width + x) * 4;
-                    data[idx] = x * 4;     // R
-                    data[idx + 1] = y * 4; // G
-                    data[idx + 2] = 128;   // B
-                    data[idx + 3] = 255;   // A
+                    data[idx] = x * 4;     // Red increases with X
+                    data[idx + 1] = y * 4; // Green increases with Y
+                    data[idx + 2] = 128;   // Blue is constant
+                    data[idx + 3] = 255;   // Alpha (opacity) is full
                 }
             }
 

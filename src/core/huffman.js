@@ -126,23 +126,8 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
         const eob = acTable[0x00];
         writer.writeBits(eob.code, eob.length);
     } else {
-        // If the last element was non-zero, we still need EOB unless we wrote 63 AC coeffs?
-        // Actually if the last coefficient (63) is non-zero, we don't need EOB.
-        // But if we ended with zeros (which we track with zeroRun), we write EOB.
-        // Wait, if the loop finishes and zeroRun is 0, it means the last element was non-zero.
-        // In that case, do we write EOB?
-        // Standard says: "If all coefficients are coded, EOB is not required."
-        // But usually we just write EOB if there are trailing zeros.
-        // My logic: if val != 0, zeroRun becomes 0.
-        // If the very last coeff (63) is non-zero, zeroRun is 0. Loop ends.
-        // We check if we need EOB.
-        // If the block ends with non-zero, we don't need EOB.
-        // BUT, my logic `if (zeroRun > 0)` only handles trailing zeros.
-        // What if the block is FULL of non-zeros? Then zeroRun is 0.
-        // Correct.
-        // What if the block is ALL zeros (except DC)?
-        // Loop 1..63. val=0. zeroRun increments to 63.
-        // Loop ends. zeroRun > 0. Write EOB. Correct.
+        // EOB is not required if all coefficients are coded.
+        // But we usually write it if there are trailing zeros. 
     }
 
     return dcVal; // Return new DC value

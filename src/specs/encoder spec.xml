@@ -1,0 +1,93 @@
+<EncoderSpec>
+    <Overview>
+        <Goal>Implement a baseline JPEG encoder (Sequential DCT, Huffman Coding) compliant with CCITT T.81.</Goal>
+        <Reference>src/specs/jpeg-spec.xml</Reference>
+        <Methodology>Test Driven Development (TDD)</Methodology>
+    </Overview>
+
+    <Phases>
+        <Phase name="1. Core Transformations" status="Pending">
+            <Description>Implement mathematical transformations required for JPEG compression.</Description>
+            <Steps>
+                <Step name="Color Space Conversion">
+                    <Requirement>Convert RGB to YCbCr [cite: jpeg-spec.xml#FrameHeader].</Requirement>
+                    <Test>Verify RGB -> YCbCr conversion values.</Test>
+                </Step>
+                <Step name="Level Shift">
+                    <Requirement>Shift samples by -128 (for 8-bit precision) [cite: jpeg-spec.xml#ProcessingOrder].</Requirement>
+                    <Test>Input [0, 255] -> Output [-128, 127].</Test>
+                </Step>
+                <Step name="FDCT">
+                    <Requirement>Forward Discrete Cosine Transform on 8x8 blocks [cite: jpeg-spec.xml#FDCT].</Requirement>
+                    <Test>Verify FDCT output against known input/output pairs.</Test>
+                </Step>
+                <Step name="Quantization">
+                    <Requirement>Divide DCT coefficients by Quantization Table [cite: jpeg-spec.xml#Quantization].</Requirement>
+                    <Test>Verify division and rounding using standard Luminance/Chrominance tables.</Test>
+                </Step>
+                <Step name="ZigZag Reordering">
+                    <Requirement>Reorder 8x8 block to 1D array [cite: jpeg-spec.xml#ZigZag_Sequence].</Requirement>
+                    <Test>Verify index mapping matches standard ZigZag order.</Test>
+                </Step>
+            </Steps>
+        </Phase>
+
+        <Phase name="2. Entropy Coding" status="Pending">
+            <Description>Implement Huffman coding for DC and AC coefficients.</Description>
+            <Steps>
+                <Step name="DC Coding">
+                    <Requirement>Differential coding of DC coefficients [cite: jpeg-spec.xml#DC_Coding].</Requirement>
+                    <Test>Verify DIFF calculation and category selection.</Test>
+                </Step>
+                <Step name="AC Coding">
+                    <Requirement>Run-Length Encoding of zeros [cite: jpeg-spec.xml#AC_Coefficients].</Requirement>
+                    <Test>Verify RLE pairs (Run/Size) and special markers (ZRL, EOB).</Test>
+                </Step>
+                <Step name="Huffman Tables">
+                    <Requirement>Generate/Use standard Huffman tables [cite: jpeg-spec.xml#HuffmanTable].</Requirement>
+                    <Test>Verify bit strings for standard symbols.</Test>
+                </Step>
+            </Steps>
+        </Phase>
+
+        <Phase name="3. File Structure &amp; Markers" status="Pending">
+            <Description>Construct the JPEG file stream with appropriate markers.</Description>
+            <Steps>
+                <Step name="SOI/EOI">
+                    <Requirement>Start and End of Image markers [cite: jpeg-spec.xml#Marker_Codes].</Requirement>
+                    <Test>Verify file starts with 0xFFD8 and ends with 0xFFD9.</Test>
+                </Step>
+                <Step name="DQT">
+                    <Requirement>Define Quantization Tables [cite: jpeg-spec.xml#QuantizationTable].</Requirement>
+                    <Test>Verify DQT segment structure and table data.</Test>
+                </Step>
+                <Step name="SOF0">
+                    <Requirement>Start of Frame (Baseline DCT) [cite: jpeg-spec.xml#FrameHeader].</Requirement>
+                    <Test>Verify dimensions, precision, and component info.</Test>
+                </Step>
+                <Step name="DHT">
+                    <Requirement>Define Huffman Tables [cite: jpeg-spec.xml#HuffmanTable].</Requirement>
+                    <Test>Verify DHT segment structure for DC/AC tables.</Test>
+                </Step>
+                <Step name="SOS">
+                    <Requirement>Start of Scan [cite: jpeg-spec.xml#ScanHeader].</Requirement>
+                    <Test>Verify scan parameters and component selectors.</Test>
+                </Step>
+                <Step name="Byte Stuffing">
+                    <Requirement>Insert 0x00 after 0xFF in entropy data [cite: jpeg-spec.xml#ByteStuffing].</Requirement>
+                    <Test>Ensure no raw 0xFF exists in entropy stream (except markers).</Test>
+                </Step>
+            </Steps>
+        </Phase>
+
+        <Phase name="4. Integration" status="Pending">
+            <Description>Combine all steps to encode an image.</Description>
+            <Steps>
+                <Step name="Full Encode">
+                    <Requirement>Encode raw image data to JPEG format.</Requirement>
+                    <Test>Encode test image, verify valid JPEG structure and visual output.</Test>
+                </Step>
+            </Steps>
+        </Phase>
+    </Phases>
+</EncoderSpec>

@@ -4,7 +4,7 @@
  * and can handle different image sizes.
  */
 import { describe, it, expect } from '/test/utils/test-runner.js';
-import { JpegEncoder } from '../src/jpeg-encoder.js';
+import { JpegEncoder } from '/src/jpeg-encoder.js';
 
 describe('JpegEncoder Integration', () => {
     it('encodes a small 8x8 white block without errors', () => {

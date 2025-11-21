@@ -6,11 +6,29 @@ import { zigZag } from './core/zigzag.js';
 import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from './core/huffman.js';
 import { BitWriter } from './utils/bit-writer.js';
 
+/**
+ * JpegEncoder
+ * 
+ * This class implements a basic JPEG encoder.
+ * The JPEG compression process involves several steps:
+ * 1. Color Space Conversion: RGB -> YCbCr (Luminance, Blue-difference, Red-difference)
+ * 2. Subsampling: (Skipped here, we use 4:4:4 which means no subsampling)
+ * 3. Block Splitting: The image is split into 8x8 blocks.
+ * 4. DCT (Discrete Cosine Transform): Converts spatial data (pixels) into frequency domain.
+ * 5. Quantization: Reduces precision of high-frequency components to save space (lossy step).
+ * 6. ZigZag Reordering: Reorders the 8x8 block into a 1D array, grouping low frequencies.
+ * 7. Entropy Coding (Huffman): Compresses the data using Huffman tables.
+ */
 export class JpegEncoder {
     constructor(quality = 50) {
         this.quality = quality;
     }
 
+    /**
+     * Encodes the provided ImageData into a JPEG byte array.
+     * @param {ImageData|Object} imageData - Object containing width, height, and data (RGBA).
+     * @returns {Uint8Array} The raw JPEG file bytes.
+     */
     encode(imageData) {
         console.log('JpegEncoder.encode called');
         const width = imageData.width;
@@ -20,6 +38,7 @@ export class JpegEncoder {
         this.headers = [];
         const writer = new BitWriter();
 
+        // Write the standard JPEG markers (SOI, APP0, DQT, SOF0, DHT, SOS)
         this.writeHeaders(writer, width, height);
 
         const padded = padDimensions(width, height);
@@ -28,6 +47,7 @@ export class JpegEncoder {
         let prevDC_Cr = 0;
 
         let blockCount = 0;
+        // Process the image in 8x8 blocks
         for (let y = 0; y < padded.height; y += 8) {
             for (let x = 0; x < padded.width; x += 8) {
                 blockCount++;
@@ -47,6 +67,9 @@ export class JpegEncoder {
                         const g = data[idx + 1];
                         const b = data[idx + 2];
 
+                        // Convert RGB to YCbCr.
+                        // Y is brightness (Luma), Cb and Cr are color (Chroma).
+                        // We subtract 128 to center the values around 0 for DCT.
                         const ycbcr = rgbToYcbcr(r, g, b);
                         Y[row * 8 + col] = ycbcr.y - 128;
                         Cb[row * 8 + col] = ycbcr.cb - 128;
@@ -54,6 +77,8 @@ export class JpegEncoder {
                     }
                 }
 
+                // Process each channel separately.
+                // Note: We pass the previous DC value because DC coefficients are delta-encoded.
                 prevDC_Y = this.processBlock(Y, prevDC_Y, QUANTIZATION_TABLE_LUMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
                 prevDC_Cb = this.processBlock(Cb, prevDC_Cb, QUANTIZATION_TABLE_CHROMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
                 prevDC_Cr = this.processBlock(Cr, prevDC_Cr, QUANTIZATION_TABLE_CHROMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
@@ -67,9 +92,13 @@ export class JpegEncoder {
     }
 
     processBlock(blockData, prevDC, qTable, writer, dcTable, acTable) {
+        // 1. Forward DCT: Convert 8x8 pixel block to frequency domain
         const dct = forwardDCT(blockData);
+        // 2. Quantization: Divide by quantization table to reduce precision (compression happens here)
         const quantized = quantize(dct, qTable);
+        // 3. ZigZag: Reorder 2D block to 1D array to group zeros at the end
         const zigzagged = zigZag(quantized);
+        // 4. Huffman Encode: Compress the resulting coefficients
         return encodeBlock(zigzagged, prevDC, writer, dcTable, acTable);
     }
 
