@@ -47,15 +47,38 @@
                         <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
                     </class>
                 </file>
-                <file name="test-runner.js" description="Simple custom test runner.">
-                    <function name="describe" params="name, fn" description="Defines a test suite." />
-                    <function name="it" params="name, fn" description="Defines a test case." />
-                    <function name="expect" params="actual" return="Object" description="Assertion matcher." />
-                </file>
+
             </directory>
 
             <directory name="specs" description="Project documentation and specifications">
                 <file name="outline.xml" description="Project structure and component overview (this file)." />
+            </directory>
+        </directory>
+        <directory name="test">
+            <file name="jpeg-encoder.test.js" description="Integration tests for the JpegEncoder class." />
+            <directory name="core" description="Unit tests for core algorithms">
+                <file name="blocks.test.js" description="Tests for block padding and extraction." />
+                <file name="colorspace.test.js" description="Tests for RGB/YCbCr conversion." />
+                <file name="dct.test.js" description="Tests for Discrete Cosine Transform." />
+                <file name="huffman.test.js" description="Tests for Huffman coding logic." />
+                <file name="quantization.test.js" description="Tests for quantization tables and logic." />
+                <file name="zigzag.test.js" description="Tests for ZigZag reordering." />
+            </directory>
+            <directory name="utils" description="Unit tests for utility classes">
+                <file name="test-runner.js" description="Simple custom test runner.">
+                    <function name="describe" params="name, fn" description="Defines a test suite." />
+                    <function name="it" params="name, fn" description="Defines a test case." />
+                    <function name="expect" params="actual" return="Matcher" description="Assertion matcher factory.">
+                        <class name="Matcher">
+                            <method name="toBe" params="expected" description="Asserts strict equality (===)." />
+                            <method name="toEqual" params="expected" description="Asserts deep equality via JSON stringification." />
+                            <method name="toBeCloseTo" params="expected, precision=2" description="Asserts number is close to expected within precision." />
+                            <method name="toBeGreaterThan" params="expected" description="Asserts actual > expected." />
+                            <method name="toBeLessThan" params="expected" description="Asserts actual < expected." />
+                            <method name="toBeDefined" description="Asserts actual is not undefined." />
+                        </class>
+                    </function>
+                </file>
             </directory>
         </directory>
     </structure>
