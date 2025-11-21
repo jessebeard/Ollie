@@ -1,0 +1,72 @@
+<project name="Ollie" description="A pure JavaScript JPEG Encoder implementation">
+    <structure>
+        <directory name="src">
+            <file name="main.js" description="Entry point for the web interface. Handles file input, canvas manipulation, and invokes the encoder." />
+            <file name="jpeg-encoder.js" description="Main encoder class. Orchestrates the JPEG compression pipeline.">
+                <class name="JpegEncoder">
+                    <method name="constructor" params="quality=50" description="Initializes the encoder with quality setting." />
+                    <method name="encode" params="imageData" return="Uint8Array" description="Encodes the provided ImageData (RGBA) into a JPEG byte array." />
+                </class>
+            </file>
+            
+            <directory name="core" description="Core algorithms and data structures for JPEG compression">
+                <file name="colorspace.js" description="Converts RGB pixels to YCbCr color space.">
+                    <function name="rgbToYcbcr" params="r, g, b" return="{y, cb, cr}" description="Converts RGB values (0-255) to YCbCr." />
+                    <function name="ycbcrToRgb" params="y, cb, cr" return="{r, g, b}" description="Converts YCbCr values back to RGB (placeholder)." />
+                </file>
+                <file name="blocks.js" description="Handles image padding and extraction of 8x8 pixel blocks.">
+                    <function name="padDimensions" params="width, height" return="{width, height}" description="Calculates new dimensions padded to multiples of 8." />
+                    <function name="extractBlock" params="data, imgWidth, imgHeight, x, y" return="Float32Array(64)" description="Extracts an 8x8 block from the flattened image data." />
+                </file>
+                <file name="dct.js" description="Implements the Forward Discrete Cosine Transform (FDCT).">
+                    <function name="forwardDCT" params="block" return="Float32Array(64)" description="Performs 2D FDCT on an 8x8 block." />
+                </file>
+                <file name="quantization.js" description="Defines quantization tables and applies quantization.">
+                    <constant name="QUANTIZATION_TABLE_LUMA" type="Int32Array" />
+                    <constant name="QUANTIZATION_TABLE_CHROMA" type="Int32Array" />
+                    <function name="quantize" params="block, table" return="Int32Array(64)" description="Divides DCT coefficients by the quantization table." />
+                </file>
+                <file name="zigzag.js" description="Implements ZigZag reordering of quantized coefficients.">
+                    <constant name="ZIGZAG_ORDER" type="Int32Array" />
+                    <function name="zigZag" params="block" return="Int32Array(64)" description="Reorders 8x8 block into 1D array using ZigZag pattern." />
+                </file>
+                <file name="huffman.js" description="Implements Huffman entropy coding.">
+                    <constant name="DC_LUMA_TABLE" type="Object" />
+                    <constant name="AC_LUMA_TABLE" type="Object" />
+                    <function name="computeCategory" params="val" return="number" description="Computes the SSSS category for a value." />
+                    <function name="getBitRepresentation" params="val" return="number" description="Computes the bit representation of a value within its category." />
+                    <function name="encodeBlock" params="block, previousDC, writer, dcTable, acTable" return="number" description="Encodes a single block using Huffman tables. Returns the new DC value." />
+                </file>
+            </directory>
+
+            <directory name="utils" description="Utility helper classes">
+                <file name="bit-writer.js" description="Helper class for writing variable-length bit sequences.">
+                    <class name="BitWriter">
+                        <method name="writeBits" params="data, length" description="Writes a sequence of bits." />
+                        <method name="writeBit" params="bit" description="Writes a single bit." />
+                        <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
+                    </class>
+                </file>
+                <file name="test-runner.js" description="Simple custom test runner.">
+                    <function name="describe" params="name, fn" description="Defines a test suite." />
+                    <function name="it" params="name, fn" description="Defines a test case." />
+                    <function name="expect" params="actual" return="Object" description="Assertion matcher." />
+                </file>
+            </directory>
+
+            <directory name="specs" description="Project documentation and specifications">
+                <file name="outline.xml" description="Project structure and component overview (this file)." />
+            </directory>
+        </directory>
+    </structure>
+
+    <pipeline>
+        <step order="1" name="Preprocessing" description="Image data is padded to multiples of 8 and converted from RGB to YCbCr." />
+        <step order="2" name="Block Processing" description="Image is processed in 8x8 blocks." />
+        <step order="3" name="DCT" description="Forward DCT converts spatial data to frequency domain." />
+        <step order="4" name="Quantization" description="Frequency coefficients are divided by quantization tables to reduce precision." />
+        <step order="5" name="ZigZag" description="2D block is flattened to 1D array in zigzag order." />
+        <step order="6" name="Entropy Coding" description="Run-length encoding and Huffman coding are applied." />
+        <step order="7" name="File Assembly" description="Headers (SOI, DQT, SOF0, DHT, SOS) and scan data are combined into the final JPEG file." />
+    </pipeline>
+</project>
