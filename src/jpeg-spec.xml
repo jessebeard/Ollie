@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<JPEG_Specification_T81 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    
+    <Meta>
+        <Title>Digital Compression and Coding of Continuous-Tone Still Images</Title>
+        <Standard>CCITT Recommendation T.81 | ISO/IEC 10918-1</Standard>
+        [cite_start]<Source>Uploaded PDF [cite: 1-8]</Source>
+        <Usage>Reference for implementing JPEG encoders and decoders</Usage>
+    </Meta>
+
+    <Definitions>
+        <Term name="DCT">Discrete Cosine Transform. [cite_start]Lossy transformation of 8x8 blocks[cite: 150].</Term>
+        [cite_start]<Term name="Quantization">Reduction of precision of DCT coefficients using a table[cite: 238].</Term>
+        [cite_start]<Term name="EntropyCoding">Lossless compression (Huffman or Arithmetic) of quantized coefficients[cite: 164].</Term>
+        <Term name="MCU">Minimum Coded Unit. The smallest group of data units coded. [cite_start]Depends on interleaving[cite: 214, 401].</Term>
+        [cite_start]<Term name="Marker">Two-byte code (0xFF + non-zero byte) identifying structural parts[cite: 209].</Term>
+        [cite_start]<Term name="ByteStuffing">Insertion of 0x00 after any 0xFF generated during entropy coding to prevent marker emulation[cite: 99, 586].</Term>
+    </Definitions>
+
+    <Syntax_and_Structure>
+        [cite_start]<ByteOrder>Big Endian (Most Significant Byte first)[cite: 561].</ByteOrder>
+        
+        <Marker_Codes type="2 bytes">
+            [cite_start]<Marker code="0xFFD8" symbol="SOI" description="Start of Image [cite: 574]" />
+            [cite_start]<Marker code="0xFFD9" symbol="EOI" description="End of Image [cite: 574]" />
+            
+            [cite_start]<Marker code="0xFFC0" symbol="SOF0" description="Baseline DCT (Huffman) [cite: 574]" />
+            [cite_start]<Marker code="0xFFC1" symbol="SOF1" description="Extended Sequential DCT (Huffman) [cite: 574]" />
+            [cite_start]<Marker code="0xFFC2" symbol="SOF2" description="Progressive DCT (Huffman) [cite: 574]" />
+            [cite_start]<Marker code="0xFFC4" symbol="DHT" description="Define Huffman Table [cite: 574]" />
+            
+            [cite_start]<Marker code="0xFFDA" symbol="SOS" description="Start of Scan [cite: 574]" />
+            [cite_start]<Marker code="0xFFDB" symbol="DQT" description="Define Quantization Table [cite: 574]" />
+            [cite_start]<Marker code="0xFFDD" symbol="DRI" description="Define Restart Interval [cite: 574]" />
+            [cite_start]<Marker code="0xFFD0" range_end="0xFFD7" symbol="RSTm" description="Restart Marker (Modulo 8 count) [cite: 574]" />
+            
+            [cite_start]<Marker code="0xFFE0" range_end="0xFFEF" symbol="APPn" description="Application Segment (e.g., JFIF, Exif) [cite: 574]" />
+            [cite_start]<Marker code="0xFFFE" symbol="COM" description="Comment [cite: 574]" />
+        </Marker_Codes>
+
+        <Segment_Layouts>
+            [cite_start]<FrameHeader marker="SOFn" description="Frame parameters [cite: 636]">
+                <Parameter name="Lf" size="16" description="Segment Length" />
+                [cite_start]<Parameter name="P" size="8" description="Sample Precision (8 for Baseline) [cite: 643]" />
+                [cite_start]<Parameter name="Y" size="16" description="Number of Lines (Height) [cite: 644]" />
+                [cite_start]<Parameter name="X" size="16" description="Samples per Line (Width) [cite: 647]" />
+                [cite_start]<Parameter name="Nf" size="8" description="Number of Components (1=Gray, 3=YCbCr, etc.) [cite: 649]" />
+                <Loop count="Nf">
+                    <ComponentParams>
+                        [cite_start]<C size="8" description="Component Identifier [cite: 651]" />
+                        [cite_start]<H_V size="8" description="Sampling Factors (High 4 bits: H, Low 4 bits: V) [cite: 653, 655]" />
+                        [cite_start]<Tq size="8" description="Quantization Table Destination Selector [cite: 657]" />
+                    </ComponentParams>
+                </Loop>
+            </FrameHeader>
+
+            [cite_start]<ScanHeader marker="SOS" description="Scan parameters [cite: 667]">
+                <Parameter name="Ls" size="16" description="Segment Length" />
+                [cite_start]<Parameter name="Ns" size="8" description="Number of components in scan [cite: 671]" />
+                <Loop count="Ns">
+                    <ComponentParams>
+                        [cite_start]<Cs size="8" description="Scan Component Selector [cite: 673]" />
+                        [cite_start]<Td_Ta size="8" description="Entropy Table Selector (High 4: DC table, Low 4: AC table) [cite: 679, 682]" />
+                    </ComponentParams>
+                </Loop>
+                [cite_start]<Parameter name="Ss" size="8" description="Start of spectral selection (0 for Sequential DCT) [cite: 684]" />
+                [cite_start]<Parameter name="Se" size="8" description="End of spectral selection (63 for Sequential DCT) [cite: 687]" />
+                [cite_start]<Parameter name="Ah_Al" size="8" description="Successive approximation (0 for Sequential DCT) [cite: 690, 693]" />
+            </ScanHeader>
+
+            [cite_start]<QuantizationTable marker="DQT" description="Defines 64-integer tables [cite: 706]">
+                <Parameter name="Lq" size="16" description="Segment Length" />
+                <Loop condition="Bytes remaining">
+                    <Pq_Tq size="8" description="Precision (High 4: 0=8bit, 1=16bit) | [cite_start]Dest ID (Low 4) [cite: 711, 714]" />
+                    [cite_start]<Elements count="64" size="8 or 16" description="64 Quantization elements in Zig-Zag order [cite: 715]" />
+                </Loop>
+            </QuantizationTable>
+
+            [cite_start]<HuffmanTable marker="DHT" description="Defines Huffman trees [cite: 722]">
+                <Parameter name="Lh" size="16" description="Segment Length" />
+                <Loop condition="Bytes remaining">
+                    <Tc_Th size="8" description="Table Class (High 4: 0=DC, 1=AC) | [cite_start]Dest ID (Low 4) [cite: 728, 729]" />
+                    [cite_start]<List_BITS count="16" size="8" description="Counts of codes of length 1..16 [cite: 730]" />
+                    [cite_start]<List_HUFFVAL count="Sum(BITS)" size="8" description="Symbols associated with codes [cite: 731]" />
+                </Loop>
+            </HuffmanTable>
+        </Segment_Layouts>
+    </Syntax_and_Structure>
+
+    <Algorithmic_Logic>
+        <Modes>
+            [cite_start]<Sequential_DCT description="Process data block by block, top-left to bottom-right [cite: 349]">
+                [cite_start]<DataUnit>8x8 Block of samples [cite: 391]</DataUnit>
+                <ProcessingOrder>
+                    1. [cite_start]Level Shift (Input - 128 for 8-bit)[cite: 501].
+                    2. [cite_start]FDCT (Forward Discrete Cosine Transform)[cite: 325].
+                    3. [cite_start]Quantization (FDCT / QuantTable)[cite: 327].
+                    4. [cite_start]Zig-Zag Reordering[cite: 331].
+                    5. [cite_start]Entropy Encoding (Huffman or Arithmetic)[cite: 332].
+                </ProcessingOrder>
+            </Sequential_DCT>
+        </Modes>
+
+        <Mathematical_Functions>
+            <FDCT type="Informative">
+                [cite_start]<Formula>S_vu = (1/4) * C_u * C_v * Sum(x=0..7) Sum(y=0..7) s_yx * cos((2x+1)u*pi/16) * cos((2y+1)v*pi/16) [cite: 512]</Formula>
+            </FDCT>
+            
+            <ZigZag_Sequence>
+                [cite_start]<Description>Converts 2D 8x8 array to 1D array of 64 coefficients[cite: 523].</Description>
+                <Order>0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25...</Order> </ZigZag_Sequence>
+
+            <DC_Coding>
+                <Logic>DC coefficients are differentially coded against the PREVIOUS block's DC value of the same component.</Logic>
+                [cite_start]<Formula>DIFF = DC_current - DC_pred [cite: 523]</Formula>
+            </DC_Coding>
+        </Mathematical_Functions>
+
+        <Huffman_Coding_Model>
+            <DC_Coefficients>
+                [cite_start]<Step1>Determine Category (SSSS) of DIFF[cite: 1242].</Step1>
+                <Step2>Emit Huffman Code for SSSS.</Step2>
+                [cite_start]<Step3>Emit Additional Bits (raw binary representation of DIFF)[cite: 1243].</Step3>
+            </DC_Coefficients>
+            
+            <AC_Coefficients>
+                <Logic>Run-Length Encoding of Zeros.</Logic>
+                <SymbolStructure>Byte = (RunLength &lt;&lt; 4) | [cite_start]Size(Amplitude)[cite: 1262].</SymbolStructure>
+                <SpecialSymbols>
+                    [cite_start]<ZRL value="0xF0">Run of 16 zeros[cite: 1263].</ZRL>
+                    [cite_start]<EOB value="0x00">End of Block (all remaining coeffs are zero)[cite: 1264].</EOB>
+                </SpecialSymbols>
+            </AC_Coefficients>
+        </Huffman_Coding_Model>
+    </Algorithmic_Logic>
+
+    <Interleaving_Control>
+        <Logic>
+            [cite_start]If Ns (Components in Scan) > 1, data is interleaved[cite: 476].
+            The MCU (Minimum Coded Unit) is determined by H and V sampling factors.
+        </Logic>
+        <Example>
+            If Y has H=2, V=2; Cb has H=1, V=1; Cr has H=1, V=1:
+            [cite_start]MCU = Y1, Y2, Y3, Y4, Cb1, Cr1 (Processed in that order)[cite: 488].
+        </Example>
+    </Interleaving_Control>
+
+    <Reference_Tables>
+        <ZigZag_Indices>
+             0,  1,  5,  6, 14, 15, 27, 28,
+             2,  4,  7, 13, 16, 26, 29, 42,
+             3,  8, 12, 17, 25, 30, 41, 43,
+             9, 11, 18, 24, 31, 40, 44, 53,
+            10, 19, 23, 32, 39, 45, 52, 54,
+            20, 22, 33, 38, 46, 51, 55, 60,
+            21, 34, 37, 47, 50, 56, 59, 61,
+            [cite_start]35, 36, 48, 49, 57, 58, 62, 63 [cite: 539]
+        </ZigZag_Indices>
+        
+        <Note>
+            Typical Quantization Tables (Luminance/Chrominance) are found in Annex K but are not normative default values. [cite_start]They must be read from DQT segments[cite: 1861].
+        </Note>
+    </Reference_Tables>
+
+</JPEG_Specification_T81>

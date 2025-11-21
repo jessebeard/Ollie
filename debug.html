@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Import</title>
+</head>
+
+<body>
+    <h1>Debug Import</h1>
+    <div id="log"></div>
+    <script type="module">
+        const log = document.getElementById('log');
+        function print(msg) {
+            log.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        window.onerror = function (msg, url, line) {
+            print(`Global Error: ${msg} at ${url}:${line}`);
+            return false;
+        };
+
+        print('Attempting to import JpegEncoder...');
+
+        import('./src/jpeg-encoder.js')
+            .then(module => {
+                print('Successfully imported JpegEncoder module');
+                try {
+                    console.log('Module:', module);
+                } catch (e) {
+                    print('Error logging module: ' + e);
+                }
+
+                try {
+                    if (!module.JpegEncoder) {
+                        print('JpegEncoder export is missing!');
+                        return;
+                    }
+                    const encoder = new module.JpegEncoder();
+                    print('Successfully instantiated JpegEncoder');
+                } catch (e) {
+                    print('Failed to instantiate: ' + e.message);
+                    console.error(e);
+                }
+            })
+            .catch(err => {
+                print('Failed to import: ' + err);
+                if (err.stack) print('Stack: ' + err.stack);
+                console.error(err);
+            });
+    </script>
+</body>
+
+</html>
