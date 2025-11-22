@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS JPEG Encoder</title>
+    <title>JS JPEG Encoder & Decoder</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -60,28 +60,99 @@
         button:hover {
             background: #0056b3;
         }
+
+        .tabs {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            border-radius: 0;
+            cursor: pointer;
+        }
+
+        .tab-btn:hover {
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .tab-btn.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>JPEG Encoder from Scratch</h1>
+        <h1>JPEG Encoder & Decoder</h1>
 
-        <div class="controls">
-            <input type="file" id="file-input" accept="image/*">
-            <button id="encode-btn">Encode to JPEG</button>
-            <button id="test-btn" style="background: #28a745; margin-left: 10px;">Run Diagnostic</button>
-            <div id="status" style="margin-top: 10px; color: #666;">Select an image to begin</div>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="encode">Encoder</button>
+            <button class="tab-btn" data-tab="decode">Decoder</button>
         </div>
 
-        <div class="canvases">
-            <div class="canvas-wrapper">
-                <h2>Original</h2>
-                <canvas id="original-canvas"></canvas>
+        <div id="encode-tab" class="tab-content active">
+            <div class="controls">
+                <h3>JPEG Encoder</h3>
+                <input type="file" id="file-input" accept="image/*">
+                <button id="encode-btn">Encode to JPEG</button>
+                <button id="test-btn" style="background: #28a745; margin-left: 10px;">Run Diagnostic</button>
+                <a id="download-link" style="display:none" download="encoded.jpg">
+                    <button style="background: #6c757d; margin-left: 10px;">Download JPEG</button>
+                </a>
+                <div id="status" style="margin-top: 10px; color: #666;">Select an image to begin</div>
             </div>
-            <div class="canvas-wrapper">
-                <h2>Encoded (Result)</h2>
-                <canvas id="processed-canvas"></canvas>
+
+            <div class="canvases">
+                <div class="canvas-wrapper">
+                    <h2>Original</h2>
+                    <canvas id="original-canvas"></canvas>
+                </div>
+                <div class="canvas-wrapper">
+                    <h2>Encoded (Result)</h2>
+                    <canvas id="processed-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="decode-tab" class="tab-content">
+            <div class="controls">
+                <h3>JPEG Decoder</h3>
+                <input type="file" id="decode-input" accept=".jpg,.jpeg">
+                <button id="decode-btn">Decode JPEG</button>
+                <div id="decode-status" style="margin-top: 10px; color: #666;">Select a JPEG to decode</div>
+
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <label for="idct-method" style="margin-right: 10px; font-weight: bold;">IDCT Method:</label>
+                    <select id="idct-method" style="padding: 5px;">
+                        <option value="naive">Naive (O(N³))</option>
+                        <option value="aan">AAN (O(N))</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="canvases">
+                <div class="canvas-wrapper">
+                    <h2>Decoded Result</h2>
+                    <canvas id="decoded-canvas"></canvas>
+                </div>
             </div>
         </div>
     </div>

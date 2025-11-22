@@ -1,0 +1,155 @@
+<Specification version="1.0" type="Algorithm_Reference">
+    <Meta>
+        <Title>Design and Implementation of 2D-DCT by Using Arai Algorithm</Title>
+        <Source_Document>Design_and_Implementation_of_2D-DCT_by_Using_Arai_.pdf</Source_Document>
+        <Context>Image Compression, JPEG, Frequency Domain Transformation</Context>
+        <Target_Language>JavaScript</Target_Language>
+    </Meta>
+
+    <Definitions>
+        <Overview>
+            [cite_start]The DCT converts a signal from spatial representation into the frequency domain[cite: 10].
+            [cite_start]This implementation uses the AAN 8-point DCT algorithm to reduce computational complexity by minimizing multiplication operations[cite: 62, 260].
+            [cite_start]The process is divided into an 8x8 block processing workflow[cite: 45].
+        </Overview>
+        <Coordinate_System>
+            [cite_start]<Input>f(x, y) spatial domain values [cite: 57]</Input>
+            [cite_start]<Output>C(u, v) DCT coefficients [cite: 56]</Output>
+            [cite_start]<Block_Size>8x8 pixels [cite: 45]</Block_Size>
+        </Coordinate_System>
+    </Definitions>
+
+    <Algorithm name="AAN_1D_DCT">
+        <Description>
+            1D Discrete Cosine Transform using the Arai algorithm flow. 
+            To be applied to rows and then columns (or columns then rows) for 2D execution.
+        </Description>
+
+        <Inputs>
+            <Variable name="a" type="Array" length="8" description="Input data block (spatial)" />
+        </Inputs>
+
+        <Constants>
+            [cite_start]<Multipliers description="Rotation constants derived from Cosine functions [cite: 151-157]">
+                <Const name="m1">cos(4pi/16)</Const>
+                <Const name="m2">cos(6pi/16)</Const>
+                <Const name="m3">cos(2pi/16) - cos(6pi/16)</Const>
+                <Const name="m4">cos(2pi/16) + cos(6pi/16)</Const>
+            </Multipliers>
+            <Scale_Factors description="Post-processing normalization factors (s)">
+                <Const name="s_0">1 / (2 * sqrt(2))</Const>
+                [cite_start]<Const name="s_i">1 / (4 * cos(i * pi / 16)) for i = 1...7 [cite: 161-163]</Const>
+            </Scale_Factors>
+        </Constants>
+
+        <Processing_Stages>
+            <Stage number="1" description="Initial Butterfly Operations">
+                <Equations>
+                    [cite_start]<Eq>b[0] = a[0] + a[7] [cite: 113]</Eq>
+                    [cite_start]<Eq>b[1] = a[1] + a[6] [cite: 114]</Eq>
+                    [cite_start]<Eq>b[2] = a[3] - a[4] [cite: 114]</Eq>
+                    [cite_start]<Eq>b[3] = a[1] - a[6] [cite: 115]</Eq>
+                    [cite_start]<Eq>b[4] = a[2] + a[5] [cite: 115]</Eq>
+                    [cite_start]<Eq>b[5] = a[3] + a[4] [cite: 115]</Eq>
+                    [cite_start]<Eq>b[6] = a[2] - a[5] [cite: 116]</Eq>
+                    [cite_start]<Eq>b[7] = a[0] - a[7] [cite: 116]</Eq>
+                </Equations>
+            </Stage>
+
+            <Stage number="2" description="Secondary Additions">
+                <Equations>
+                    [cite_start]<Eq>c[0] = b[0] + b[5] [cite: 118]</Eq>
+                    [cite_start]<Eq>c[1] = b[1] - b[4] [cite: 118]</Eq>
+                    [cite_start]<Eq>c[2] = b[2] + b[6] [cite: 119]</Eq>
+                    [cite_start]<Eq>c[3] = b[1] + b[4] [cite: 120]</Eq>
+                    [cite_start]<Eq>c[4] = b[0] - b[5] [cite: 120]</Eq>
+                    [cite_start]<Eq>c[5] = b[3] + b[7] [cite: 120]</Eq>
+                    [cite_start]<Eq>c[6] = b[3] + b[6] [cite: 121]</Eq>
+                    [cite_start]<Eq>c[7] = b[7] [cite: 121]</Eq>
+                </Equations>
+            </Stage>
+
+            <Stage number="3" description="Tertiary Additions">
+                <Equations>
+                    [cite_start]<Eq>d[0] = c[0] + c[3] [cite: 123]</Eq>
+                    [cite_start]<Eq>d[1] = c[0] - c[3] [cite: 123]</Eq>
+                    [cite_start]<Eq>d[2] = c[2] [cite: 124]</Eq>
+                    [cite_start]<Eq>d[3] = c[1] + c[4] [cite: 124]</Eq>
+                    [cite_start]<Eq>d[4] = c[2] - c[5] [cite: 125]</Eq>
+                    [cite_start]<Eq>d[5] = c[4] [cite: 126]</Eq>
+                    [cite_start]<Eq>d[6] = c[5] [cite: 126]</Eq>
+                    [cite_start]<Eq>d[7] = c[6] [cite: 126]</Eq>
+                    [cite_start]<Eq>d[8] = c[7] [cite: 127]</Eq> </Equations>
+            </Stage>
+
+            <Stage number="4" description="Multiplication Stage (Rotation)">
+                <Developer_Note>
+                    The source text contains likely typos (e.g., "e(2) := m(3)*m(2)"). 
+                    Logic dictates multiplying the signal 'd' by the multiplier 'm'.
+                    Standard AAN implementation logic is inferred where text is ambiguous.
+                </Developer_Note>
+                <Equations>
+                    [cite_start]<Eq>e[0] = d[0] [cite: 129]</Eq>
+                    [cite_start]<Eq>e[1] = d[1] [cite: 129]</Eq>
+                    [cite_start]<Eq>e[2] = d[2] * m3 [cite: 130][cite_start]</Eq> <Eq>e[3] = d[??] * m1 * m7 (Verify m factors against standard) [cite: 130]</Eq>
+                    [cite_start]<Eq>e[4] = d[??] * m4 * m6 (Verify m factors against standard) [cite: 131]</Eq>
+                    [cite_start]<Eq>e[5] = d[5] [cite: 131]</Eq>
+                    [cite_start]<Eq>e[6] = d[6] * m1 * m3 (Verify m factors against standard) [cite: 135]</Eq>
+                    [cite_start]<Eq>e[7] = d[7] * m2 * m4 (Verify m factors against standard) [cite: 136]</Eq>
+                    [cite_start]<Eq>e[8] = d[8] [cite: 136]</Eq>
+                </Equations>
+            </Stage>
+
+            <Stage number="5" description="Final Additions">
+                <Equations>
+                    [cite_start]<Eq>f[0] = e[0] [cite: 138]</Eq>
+                    [cite_start]<Eq>f[1] = e[1] [cite: 138]</Eq>
+                    [cite_start]<Eq>f[2] = e[5] + e[6] [cite: 138]</Eq>
+                    [cite_start]<Eq>f[3] = e[5] - e[6] [cite: 139]</Eq>
+                    [cite_start]<Eq>f[4] = e[3] + e[8] [cite: 139]</Eq>
+                    [cite_start]<Eq>f[5] = e[8] - e[3] [cite: 139]</Eq>
+                    [cite_start]<Eq>f[6] = e[2] + e[7] [cite: 140]</Eq>
+                    [cite_start]<Eq>f[7] = e[4] + e[7] [cite: 140]</Eq>
+                </Equations>
+            </Stage>
+
+            <Stage number="6" description="Output Rearrangement">
+                <Equations>
+                    [cite_start]<Eq>s[0] = f[0] [cite: 142]</Eq>
+                    [cite_start]<Eq>s[1] = f[4] + f[7] [cite: 142]</Eq>
+                    [cite_start]<Eq>s[2] = f[2] [cite: 143]</Eq>
+                    [cite_start]<Eq>s[3] = f[5] - f[6] [cite: 143]</Eq>
+                    [cite_start]<Eq>s[4] = f[1] [cite: 144]</Eq>
+                    [cite_start]<Eq>s[5] = f[5] + f[6] [cite: 145]</Eq>
+                    [cite_start]<Eq>s[6] = f[3] [cite: 146]</Eq>
+                    [cite_start]<Eq>s[7] = f[4] - f[7] [cite: 146]</Eq>
+                </Equations>
+            </Stage>
+        </Processing_Stages>
+
+        <Post_Scaling>
+            <Description>
+                The AAN algorithm pushes scaling to the end. The output `s` must be scaled.
+                Note: The paper variable for scaled output is `y`.
+            </Description>
+            [cite_start]<Equation>y[i] = s[i] * ScaleFactor[i] [cite: 149]</Equation>
+            <Implementation_Note>
+                [cite_start]The paper suggests a multiply by 4.0 may be included in scaling: "y(i) := sa(i) * s(i) * 4.0"[cite: 149].
+            </Implementation_Note>
+        </Post_Scaling>
+    </Algorithm>
+
+    <Algorithm name="Full_2D_Compression_Workflow">
+        <Description>
+            [cite_start]The complete compression procedure as defined in Figure 2 and Section IV[cite: 183].
+        </Description>
+        <Steps>
+            [cite_start]<Step index="1">Divide image into 8x8 pixel blocks[cite: 184].</Step>
+            [cite_start]<Step index="2">Apply 2D-DCT to each block (Row-Column method)[cite: 186].</Step>
+            [cite_start]<Step index="3">Quantization: Divide DCT coefficient by Quantizer step size and round[cite: 165, 188].
+                [cite_start]<Equation>F_Q(u,v) = Round( F(u,v) / Q(u,v) ) [cite: 166]</Equation>
+            </Step>
+            [cite_start]<Step index="4">Entropy Coding (Huffman)[cite: 172, 190].</Step>
+        </Steps>
+    </Algorithm>
+</Specification>

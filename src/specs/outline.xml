@@ -1,11 +1,17 @@
 <project name="Ollie" description="A pure JavaScript JPEG Encoder implementation">
     <structure>
         <directory name="src">
-            <file name="main.js" description="Entry point for the web interface. Handles file input, canvas manipulation, and invokes the encoder." />
+            <file name="main.js" description="Entry point for the web interface. Handles file input, canvas manipulation, download button, and invokes the encoder." />
             <file name="jpeg-encoder.js" description="Main encoder class. Orchestrates the JPEG compression pipeline.">
                 <class name="JpegEncoder">
                     <method name="constructor" params="quality=50" description="Initializes the encoder with quality setting." />
                     <method name="encode" params="imageData" return="Uint8Array" description="Encodes the provided ImageData (RGBA) into a JPEG byte array." />
+                </class>
+            </file>
+            <file name="jpeg-decoder.js" description="Main decoder class. Orchestrates the JPEG decompression pipeline.">
+                <class name="JpegDecoder">
+                    <method name="constructor" description="Initializes the decoder." />
+                    <method name="decode" params="jpegBytes" return="ImageData" description="Decodes a JPEG byte array into ImageData (RGBA)." />
                 </class>
             </file>
             
@@ -39,6 +45,49 @@
                 </file>
             </directory>
 
+            <directory name="decoder" description="Core algorithms for JPEG decoding">
+                <file name="quantization-parser.js" description="Parses DQT segments and extracts quantization tables.">
+                    <function name="parseQuantizationTable" params="data" return="Map<id, table>" description="Extracts quantization tables from DQT segment." />
+                </file>
+                <file name="huffman-parser.js" description="Parses DHT segments and builds Huffman decoding trees.">
+                    <class name="HuffmanTable">
+                        <method name="constructor" params="bits, values" description="Builds lookup table from BITS and HUFFVAL arrays." />
+                        <method name="decode" params="bitReader" return="symbol" description="Decodes next symbol from bitstream." />
+                    </class>
+                    <function name="parseHuffmanTable" params="data" return="Map<id, HuffmanTable>" description="Extracts Huffman tables from DHT segment." />
+                </file>
+                <file name="frame-parser.js" description="Parses SOF0 frame header.">
+                    <function name="parseFrameHeader" params="data" return="FrameInfo" description="Extracts image dimensions, components, and sampling factors." />
+                </file>
+                <file name="scan-parser.js" description="Parses SOS scan header.">
+                    <function name="parseScanHeader" params="data" return="ScanInfo" description="Extracts scan parameters and component-to-table mappings." />
+                </file>
+                <file name="huffman-decoder.js" description="Decodes Huffman-encoded bitstream into quantized coefficients.">
+                    <function name="decodeBlock" params="bitReader, dcTable, acTable, previousDC" return="{block, dc}" description="Decodes one 8x8 block of quantized coefficients." />
+                    <function name="decodeDC" params="bitReader, table, previousDC" return="number" description="Decodes DC coefficient with differential coding." />
+                    <function name="decodeAC" params="bitReader, table, block" description="Decodes AC coefficients with run-length encoding." />
+                </file>
+                <file name="inverse-zigzag.js" description="Converts 1D coefficient array to 8x8 2D block.">
+                    <constant name="INVERSE_ZIGZAG_ORDER" type="Int32Array" />
+                    <function name="inverseZigZag" params="array" return="Float32Array(64)" description="Reorders 1D array into 8x8 block." />
+                </file>
+                <file name="dequantization.js" description="Multiplies quantized coefficients by quantization table.">
+                    <function name="dequantize" params="block, table" return="Float32Array(64)" description="Reverses quantization by multiplication." />
+                </file>
+                <file name="idct.js" description="Implements the Inverse Discrete Cosine Transform (IDCT).">
+                    <function name="inverseDCT" params="block" return="Float32Array(64)" description="Performs 2D IDCT on an 8x8 block." />
+                </file>
+                <file name="colorspace-decoder.js" description="Converts YCbCr to RGB color space.">
+                    <function name="ycbcrToRgb" params="y, cb, cr" return="{r, g, b}" description="Converts YCbCr values to RGB (0-255)." />
+                </file>
+                <file name="upsampling.js" description="Upsamples subsampled chroma components.">
+                    <function name="upsample" params="component, hFactor, vFactor" return="Array" description="Upsamples component using bilinear interpolation." />
+                </file>
+                <file name="block-assembly.js" description="Assembles decoded 8x8 blocks into full image.">
+                    <function name="assembleImage" params="blocks, width, height, components" return="ImageData" description="Combines blocks into final RGBA image." />
+                </file>
+            </directory>
+
             <directory name="utils" description="Utility helper classes">
                 <file name="bit-writer.js" description="Helper class for writing variable-length bit sequences.">
                     <class name="BitWriter">
@@ -47,41 +96,31 @@
                         <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
                     </class>
                 </file>
+                <file name="bit-reader.js" description="Helper class for reading variable-length bit sequences from JPEG data.">
+                    <class name="BitReader">
+                        <method name="constructor" params="data" description="Initializes reader with byte array." />
+                        <method name="readBit" return="number" description="Reads a single bit (0 or 1)." />
+                        <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
+                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits." />
+                        <method name="alignToByte" description="Skips to next byte boundary." />
+                    </class>
+                </file>
+                <file name="marker-parser.js" description="Parses JPEG file structure and extracts segments.">
+                    <function name="findNextMarker" params="data, offset" return="{marker, offset}" description="Locates next 0xFFxx marker." />
+                    <function name="readMarkerSegment" params="data, offset" return="{type, data, nextOffset}" description="Extracts segment payload." />
+                    <function name="parseFileStructure" params="jpegBytes" return="SegmentMap" description="Builds map of all segments in file." />
+                </file>
 
             </directory>
 
             <directory name="specs" description="Project documentation and specifications">
                 <file name="outline.xml" description="Project structure and component overview (this file)." />
+                <file name="test-outline.xml" description="Test suite structure and component overview." />
             </directory>
         </directory>
-        <directory name="test">
-            <file name="jpeg-encoder.test.js" description="Integration tests for the JpegEncoder class." />
-            <directory name="core" description="Unit tests for core algorithms">
-                <file name="blocks.test.js" description="Tests for block padding and extraction." />
-                <file name="colorspace.test.js" description="Tests for RGB/YCbCr conversion." />
-                <file name="dct.test.js" description="Tests for Discrete Cosine Transform." />
-                <file name="huffman.test.js" description="Tests for Huffman coding logic." />
-                <file name="quantization.test.js" description="Tests for quantization tables and logic." />
-                <file name="zigzag.test.js" description="Tests for ZigZag reordering." />
-            </directory>
-            <directory name="utils" description="Unit tests for utility classes">
-                <file name="test-runner.js" description="Simple custom test runner.">
-                    <function name="describe" params="name, fn" description="Defines a test suite." />
-                    <function name="it" params="name, fn" description="Defines a test case." />
-                    <function name="expect" params="actual" return="Matcher" description="Assertion matcher factory.">
-                        <class name="Matcher">
-                            <method name="toBe" params="expected" description="Asserts strict equality (===)." />
-                            <method name="toEqual" params="expected" description="Asserts deep equality via JSON stringification." />
-                            <method name="toBeCloseTo" params="expected, precision=2" description="Asserts number is close to expected within precision." />
-                            <method name="toBeGreaterThan" params="expected" description="Asserts actual > expected." />
-                            <method name="toBeLessThan" params="expected" description="Asserts actual < expected." />
-                            <method name="toBeDefined" description="Asserts actual is not undefined." />
-                        </class>
-                    </function>
-                </file>
-            </directory>
-        </directory>
+
     </structure>
+    <directory name="test" description="Test suite. See src/specs/test-outline.xml for detailed structure." />
 
     <pipeline>
         <step order="1" name="Preprocessing" description="Image data is padded to multiples of 8 and converted from RGB to YCbCr." />

@@ -1,4 +1,6 @@
 import { JpegEncoder } from './jpeg-encoder.js';
+import { JpegDecoder } from './jpeg-decoder.js';
+import { idctNaive, idctAAN } from './core/decoder/idct.js';
 
 function init() {
     const fileInput = document.getElementById('file-input');
@@ -54,6 +56,11 @@ function init() {
                 const pCtx = processedCanvas.getContext('2d');
                 pCtx.drawImage(resImg, 0, 0);
                 statusDiv.textContent = `Encoded! Size: ${jpegBytes.length} bytes`;
+
+                // Enable download
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.href = url;
+                downloadLink.style.display = 'inline-block';
             };
             resImg.src = url;
         } catch (e) {
@@ -62,10 +69,71 @@ function init() {
         }
     });
 
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab-btn');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+
+            tab.classList.add('active');
+            document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+        });
+    });
+
+    // Decoder logic
+    const decodeInput = document.getElementById('decode-input');
+    const decodeBtn = document.getElementById('decode-btn');
+    const decodeStatus = document.getElementById('decode-status');
+    const decodedCanvas = document.getElementById('decoded-canvas');
+
+    decodeBtn.addEventListener('click', async () => {
+        const file = decodeInput.files[0];
+        if (!file) {
+            decodeStatus.textContent = 'Please select a JPEG file first.';
+            return;
+        }
+
+        decodeStatus.textContent = 'Decoding...';
+        await new Promise(r => setTimeout(r, 10));
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+
+            const decoder = new JpegDecoder();
+
+            // Configure IDCT method
+            const idctSelect = document.getElementById('idct-method');
+            if (idctSelect && idctSelect.value === 'aan') {
+                decoder.setIdctMethod(idctAAN);
+                console.log('Using AAN IDCT');
+            } else {
+                decoder.setIdctMethod(idctNaive);
+                console.log('Using Naive IDCT');
+            }
+
+            const result = decoder.decode(bytes);
+
+            decodedCanvas.width = result.width;
+            decodedCanvas.height = result.height;
+            const ctx = decodedCanvas.getContext('2d');
+            const imageData = new ImageData(result.data, result.width, result.height);
+            ctx.putImageData(imageData, 0, 0);
+
+            decodeStatus.textContent = `Decoded! ${result.width}x${result.height}`;
+        } catch (e) {
+            console.error(e);
+            decodeStatus.textContent = 'Error: ' + e.message;
+        }
+    });
+
     document.getElementById('test-btn').addEventListener('click', () => {
         console.log('Starting diagnostic...');
         statusDiv.textContent = 'Running diagnostic...';
-
+        // ... existing diagnostic code ...
         try {
             const width = 64;
             const height = 64;

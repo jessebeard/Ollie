@@ -1,0 +1,65 @@
+<TestingSpec>
+    <Overview>
+        <Description>Documentation for the custom environment-aware test runner used in the Ollie project.</Description>
+        <Environments>
+            <Environment name="Node.js">
+                <Description>CLI-based testing using `node test/runner.js`.</Description>
+                <Features>Console output, stats tracking, process exit codes, DOM mocking.</Features>
+            </Environment>
+            <Environment name="Browser">
+                <Description>DOM-based testing using `test.html`.</Description>
+                <Features>Visual report, hierarchical suite rendering, immediate feedback.</Features>
+            </Environment>
+        </Environments>
+    </Overview>
+
+    <Architecture>
+        <Component name="Core Logic" file="test/utils/test-runner.js">
+            <Description>Implements describe/it/expect logic and environment detection.</Description>
+        </Component>
+        <Component name="Node Entry" file="test/runner.js">
+            <Description>Mocks DOM APIs and imports all test files for CLI execution.</Description>
+        </Component>
+        <Component name="Browser Entry" file="test.html">
+            <Description>HTML harness that imports test files as ES modules.</Description>
+        </Component>
+    </Architecture>
+
+    <API>
+        <Function name="describe" signature="describe(name, fn)">
+            <Description>Defines a test suite.</Description>
+            <Behavior environment="Node">Logs suite name.</Behavior>
+            <Behavior environment="Browser">Creates a suite container. Supports nesting via `window.__currentSuite`.</Behavior>
+        </Function>
+
+        <Function name="it" signature="it(name, fn)">
+            <Description>Defines a test case.</Description>
+            <Behavior environment="Node">Executes test, logs result, updates stats.</Behavior>
+            <Behavior environment="Browser">Appends test case to current suite, updates UI with pass/fail status.</Behavior>
+        </Function>
+
+        <Function name="expect" signature="expect(actual)">
+            <Description>Assertion factory returning a matcher object.</Description>
+            <Matchers>
+                <Matcher name="toBe" params="expected">Strict equality (===).</Matcher>
+                <Matcher name="toEqual" params="expected">Deep equality (JSON stringify).</Matcher>
+                <Matcher name="toBeCloseTo" params="expected, precision=2">Number proximity check.</Matcher>
+                <Matcher name="toBeGreaterThan" params="expected">actual > expected.</Matcher>
+                <Matcher name="toBeGreaterThanOrEqual" params="expected">actual >= expected.</Matcher>
+                <Matcher name="toBeLessThan" params="expected">actual &lt; expected.</Matcher>
+                <Matcher name="toBeLessThanOrEqual" params="expected">actual &lt;= expected.</Matcher>
+                <Matcher name="toBeDefined">actual !== undefined.</Matcher>
+                <Matcher name="not.toBe" params="expected">Negated strict equality.</Matcher>
+            </Matchers>
+        </Function>
+    </API>
+
+    <GlobalState>
+        <Variable name="window.__currentSuite" environment="Browser">
+            <Description>DOM element of the currently executing suite. Used for nesting.</Description>
+        </Variable>
+        <Variable name="stats" environment="Node">
+            <Description>Object tracking {total, passed, failed}.</Description>
+        </Variable>
+    </GlobalState>
+</TestingSpec>

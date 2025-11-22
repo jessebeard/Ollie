@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPEG Encoder Tests</title>
+    <title>JPEG Codec Tests</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -41,73 +41,51 @@
             border-bottom: 1px solid #444;
             padding-bottom: 10px;
         }
+
+        .summary {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Test Results</h1>
+    <h1>JPEG Codec Test Results</h1>
     <div id="test-results"></div>
 
-    <!DOCTYPE html>
-    <html lang="en">
+    <script type="module">
+        // Encoder Tests
+        import './test/core/colorspace.test.js';
+        import './test/core/encoder/blocks.test.js';
+        import './test/core/encoder/headers.test.js';
+        import './test/core/dct.test.js';
+        import './test/core/quantization.test.js';
+        import './test/core/zigzag.test.js';
+        import './test/core/huffman.test.js';
+        import './test/jpeg-encoder.test.js';
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>JPEG Encoder Tests</title>
-        <style>
-            body {
-                font-family: system-ui, sans-serif;
-                padding: 20px;
-                background: #1a1a1a;
-                color: #eee;
-            }
+        // Decoder Tests - Phase 1-4
+        import './test/core/decoder/frame-parser.test.js';
+        import './test/core/decoder/scan-parser.test.js';
+        import './test/core/decoder/huffman-parser.test.js';
+        import './test/core/decoder/quantization-parser.test.js';
+        import './test/core/decoder/huffman-decoder.test.js';
+        import './test/core/decoder/inverse-zigzag.test.js';
+        import './test/core/decoder/dequantization.test.js';
+        import './test/core/decoder/idct.test.js';
 
-            .suite {
-                margin-bottom: 20px;
-                padding: 15px;
-                background: #2a2a2a;
-                border-radius: 8px;
-            }
+        // Decoder Tests - Phase 5
+        import './test/core/decoder/colorspace-decoder.test.js';
+        import './test/core/decoder/upsampling.test.js';
+        import './test/core/decoder/block-assembly.test.js';
 
-            .test-case {
-                margin: 5px 0;
-                padding: 5px;
-                border-radius: 4px;
-            }
+        // Integration Tests - Phase 6
+        import './test/jpeg-decoder.test.js';
+        import './test/integration/roundtrip.test.js';
+    </script>
+</body>
 
-            .pass {
-                color: #4ade80;
-                background: rgba(74, 222, 128, 0.1);
-            }
-
-            .fail {
-                color: #f87171;
-                background: rgba(248, 113, 113, 0.1);
-            }
-
-            h3 {
-                margin-top: 0;
-                border-bottom: 1px solid #444;
-                padding-bottom: 10px;
-            }
-        </style>
-    </head>
-
-    <body>
-        <h1>Test Results</h1>
-        <div id="test-results"></div>
-
-        <script type="module">
-            // Import all test files here
-            import './test/core/colorspace.test.js';
-            import './test/core/blocks.test.js';
-            import './test/core/dct.test.js';
-            import './test/core/quantization.test.js';
-            import './test/core/zigzag.test.js';
-            import './test/core/huffman.test.js';
-            import './test/jpeg-encoder.test.js';
-        </script>
-    </body>
-
-    </html>
+</html>
