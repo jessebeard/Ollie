@@ -119,11 +119,122 @@ export function idctOptimizedRef(coefficients) {
 }
 
 /**
- * Fast AAN IDCT - Placeholder
- * Will implement Arai-Agui-Nakajima algorithm after verifying reference implementations
+ * Fast AAN IDCT - Implementation of Arai-Agui-Nakajima algorithm
+ * 
+ * Performance optimizations:
+ * - In-place modification of the input array (safe as input is fresh from inverseZigZag)
+ * - Pre-computed scaling factors combined with normalization
+ * - Unrolled 1D IDCT passes
  */
 export function idctFastAAN(coefficients) {
-    // TODO: Implement AAN algorithm
-    // For now, delegate to optimized reference
-    return idctOptimizedRef(coefficients);
+    // AAN Scaling Factors Derivation:
+    // 1. The JPEG IDCT specification requires a total gain of 1/8 for the DC coefficient 
+    //    (1/4 from formula * 1/sqrt(2) * 1/sqrt(2) from C(0) factors).
+    // 2. The standard AAN algorithm flow has a natural gain of 1 for DC.
+    // 3. To match the spec, we need a total correction factor of 1/8.
+    // 4. Since we perform two identical 1D passes (Columns then Rows), we split this factor:
+    //    Per-pass factor = sqrt(1/8) ≈ 0.35355339059.
+    // 5. Final S[i] = Standard_AAN_Factor[i] * 0.35355339059.
+
+    // S[0]: 1.0 * 0.35355339059 = 0.35355339059
+    // S[1]: 1.387039845 * 0.35355339059 = 0.4903926402
+    // S[2]: 1.306562965 * 0.35355339059 = 0.46193976625
+    // S[3]: 1.175875602 * 0.35355339059 = 0.41573480615
+    // S[4]: 1.0 * 0.35355339059 = 0.35355339059
+    // S[5]: 0.785694958 * 0.35355339059 = 0.2777851165
+    // S[6]: 0.541196100 * 0.35355339059 = 0.19134171618
+    // S[7]: 0.275899379 * 0.35355339059 = 0.0975451610
+
+    // Pass 1: Columns (Stride 8)
+    for (let i = 0; i < 8; i++) {
+        idct1D(coefficients, i, 8);
+    }
+
+    // Pass 2: Rows (Stride 1)
+    for (let i = 0; i < 64; i += 8) {
+        idct1D(coefficients, i, 1);
+    }
+
+    return coefficients;
+}
+
+// Pre-computed constants for AAN
+const S0 = 0.35355339059;
+const S1 = 0.4903926402;
+const S2 = 0.46193976625;
+const S3 = 0.41573480615;
+const S4 = 0.35355339059;
+const S5 = 0.2777851165;
+const S6 = 0.19134171618;
+const S7 = 0.0975451610;
+
+// 1D IDCT Helper (In-place)
+function idct1D(data, offset, stride) {
+    const s0 = offset;
+    const s1 = offset + stride;
+    const s2 = offset + 2 * stride;
+    const s3 = offset + 3 * stride;
+    const s4 = offset + 4 * stride;
+    const s5 = offset + 5 * stride;
+    const s6 = offset + 6 * stride;
+    const s7 = offset + 7 * stride;
+
+    // Read and Prescale
+    let x0 = data[s0] * S0;
+    let x1 = data[s1] * S1;
+    let x2 = data[s2] * S2;
+    let x3 = data[s3] * S3;
+    let x4 = data[s4] * S4;
+    let x5 = data[s5] * S5;
+    let x6 = data[s6] * S6;
+    let x7 = data[s7] * S7;
+
+    // Even part
+    let tmp0 = x0;
+    let tmp1 = x4;
+    let tmp2 = x2;
+    let tmp3 = x6;
+
+    let tmp10 = tmp0 + tmp1;
+    let tmp11 = tmp0 - tmp1;
+
+    let tmp13 = tmp2 + tmp3;
+    let tmp12 = (tmp2 - tmp3) * 1.414213562 - tmp13;
+
+    tmp0 = tmp10 + tmp13;
+    tmp3 = tmp10 - tmp13;
+    tmp1 = tmp11 + tmp12;
+    tmp2 = tmp11 - tmp12;
+
+    // Odd part
+    let tmp4 = x1;
+    let tmp5 = x3;
+    let tmp6 = x5;
+    let tmp7 = x7;
+
+    let z13 = tmp6 + tmp5;
+    let z10 = tmp6 - tmp5;
+    let z11 = tmp4 + tmp7;
+    let z12 = tmp4 - tmp7;
+
+    let tmp7_ = z11 + z13;
+    let tmp11_ = (z11 - z13) * 1.414213562;
+
+    let z5 = (z10 + z12) * 1.847759065;
+    let tmp10_ = 1.082392200 * z12 - z5;
+    let tmp12_ = -2.613125930 * z10 + z5;
+
+    let tmp6_ = tmp12_ - tmp7_;
+    let tmp5_ = tmp11_ - tmp6_;
+    let tmp4_ = tmp10_ + tmp5_;
+
+    // Write back
+    data[s0] = tmp0 + tmp7_;
+    data[s7] = tmp0 - tmp7_;
+    data[s1] = tmp1 + tmp6_;
+    data[s6] = tmp1 - tmp6_;
+    data[s2] = tmp2 + tmp5_;
+    data[s5] = tmp2 - tmp5_;
+    data[s3] = tmp3 + tmp4_;
+    data[s4] = tmp3 - tmp4_;
 }
