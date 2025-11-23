@@ -12,6 +12,12 @@
 /**
  * Huffman Table class for decoding
  */
+import { decodeNaive, buildNaiveLookup } from './huffman-decode-naive.js';
+import { decodeOptimized, buildOptimizedLookup } from './huffman-decode-optimized.js';
+
+/**
+ * Huffman Table class for decoding
+ */
 export class HuffmanTable {
     constructor(bits, values, tableClass, tableId) {
         this.bits = bits;           // Array of 16 elements: count of codes for each bit length
@@ -19,67 +25,38 @@ export class HuffmanTable {
         this.tableClass = tableClass; // 0=DC, 1=AC
         this.tableId = tableId;     // 0-3
 
-        // Build lookup table for fast decoding
-        this.buildLookupTable();
-    }
-
-    /**
-     * Build a lookup table for fast Huffman decoding
-     * Uses the algorithm from JPEG spec Annex C
-     */
-    buildLookupTable() {
-        this.lookup = new Map();
-        this.maxCodeLength = 0;
-
-        let code = 0;
-        let symbolIndex = 0;
-
-        for (let bitLength = 1; bitLength <= 16; bitLength++) {
-            const count = this.bits[bitLength - 1];
-
-            if (count > 0) {
-                this.maxCodeLength = bitLength;
-            }
-
-            for (let i = 0; i < count; i++) {
-                const symbol = this.values[symbolIndex];
-
-                // Store: code -> {symbol, length}
-                this.lookup.set((code << (16 - bitLength)), {
-                    symbol,
-                    length: bitLength
-                });
-
-                code++;
-                symbolIndex++;
-            }
-
-            code <<= 1; // Shift for next bit length
-        }
+        // Build lookup tables
+        // We build both for now to support switching, or we could lazy build.
+        // Since tables are small, building both is fine.
+        buildNaiveLookup(this);
+        buildOptimizedLookup(this);
     }
 
     /**
      * Decode a symbol from a BitReader
+     * This method delegates to the currently selected implementation
      * @param {BitReader} bitReader - Bit reader positioned at start of code
      * @returns {number} Decoded symbol
      */
     decode(bitReader) {
-        let code = 0;
+        // Default to optimized if not set
+        return decodeOptimized(this, bitReader);
+    }
 
-        for (let i = 1; i <= this.maxCodeLength; i++) {
-            code = (code << 1) | bitReader.readBit();
-
-            // Check if this code exists in lookup
-            const key = code << (16 - i);
-            if (this.lookup.has(key)) {
-                const entry = this.lookup.get(key);
-                if (entry.length === i) {
-                    return entry.symbol;
-                }
-            }
+    /**
+     * Set the decoding method globally for all HuffmanTable instances
+     * @param {string} method - 'naive' or 'optimized'
+     */
+    static setDecodeMethod(method) {
+        if (method === 'naive') {
+            HuffmanTable.prototype.decode = function (bitReader) {
+                return decodeNaive(this, bitReader);
+            };
+        } else {
+            HuffmanTable.prototype.decode = function (bitReader) {
+                return decodeOptimized(this, bitReader);
+            };
         }
-
-        throw new Error('Invalid Huffman code');
     }
 }
 

@@ -1,6 +1,9 @@
 import { JpegEncoder } from './jpeg-encoder.js';
 import { JpegDecoder } from './jpeg-decoder.js';
 import { idctNaive, idctAAN } from './core/decoder/idct.js';
+import { idctPureRef, idctOptimizedRef, idctFastAAN } from './core/decoder/idct-spec.js';
+import { HuffmanTable } from './core/decoder/huffman-parser.js';
+import { BitReader } from './utils/bit-reader.js';
 
 function init() {
     const fileInput = document.getElementById('file-input');
@@ -107,12 +110,50 @@ function init() {
 
             // Configure IDCT method
             const idctSelect = document.getElementById('idct-method');
-            if (idctSelect && idctSelect.value === 'aan') {
-                decoder.setIdctMethod(idctAAN);
-                console.log('Using AAN IDCT');
+            if (idctSelect) {
+                switch (idctSelect.value) {
+                    case 'pureRef':
+                        decoder.setIdctMethod(idctPureRef);
+                        console.log('Using Pure Ref IDCT (Spec Formula)');
+                        break;
+                    case 'optimizedRef':
+                        decoder.setIdctMethod(idctOptimizedRef);
+                        console.log('Using Optimized Ref IDCT (Separable)');
+                        break;
+                    case 'fastAAN':
+                        decoder.setIdctMethod(idctFastAAN);
+                        console.log('Using Fast AAN IDCT');
+                        break;
+                    case 'aan':
+                        decoder.setIdctMethod(idctAAN);
+                        console.log('Using Legacy AAN IDCT');
+                        break;
+                    case 'naive':
+                    default:
+                        decoder.setIdctMethod(idctNaive);
+                        console.log('Using Legacy Naive IDCT');
+                        break;
+                }
+            }
+
+            // Configure Huffman method
+            const huffmanSelect = document.getElementById('huffman-method');
+            if (huffmanSelect && huffmanSelect.value === 'naive') {
+                HuffmanTable.setDecodeMethod('naive');
+                console.log('Using Naive Huffman Decoding');
             } else {
-                decoder.setIdctMethod(idctNaive);
-                console.log('Using Naive IDCT');
+                HuffmanTable.setDecodeMethod('optimized');
+                console.log('Using Optimized Huffman Decoding');
+            }
+
+            // Configure BitReader method
+            const bitReaderSelect = document.getElementById('bitreader-method');
+            if (bitReaderSelect && bitReaderSelect.value === 'naive') {
+                BitReader.setMode('naive');
+                console.log('Using Naive BitReader');
+            } else {
+                BitReader.setMode('optimized');
+                console.log('Using Optimized BitReader');
             }
 
             const result = decoder.decode(bytes);

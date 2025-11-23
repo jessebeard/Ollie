@@ -1,7 +1,7 @@
 <project name="Ollie" description="A pure JavaScript JPEG Encoder implementation">
     <structure>
         <directory name="src">
-            <file name="main.js" description="Entry point for the web interface. Handles file input, canvas manipulation, download button, and invokes the encoder." />
+            <file name="main.js" description="Entry point for the web interface. Handles file input, canvas manipulation, download button, encoder/decoder invocation, and runtime configuration of IDCT/Huffman/BitReader methods via UI selectors." />
             <file name="jpeg-encoder.js" description="Main encoder class. Orchestrates the JPEG compression pipeline.">
                 <class name="JpegEncoder">
                     <method name="constructor" params="quality=50" description="Initializes the encoder with quality setting." />
@@ -49,12 +49,21 @@
                 <file name="quantization-parser.js" description="Parses DQT segments and extracts quantization tables.">
                     <function name="parseQuantizationTable" params="data" return="Map<id, table>" description="Extracts quantization tables from DQT segment." />
                 </file>
-                <file name="huffman-parser.js" description="Parses DHT segments and builds Huffman decoding trees.">
+                <file name="huffman-parser.js" description="Parses DHT segments and builds Huffman decoding lookup tables.">
                     <class name="HuffmanTable">
-                        <method name="constructor" params="bits, values" description="Builds lookup table from BITS and HUFFVAL arrays." />
-                        <method name="decode" params="bitReader" return="symbol" description="Decodes next symbol from bitstream." />
+                        <method name="constructor" params="bits, values, tableClass, tableId" description="Builds lookup tables from BITS and HUFFVAL arrays." />
+                        <method name="decode" params="bitReader" return="symbol" description="Decodes next symbol from bitstream using configured method." />
+                        <method name="setDecodeMethod" params="method" description="Static method to switch between naive and optimized decoding." />
                     </class>
                     <function name="parseHuffmanTable" params="data" return="Map<id, HuffmanTable>" description="Extracts Huffman tables from DHT segment." />
+                </file>
+                <file name="huffman-decode-naive.js" description="Naive Huffman decoding using Map-based lookup (O(N)).">
+                    <function name="buildNaiveLookup" params="table" description="Builds Map-based lookup table." />
+                    <function name="decodeNaive" params="table, bitReader" return="symbol" description="Decodes symbol using Map lookup." />
+                </file>
+                <file name="huffman-decode-optimized.js" description="Optimized Huffman decoding using 16-bit LUT (O(1)).">
+                    <function name="buildOptimizedLookup" params="table" description="Builds 16-bit Uint16Array lookup table." />
+                    <function name="decodeOptimized" params="table, bitReader" return="symbol" description="Decodes symbol using direct array lookup." />
                 </file>
                 <file name="frame-parser.js" description="Parses SOF0 frame header.">
                     <function name="parseFrameHeader" params="data" return="FrameInfo" description="Extracts image dimensions, components, and sampling factors." />
@@ -74,8 +83,9 @@
                 <file name="dequantization.js" description="Multiplies quantized coefficients by quantization table.">
                     <function name="dequantize" params="block, table" return="Float32Array(64)" description="Reverses quantization by multiplication." />
                 </file>
-                <file name="idct.js" description="Implements the Inverse Discrete Cosine Transform (IDCT).">
-                    <function name="inverseDCT" params="block" return="Float32Array(64)" description="Performs 2D IDCT on an 8x8 block." />
+                <file name="idct.js" description="Implements the Inverse Discrete Cosine Transform (IDCT) with naive and AAN implementations.">
+                    <function name="idctNaive" params="block" return="Float32Array(64)" description="Naive IDCT implementation (O(N³))." />
+                    <function name="idctAAN" params="block" return="Float32Array(64)" description="Optimized AAN IDCT implementation (O(N))." />
                 </file>
                 <file name="colorspace-decoder.js" description="Converts YCbCr to RGB color space.">
                     <function name="ycbcrToRgb" params="y, cb, cr" return="{r, g, b}" description="Converts YCbCr values to RGB (0-255)." />
@@ -96,13 +106,36 @@
                         <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
                     </class>
                 </file>
-                <file name="bit-reader.js" description="Helper class for reading variable-length bit sequences from JPEG data.">
+                <file name="bit-reader.js" description="Wrapper class that delegates to naive or optimized BitReader implementations.">
                     <class name="BitReader">
-                        <method name="constructor" params="data" description="Initializes reader with byte array." />
+                        <method name="constructor" params="data" description="Initializes reader with byte array, uses configured mode." />
+                        <method name="setMode" params="mode" description="Static method to switch between 'naive' and 'optimized' modes." />
                         <method name="readBit" return="number" description="Reads a single bit (0 or 1)." />
                         <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
                         <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits." />
+                        <method name="peek16Bits" return="number" description="Optimized lookahead for 16 bits (Huffman decoding)." />
+                        <method name="skipBits" params="length" description="Advances bit pointer efficiently." />
                         <method name="alignToByte" description="Skips to next byte boundary." />
+                    </class>
+                </file>
+                <file name="bit-reader-naive.js" description="Original BitReader implementation using array slicing for byte stuffing.">
+                    <class name="BitReaderNaive">
+                        <method name="constructor" params="data" description="Initializes reader with byte array." />
+                        <method name="readBit" return="number" description="Reads a single bit, handles byte stuffing by modifying array." />
+                        <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
+                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits." />
+                        <method name="peek16Bits" return="number" description="Peeks 16 bits (delegates to peekBits)." />
+                        <method name="skipBits" params="length" description="Skips bits using readBit." />
+                    </class>
+                </file>
+                <file name="bit-reader-optimized.js" description="Optimized BitReader avoiding array copies, using lookahead.">
+                    <class name="BitReaderOptimized">
+                        <method name="constructor" params="data" description="Initializes reader with byte array." />
+                        <method name="readBit" return="number" description="Reads a single bit, skips stuffed bytes without copying." />
+                        <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
+                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits using try-finally." />
+                        <method name="peek16Bits" return="number" description="Fast lookahead for 16 bits with special byte-aligned path." />
+                        <method name="skipBits" params="length" description="Efficiently advances pointer, handles byte stuffing." />
                     </class>
                 </file>
                 <file name="marker-parser.js" description="Parses JPEG file structure and extracts segments.">

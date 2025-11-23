@@ -1,138 +1,45 @@
-/**
- * BitReader - Reads variable-length bit sequences from JPEG entropy-coded data
- * 
- * Handles:
- * - Bit-by-bit reading from byte array
- * - Byte stuffing (0xFF 0x00 -> 0xFF)
- * - Restart markers (0xFFD0-0xFFD7)
- * - Marker detection
- */
+import { BitReaderNaive } from './bit-reader-naive.js';
+import { BitReaderOptimized } from './bit-reader-optimized.js';
 
+/**
+ * BitReader Wrapper
+ * Delegates to either Naive or Optimized implementation
+ */
 export class BitReader {
     constructor(data) {
-        this.data = data;
-        this.byteOffset = 0;
-        this.bitOffset = 0; // 0-7, position within current byte
-    }
-
-    /**
-     * Read a single bit (0 or 1)
-     */
-    readBit() {
-        // Check if we need to move to next byte
-        if (this.bitOffset === 0) {
-            // Check for byte stuffing and markers
-            this._handleByteStuffing();
-        }
-
-        const currentByte = this.data[this.byteOffset];
-        const bit = (currentByte >> (7 - this.bitOffset)) & 1;
-
-        this.bitOffset++;
-        if (this.bitOffset === 8) {
-            this.bitOffset = 0;
-            this.byteOffset++;
-        }
-
-        return bit;
-    }
-
-    /**
-     * Read multiple bits (1-16) as an integer
-     */
-    readBits(length) {
-        if (length < 1 || length > 16) {
-            throw new Error(`Invalid bit length: ${length}. Must be 1-16.`);
-        }
-
-        let value = 0;
-        for (let i = 0; i < length; i++) {
-            value = (value << 1) | this.readBit();
-        }
-        return value;
-    }
-
-    /**
-     * Peek at bits without consuming them
-     */
-    peekBits(length) {
-        const savedByteOffset = this.byteOffset;
-        const savedBitOffset = this.bitOffset;
-
-        const value = this.readBits(length);
-
-        this.byteOffset = savedByteOffset;
-        this.bitOffset = savedBitOffset;
-
-        return value;
-    }
-
-    /**
-     * Skip to next byte boundary
-     */
-    alignToByte() {
-        if (this.bitOffset !== 0) {
-            this.bitOffset = 0;
-            this.byteOffset++;
+        if (BitReader.mode === 'naive') {
+            this.impl = new BitReaderNaive(data);
+        } else {
+            this.impl = new BitReaderOptimized(data);
         }
     }
 
-    /**
-     * Handle byte stuffing and marker detection
-     * Called when moving to a new byte during bit reading
-     */
-    _handleByteStuffing() {
-        if (this.byteOffset >= this.data.length) {
-            throw new Error('Unexpected end of data');
-        }
-
-        const currentByte = this.data[this.byteOffset];
-
-        // Only check for markers/stuffing if current byte is 0xFF
-        // and we have a next byte to check
-        if (currentByte === 0xFF && this.byteOffset + 1 < this.data.length) {
-            const nextByte = this.data[this.byteOffset + 1];
-
-            if (nextByte === 0x00) {
-                // Byte stuffing: 0xFF 0x00 -> 0xFF
-                // Skip the 0x00 byte by removing it from data
-                this.data = new Uint8Array([
-                    ...this.data.slice(0, this.byteOffset + 1),
-                    ...this.data.slice(this.byteOffset + 2)
-                ]);
-                // Continue reading from current 0xFF byte
-            } else if (nextByte >= 0xD0 && nextByte <= 0xD7) {
-                // Restart marker (RSTm)
-                // Skip both bytes and reset DC predictors (handled by caller)
-                this.byteOffset += 2;
-                this.bitOffset = 0;
-                return 'RESTART';
-            } else if (nextByte !== 0xFF) {
-                // Other marker - this might be end of scan data
-                // For now, we'll allow it and let the caller handle it
-                // In a real decoder, this would signal end of entropy data
-                // We'll throw an error to be safe
-                throw new Error(`Unexpected marker: 0xFF${nextByte.toString(16).padStart(2, '0').toUpperCase()}`);
-            }
-        }
-
-        return null;
+    static setMode(mode) {
+        BitReader.mode = mode;
     }
 
-    /**
-     * Check if we've reached the end of data
-     */
-    isEOF() {
-        return this.byteOffset >= this.data.length;
-    }
+    readBit() { return this.impl.readBit(); }
+    readBits(length) { return this.impl.readBits(length); }
+    peekBits(length) { return this.impl.peekBits(length); }
+    peek16Bits() { return this.impl.peek16Bits(); }
+    skipBits(length) { return this.impl.skipBits(length); }
+    alignToByte() { return this.impl.alignToByte(); }
+    isEOF() { return this.impl.isEOF(); }
+    getPosition() { return this.impl.getPosition(); }
 
-    /**
-     * Get current position (for debugging)
-     */
-    getPosition() {
-        return {
-            byteOffset: this.byteOffset,
-            bitOffset: this.bitOffset
-        };
-    }
+    // _handleByteStuffing is internal, but if called externally (tests?), proxy it
+    _handleByteStuffing() { return this.impl._handleByteStuffing(); }
+
+    // Getters/Setters for properties if accessed directly
+    get byteOffset() { return this.impl.byteOffset; }
+    set byteOffset(v) { this.impl.byteOffset = v; }
+
+    get bitOffset() { return this.impl.bitOffset; }
+    set bitOffset(v) { this.impl.bitOffset = v; }
+
+    get data() { return this.impl.data; }
+    set data(v) { this.impl.data = v; }
 }
+
+// Default mode
+BitReader.mode = 'optimized';

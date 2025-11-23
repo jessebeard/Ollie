@@ -18,8 +18,8 @@
 export function upsampleNearest(component, srcWidth, srcHeight, dstWidth, dstHeight) {
     const result = new Float32Array(dstWidth * dstHeight);
 
-    const scaleX = srcWidth / dstWidth;
-    const scaleY = srcHeight / dstHeight;
+    const scaleX = (srcWidth - 1) / (dstWidth - 1);
+    const scaleY = (srcHeight - 1) / (dstHeight - 1);
 
     for (let y = 0; y < dstHeight; y++) {
         for (let x = 0; x < dstWidth; x++) {
@@ -112,15 +112,15 @@ export function upsampleChroma(components, samplingFactors, width, height) {
 
     // Upsample Cb if needed
     if (samplingFactors.Cb.h < maxH || samplingFactors.Cb.v < maxV) {
-        const cbWidth = samplingFactors.Cb.width || Math.ceil(width * samplingFactors.Cb.h / maxH);
-        const cbHeight = samplingFactors.Cb.height || Math.ceil(height * samplingFactors.Cb.v / maxV);
+        const cbWidth = Math.ceil(width / maxH) * samplingFactors.Cb.h;
+        const cbHeight = Math.ceil(height / maxV) * samplingFactors.Cb.v;
         result.Cb = upsampleBilinear(components.Cb, cbWidth, cbHeight, width, height);
     }
 
     // Upsample Cr if needed
     if (samplingFactors.Cr.h < maxH || samplingFactors.Cr.v < maxV) {
-        const crWidth = samplingFactors.Cr.width || Math.ceil(width * samplingFactors.Cr.h / maxH);
-        const crHeight = samplingFactors.Cr.height || Math.ceil(height * samplingFactors.Cr.v / maxV);
+        const crWidth = Math.ceil(width / maxH) * samplingFactors.Cr.h;
+        const crHeight = Math.ceil(height / maxV) * samplingFactors.Cr.v;
         result.Cr = upsampleBilinear(components.Cr, crWidth, crHeight, width, height);
     }
 

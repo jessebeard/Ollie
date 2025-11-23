@@ -14,13 +14,14 @@ import { BitReader } from './utils/bit-reader.js';
 import { decodeBlock } from './core/decoder/huffman-decoder.js';
 import { inverseZigZag } from './core/decoder/inverse-zigzag.js';
 import { dequantize } from './core/decoder/dequantization.js';
-import { idct } from './core/decoder/idct.js';
+import { idctPureRef, idctOptimizedRef, idctFastAAN } from './core/decoder/idct-spec.js';
+import { idctAAN, idctNaive } from './core/decoder/idct.js';
 import { upsampleChroma } from './core/decoder/upsampling.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './core/decoder/block-assembly.js';
 
 export class JpegDecoder {
     constructor() {
-        this.reset();
+        this.hardreset();
     }
 
     reset() {
@@ -29,7 +30,11 @@ export class JpegDecoder {
         this.frameHeader = null;
         this.scanHeader = null;
         this.components = {};
-        this.idctMethod = idct;
+    }
+
+    hardreset() {
+        this.reset();
+        this.idctMethod = idctPureRef;
     }
 
     /**
@@ -37,8 +42,35 @@ export class JpegDecoder {
      * @param {Function} method - IDCT function
      */
     setIdctMethod(method) {
-        this.idctMethod = method;
+        if (typeof method === 'string') {
+            switch (method) {
+                case 'pureRef':
+                    this.idctMethod = idctPureRef;
+                    break;
+                case 'optimizedRef':
+                    this.idctMethod = idctOptimizedRef;
+                    break;
+                case 'fastAAN':
+                    this.idctMethod = idctFastAAN;
+                    break;
+                case 'aan':
+                    this.idctMethod = idctAAN;
+                    break;
+                case 'naive':
+                    this.idctMethod = idctNaive;
+                    break;
+                default:
+                    throw new Error(`Unknown IDCT method identifier: ${method}`);
+            }
+        } else if (typeof method === 'function') {
+            this.idctMethod = method;
+        } else {
+            throw new Error('setIdctMethod expects a function or a known method identifier string');
+        }
     }
+
+
+
 
     /**
      * Decode a JPEG byte array into ImageData

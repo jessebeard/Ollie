@@ -132,7 +132,8 @@ describe('HuffmanTableParser', () => {
 
         const table = new HuffmanTable(bits, values, 0, 0);
 
-        expect(table.lookup.size).toBe(2);
+        expect(table.fastLookup).toBeDefined();
+        expect(table.fastLookup.length).toBe(65536);
         expect(table.maxCodeLength).toBe(1);
     });
 
