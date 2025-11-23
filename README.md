@@ -59,14 +59,70 @@ Ollie implements the “baseline sequential DCT” JPEG, the most widely support
 
 Below are the major stages, explained in a way that mirrors the project’s structure.
 
-> **Tip for README graphics:**  
-> You can add block-diagram visuals (Mermaid, SVG, or PNG) for the pipeline.  
-> I can generate them—just say the word!
 
 ---
 
 ## 🔵 JPEG Encoding Pipeline
+```mermaid
+sequenceDiagram
+    participant RGB as "RGB Data"
+    participant Color as "Color Conversion"
+    participant Blocks as "8×8 Blocks"
+    participant Frequency as "Frequency Coefficients"
+    participant Quantized as "Quantized Coefficients"
+    participant ZigzagRLE as "Zigzag & RLE"
+    participant Huffman as "Huffman"
+    participant Bitstream as "JPEG Bitstream"
 
+    %% ---------------- ENCODING ----------------
+
+    Note over RGB: RGB Data Matrix (png)
+    RGB->>Color: RGB Bitstream Data
+
+    Note over Color: Encoding Step: Color Space Conversion<br>- RGB → YCbCr<br>- Optional chroma subsampling<br>- Center shift (subtract 128)
+    Color->>Blocks: Y, Cb, Cr component data
+
+    Note over Blocks: Encoding Step: Block Splitting<br>- Separate components<br>- Divide into 8×8 MCUs<br>- Pad edges if needed
+    Blocks->>Frequency: 8×8 Spatial blocks
+
+    Note over Frequency: Encoding Step: Forward DCT<br>- Apply 2D DCT<br>- Produce 64 frequency coefficients
+    Frequency->>Quantized: DCT coefficients<br>(Frequency Blocks)
+
+    Note over Quantized: Encoding Step: Quantization<br>- Divide by quant matrix<br>- Round to nearest integer<br>- Zero high-frequency terms
+    Quantized->>ZigzagRLE: Quantized coefficients
+
+    Note over ZigzagRLE: Encoding Step: Zigzag & RLE<br>- Zigzag reorder<br>- DC differencing<br>- AC run-length encoding<br>- Insert EOB
+    ZigzagRLE->>Huffman: RLE coefficients
+
+    Note over Huffman: Encoding Step: Huffman Encoding<br>- Encode using Huffman tables<br>- Output variable-length codes
+    Huffman->>Bitstream: JPEG bitstream
+
+    %% ---------------- DECODING ----------------
+    Note over Bitstream: Decoding Step: Huffman Decoding
+    Bitstream->>Huffman: Huffman bitstream
+
+    Note over Huffman: Sub-steps:<br>- Decode Huffman codes<br>- Recover DC/AC symbols
+    Huffman->>ZigzagRLE: Symbol sequence
+
+    Note over ZigzagRLE: Decoding Step: Zigzag & RLE<br>- Reverse DC differencing<br>- Expand AC runs<br>- Inverse zigzag
+    ZigzagRLE->>Quantized: Reordered coefficients
+
+    Note over Quantized: Decoding Step: Dequantization<br>- Multiply by quant matrix<br>- Approximate original DCT values
+    Quantized->>Frequency: Dequantized blocks
+
+    Note over Frequency: Decoding Step: Inverse DCT<br>- Apply 2D IDCT<br>- Convert frequency → spatial
+    Frequency->>Blocks: Spatial 8×8 blocks
+
+    Note over Blocks: Decoding Step: Block Reassembly<br>- Reassemble MCUs<br>- Merge Y, Cb, Cr planes
+    Blocks->>Color: Reconstructed image
+
+    Note over Color: Decoding Step: Color Conversion<br>- YCbCr → RGB<br>- Clamp to valid range
+    RGB->>Color: RGB Bitstream Data
+    Note over RGB: RGB Data Matrix (png)
+
+
+
+```
 ### 1. **Color Space Conversion (RGB → YCbCr)**  
 JPEG separates brightness from color.  
 - **Y** = luminance (perceived brightness — the most important part)  
@@ -77,10 +133,15 @@ This separation allows JPEG to compress color more aggressively than luminance, 
 ---
 
 ### 2. **(Optional) Chroma Subsampling**  
+
 Most JPEGs store color at reduced resolution (e.g., **4:2:0**):  
 - Y: full resolution  
 - Cb/Cr: half resolution horizontally & vertically  
 This dramatically reduces file size with minimal perceived quality loss.
+#### ```❗ Important Note```
+
+##### ```    Ollie does not currently support chroma subsampling,  and decoding naively expects 4:4:4 chroma subsampling. ```
+
 
 ---
 
@@ -203,13 +264,3 @@ Open **`index.html`** in a browser to try the interactive demo:
 Open **`test.html`** in a browser to run the full test suite (unit + integration).
 
 ---
-
-## 📝 Want Diagrams or Animations?
-
-I can generate:
-
-- Block-diagram SVGs for the encoding/decoding pipeline  
-- Animated GIFs showing the zigzag ordering, DCT basis functions, or quantization effects  
-- Mermaid or Graphviz diagrams directly embeddable in GitHub  
-
-Just tell me what style you want!
