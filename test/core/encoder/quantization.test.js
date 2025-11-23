@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA } from '../../src/core/quantization.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA } from '../../../src/core/encoder/quantization.js';
 
 describe('Quantization', () => {
     it('quantizes a block correctly', () => {
@@ -83,7 +83,7 @@ describe('Quantization', () => {
     });
 
     it('should roughly roundtrip with dequantize', async () => {
-        const { dequantize } = await import('../../src/core/decoder/dequantization.js');
+        const { dequantize } = await import('../../../src/core/decoder/dequantization.js');
 
         const original = new Float32Array(64).fill(100);
         const table = new Int32Array(64).fill(10); // Use Int32Array for table to match dequantize signature if needed
@@ -100,7 +100,7 @@ describe('Quantization', () => {
     });
 
     it('should roundtrip with loss (quantization noise)', async () => {
-        const { dequantize } = await import('../../src/core/decoder/dequantization.js');
+        const { dequantize } = await import('../../../src/core/decoder/dequantization.js');
 
         const original = new Float32Array(64).fill(105); // 105 / 10 = 10.5 -> 11
         const table = new Int32Array(64).fill(10);

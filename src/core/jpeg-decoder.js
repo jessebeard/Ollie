@@ -5,19 +5,19 @@
  * Supports grayscale and color images with various chroma subsampling (4:4:4, 4:2:2, 4:2:0).
  */
 
-import { parseFileStructure, MARKERS } from './utils/marker-parser.js';
-import { parseAllHuffmanTables } from './core/decoder/huffman-parser.js';
-import { parseAllQuantizationTables } from './core/decoder/quantization-parser.js';
-import { parseFrameHeader } from './core/decoder/frame-parser.js';
-import { parseScanHeader } from './core/decoder/scan-parser.js';
-import { BitReader } from './utils/bit-reader.js';
-import { decodeBlock } from './core/decoder/huffman-decoder.js';
-import { inverseZigZag } from './core/decoder/inverse-zigzag.js';
-import { dequantize } from './core/decoder/dequantization.js';
-import { idctPureRef, idctOptimizedRef, idctFastAAN } from './core/decoder/idct-spec.js';
-import { idctAAN, idctNaive } from './core/decoder/idct.js';
-import { upsampleChroma } from './core/decoder/upsampling.js';
-import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './core/decoder/block-assembly.js';
+import { parseFileStructure, MARKERS } from '../utils/marker-parser.js';
+import { parseAllHuffmanTables } from './decoder/huffman-parser.js';
+import { parseAllQuantizationTables } from './decoder/quantization-parser.js';
+import { parseFrameHeader } from './decoder/frame-parser.js';
+import { parseScanHeader } from './decoder/scan-parser.js';
+import { BitReader } from '../utils/bit-reader.js';
+import { decodeBlock } from './decoder/huffman-decoder.js';
+import { inverseZigZag } from './decoder/inverse-zigzag.js';
+import { dequantize } from './decoder/dequantization.js';
+import { idctPureRef, idctOptimizedRef, idctFastAAN } from './decoder/idct-spec.js';
+import { idctAAN, idctNaive } from './decoder/idct.js';
+import { upsampleChroma } from './decoder/upsampling.js';
+import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './decoder/block-assembly.js';
 
 export class JpegDecoder {
     constructor() {

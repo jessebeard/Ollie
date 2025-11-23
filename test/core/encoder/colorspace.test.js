@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { rgbToYcbcr, ycbcrToRgb } from '../../src/core/colorspace.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { rgbToYcbcr, ycbcrToRgb } from '../../../src/core/encoder/colorspace.js';
 
 describe('Color Space Conversion', () => {
     it('converts black correctly', () => {

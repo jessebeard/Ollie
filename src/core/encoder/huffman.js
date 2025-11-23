@@ -1,4 +1,4 @@
-import { BitWriter } from '../utils/bit-writer.js';
+import { BitWriter } from '../../utils/bit-writer.js';
 
 // Standard JPEG Huffman Tables (Luminance DC)
 // Bits counts (how many codes of length i)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { padDimensions, extractBlock } from '../../../src/core/blocks.js';
+import { padDimensions, extractBlock } from '../../../src/core/encoder/blocks.js';
 
 describe('Block Processing', () => {
     describe('padDimensions', () => {

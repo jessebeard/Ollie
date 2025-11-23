@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { forwardDCT } from '../../src/core/dct.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { forwardDCT } from '../../../src/core/encoder/dct.js';
 
 describe('Discrete Cosine Transform', () => {
     it('transforms a zero block to all zeros', () => {
@@ -98,13 +98,13 @@ describe('Discrete Cosine Transform', () => {
     });
 
     it('should roundtrip with inverse DCT (IDCT)', async () => {
-        const { idct } = await import('../../src/core/decoder/idct.js');
+        const { idctNaive } = await import('../../../src/core/decoder/idct.js');
 
         const original = new Float32Array(64);
         for (let i = 0; i < 64; i++) original[i] = i;
 
         const dct = forwardDCT(original);
-        const reconstructed = idct(dct);
+        const reconstructed = idctNaive(dct);
 
         for (let i = 0; i < 64; i++) {
             expect(reconstructed[i]).toBeCloseTo(original[i], 1);
@@ -112,13 +112,13 @@ describe('Discrete Cosine Transform', () => {
     });
 
     it('should roundtrip random data with IDCT', async () => {
-        const { idct } = await import('../../src/core/decoder/idct.js');
+        const { idctNaive } = await import('../../../src/core/decoder/idct.js');
 
         const original = new Float32Array(64);
         for (let i = 0; i < 64; i++) original[i] = Math.random() * 255 - 128;
 
         const dct = forwardDCT(original);
-        const reconstructed = idct(dct);
+        const reconstructed = idctNaive(dct);
 
         for (let i = 0; i < 64; i++) {
             expect(reconstructed[i]).toBeCloseTo(original[i], 1);

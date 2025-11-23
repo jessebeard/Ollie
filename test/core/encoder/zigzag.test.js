@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { zigZag, ZIGZAG_ORDER } from '../../src/core/zigzag.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { zigZag, ZIGZAG_ORDER } from '../../../src/core/encoder/zigzag.js';
 
 describe('ZigZag Reordering', () => {
     it('reorders a block correctly', () => {
@@ -21,7 +21,7 @@ describe('ZigZag Reordering', () => {
     });
 
     it('should roundtrip with inverseZigZag', async () => {
-        const { inverseZigZag } = await import('../../src/core/decoder/inverse-zigzag.js');
+        const { inverseZigZag } = await import('../../../src/core/decoder/inverse-zigzag.js');
 
         const original = new Int32Array(64);
         for (let i = 0; i < 64; i++) original[i] = i;
@@ -35,7 +35,7 @@ describe('ZigZag Reordering', () => {
     });
 
     it('should roundtrip random data', async () => {
-        const { inverseZigZag } = await import('../../src/core/decoder/inverse-zigzag.js');
+        const { inverseZigZag } = await import('../../../src/core/decoder/inverse-zigzag.js');
 
         const original = new Int32Array(64);
         for (let i = 0; i < 64; i++) original[i] = Math.floor(Math.random() * 1000) - 500;

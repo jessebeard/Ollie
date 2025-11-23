@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { JpegDecoder } from '../../../src/jpeg-decoder.js';
+import { JpegDecoder } from '../../../src/core/jpeg-decoder.js';
 import { idctNaive, idctAAN } from '../../../src/core/decoder/idct.js';
 
 describe('IDCT Switching', () => {

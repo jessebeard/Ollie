@@ -1,17 +1,19 @@
 <project name="Ollie Tests" description="Test suite structure for the Ollie JPEG Encoder/Decoder">
     <structure>
         <directory name="test">
-            <file name="jpeg-encoder.test.js" description="Integration tests for the JpegEncoder class." />
-            <file name="jpeg-decoder.test.js" description="Integration tests for the JpegDecoder class." />
             <file name="ui.test.js" description="UI interaction tests." />
             <file name="runner.js" description="Node.js CLI test runner. Imports all test files and displays summary. Includes DOM mocks for UI tests." />
             <directory name="core" description="Unit tests for core algorithms">
-                <file name="blocks.test.js" description="Tests for block padding and extraction." />
-                <file name="colorspace.test.js" description="Tests for RGB/YCbCr conversion." />
-                <file name="dct.test.js" description="Tests for Discrete Cosine Transform." />
-                <file name="huffman.test.js" description="Tests for Huffman coding logic." />
-                <file name="quantization.test.js" description="Tests for quantization tables and logic." />
-                <file name="zigzag.test.js" description="Tests for ZigZag reordering." />
+                <file name="jpeg-encoder.test.js" description="Integration tests for the JpegEncoder class." />
+                <file name="jpeg-decoder.test.js" description="Integration tests for the JpegDecoder class." />
+                <directory name="encoder" description="Unit tests for encoder algorithms">
+                    <file name="blocks.test.js" description="Tests for block padding and extraction." />
+                    <file name="colorspace.test.js" description="Tests for RGB/YCbCr conversion." />
+                    <file name="dct.test.js" description="Tests for Discrete Cosine Transform." />
+                    <file name="huffman.test.js" description="Tests for Huffman coding logic." />
+                    <file name="quantization.test.js" description="Tests for quantization tables and logic." />
+                    <file name="zigzag.test.js" description="Tests for ZigZag reordering." />
+                </directory>
                 <directory name="decoder" description="Unit tests for decoder algorithms">
                     <file name="quantization-parser.test.js" description="Tests for DQT segment parsing." />
                     <file name="huffman-parser.test.js" description="Tests for DHT segment parsing." />

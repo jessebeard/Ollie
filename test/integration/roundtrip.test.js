@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../utils/test-runner.js';
-import { JpegEncoder } from '../../src/jpeg-encoder.js';
-import { JpegDecoder } from '../../src/jpeg-decoder.js';
+import { JpegEncoder } from '../../src/core/jpeg-encoder.js';
+import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
 
 describe('Encoder-Decoder Roundtrip', () => {
     function createSolidImage(width, height, r, g, b) {

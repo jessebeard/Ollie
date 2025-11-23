@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { idctNaive, idctAAN } from '../../../src/core/decoder/idct.js';
-import { forwardDCT } from '../../../src/core/dct.js';
+import { forwardDCT } from '../../../src/core/encoder/dct.js';
 
 const implementations = [
     { name: 'Naive IDCT', fn: idctNaive },

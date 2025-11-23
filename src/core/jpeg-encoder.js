@@ -1,23 +1,15 @@
-import { rgbToYcbcr } from './core/colorspace.js';
-import { padDimensions, extractBlock } from './core/blocks.js';
-import { forwardDCT } from './core/dct.js';
-import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA } from './core/quantization.js';
-import { zigZag } from './core/zigzag.js';
-import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from './core/huffman.js';
-import { BitWriter } from './utils/bit-writer.js';
+import { rgbToYcbcr } from './encoder/colorspace.js';
+import { padDimensions, extractBlock } from './encoder/blocks.js';
+import { forwardDCT } from './encoder/dct.js';
+import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA } from './encoder/quantization.js';
+import { zigZag } from './encoder/zigzag.js';
+import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from './encoder/huffman.js';
+import { BitWriter } from '../utils/bit-writer.js';
 
 /**
  * JpegEncoder
  * 
  * This class implements a basic JPEG encoder.
- * The JPEG compression process involves several steps:
- * 1. Color Space Conversion: RGB -> YCbCr (Luminance, Blue-difference, Red-difference)
- * 2. Subsampling: (Skipped here, we use 4:4:4 which means no subsampling)
- * 3. Block Splitting: The image is split into 8x8 blocks.
- * 4. DCT (Discrete Cosine Transform): Converts spatial data (pixels) into frequency domain.
- * 5. Quantization: Reduces precision of high-frequency components to save space (lossy step).
- * 6. ZigZag Reordering: Reorders the 8x8 block into a 1D array, grouping low frequencies.
- * 7. Entropy Coding (Huffman): Compresses the data using Huffman tables.
  */
 export class JpegEncoder {
     constructor(quality = 50) {

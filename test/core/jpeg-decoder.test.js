@@ -1,5 +1,5 @@
-import { describe, it, expect } from './utils/test-runner.js';
-import { JpegDecoder } from '../src/jpeg-decoder.js';
+import { describe, it, expect } from '../../test/utils/test-runner.js';
+import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
 
 async function loadFixture(filename) {
     if (typeof process !== 'undefined' && process.versions && process.versions.node) {
@@ -8,7 +8,7 @@ async function loadFixture(filename) {
         const url = await import('url');
         const __filename = url.fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        return fs.readFileSync(path.join(__dirname, 'fixtures', filename));
+        return fs.readFileSync(path.join(__dirname, '../fixtures', filename));
     } else {
         const response = await fetch('/test/fixtures/' + filename);
         if (!response.ok) throw new Error(`Failed to load fixture: ${filename}`);

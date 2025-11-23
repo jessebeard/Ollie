@@ -1,0 +1,503 @@
+[1mRunning Tests...[0m
+
+
+[1mColor Space Conversion[0m
+  [32m✓[0m converts black correctly
+  [32m✓[0m converts white correctly
+  [32m✓[0m converts red correctly
+  [32m✓[0m converts blue correctly
+  [32m✓[0m handles grayscale values (R=G=B)
+  [32m✓[0m clamps output values (conceptually)
+  [32m✓[0m should roundtrip RGB -> YCbCr -> RGB
+  [32m✓[0m should roundtrip random colors
+
+[1mBlock Processing[0m
+
+[1mpadDimensions[0m
+
+[1mextractBlock[0m
+  [32m✓[0m should return same dimensions if already multiple of 8
+  [32m✓[0m should pad width to next multiple of 8
+  [32m✓[0m should pad height to next multiple of 8
+  [32m✓[0m should pad both dimensions
+  [32m✓[0m should handle 1x1 image
+  [32m✓[0m should extract a full 8x8 block from center
+  [32m✓[0m should pad right edge by clamping (repeating last column)
+  [32m✓[0m should pad bottom edge by clamping (repeating last row)
+  [32m✓[0m should pad corner by clamping both dimensions
+  [32m✓[0m should handle 1x1 image padding
+
+[1mJPEG Headers[0m
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write correct SOI marker
+  [32m✓[0m should write correct APP0 (JFIF) marker
+  [32m✓[0m should write DQT markers
+  [32m✓[0m should write correct SOF0 marker
+  [32m✓[0m should write DHT markers
+  [32m✓[0m should write SOS marker
+
+[1mDiscrete Cosine Transform[0m
+  [32m✓[0m transforms a zero block to all zeros
+  [32m✓[0m transforms a flat block (DC only)
+  [32m✓[0m is linear (DCT(A + B) = DCT(A) + DCT(B))
+  [32m✓[0m scales linearly (DCT(k * A) = k * DCT(A))
+  [32m✓[0m handles impulse response (single pixel set)
+  [32m✓[0m produces symmetric output for symmetric input
+  [32m✓[0m handles negative input values
+  [32m✓[0m is reversible (sanity check logic)
+  [32m✓[0m should roundtrip random data with IDCT
+  [32m✓[0m should roundtrip with inverse DCT (IDCT)
+
+[1mQuantization[0m
+  [32m✓[0m quantizes a block correctly
+  [32m✓[0m quantizes a zero block to all zeros
+  [32m✓[0m quantizes a block correctly (basic division)
+  [32m✓[0m handles rounding correctly
+  [32m✓[0m handles negative values
+  [32m✓[0m uses different quantization values per coefficient
+  [32m✓[0m handles large values without overflow (JS numbers are doubles)
+  [32m✓[0m should roundtrip with loss (quantization noise)
+  [32m✓[0m should roughly roundtrip with dequantize
+
+[1mZigZag Reordering[0m
+  [32m✓[0m reorders a block correctly
+  [32m✓[0m should handle all-zero blocks efficiently
+  [32m✓[0m should throw error on invalid array length
+  [32m✓[0m should handle Float32Array input
+  [32m✓[0m should roundtrip random data
+  [32m✓[0m should roundtrip with inverseZigZag
+
+[1mHuffman Coding[0m
+  [32m✓[0m computes categories correctly
+  [32m✓[0m writes bits correctly using BitWriter
+  [32m✓[0m expands buffer dynamically
+  [32m✓[0m performs byte stuffing (0xFF -> 0xFF 0x00)
+  [32m✓[0m performs byte stuffing across writes
+  [32m✓[0m encodes a simple block
+
+[1mJpegEncoder Integration[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 4
+Total JPEG file size: 413 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 72
+Total JPEG file size: 481 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 9
+Total JPEG file size: 418 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 5
+Total JPEG file size: 414 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 15
+Total JPEG file size: 424 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 4
+Total JPEG file size: 413 bytes
+  [32m✓[0m encodes a small 8x8 white block without errors
+  [32m✓[0m encodes a 16x16 image (multiple blocks)
+  [32m✓[0m encodes an image with odd dimensions (padding check)
+  [32m✓[0m encodes a 1x1 image
+  [32m✓[0m encodes a rectangular image (non-square)
+  [32m✓[0m produces valid headers
+
+[1mFrameHeaderParser[0m
+  [32m✓[0m should parse image width (X)
+  [32m✓[0m should parse image height (Y)
+  [32m✓[0m should parse sample precision (P, typically 8)
+  [32m✓[0m should parse number of components (Nf: 1=grayscale, 3=color)
+  [32m✓[0m should parse component IDs (C)
+  [32m✓[0m should parse sampling factors (H and V)
+  [32m✓[0m should parse quantization table selectors (Tq)
+  [32m✓[0m should calculate MCU dimensions from max sampling factors
+  [32m✓[0m should validate baseline constraints (P=8)
+  [32m✓[0m should validate image dimensions
+  [32m✓[0m should validate number of components
+  [32m✓[0m should throw error on incomplete data
+  [32m✓[0m should calculate MCU counts correctly
+
+[1mScanHeaderParser[0m
+  [32m✓[0m should parse number of components in scan (Ns)
+  [32m✓[0m should parse component selectors (Cs)
+  [32m✓[0m should parse DC table selectors (Td)
+  [32m✓[0m should parse AC table selectors (Ta)
+  [32m✓[0m should parse spectral selection (Ss, Se)
+  [32m✓[0m should parse successive approximation (Ah, Al)
+  [32m✓[0m should validate sequential DCT parameters (Ss=0, Se=63, Ah=0, Al=0)
+  [32m✓[0m should reject progressive spectral selection
+  [32m✓[0m should reject progressive successive approximation
+  [32m✓[0m should validate DC table ID range
+  [32m✓[0m should validate AC table ID range
+  [32m✓[0m should validate number of components range
+  [32m✓[0m should throw error on incomplete data
+  [32m✓[0m should map components to Huffman tables correctly
+
+[1mHuffmanTableParser[0m
+  [32m✓[0m should parse DC table (Tc=0)
+  [32m✓[0m should parse AC table (Tc=1)
+  [32m✓[0m should extract table destination ID (0-3)
+  [32m✓[0m should parse BITS array (16 bytes)
+  [32m✓[0m should parse HUFFVAL array (variable length)
+  [32m✓[0m should validate BITS sum <= 256
+  [32m✓[0m should build lookup table for fast decoding
+  [32m✓[0m should handle multiple tables in one DHT segment
+  [32m✓[0m should validate table class
+  [32m✓[0m should validate table ID range
+  [32m✓[0m should throw error on incomplete BITS array
+  [32m✓[0m should throw error on incomplete HUFFVAL array
+  [32m✓[0m should decode simple Huffman codes
+  [32m✓[0m should parse tables from multiple DHT segments
+
+[1mQuantizationTableParser[0m
+  [32m✓[0m should parse 8-bit precision table (Pq=0)
+  [32m✓[0m should parse 16-bit precision table (Pq=1)
+  [32m✓[0m should extract table destination ID (0-3)
+  [32m✓[0m should parse 64 elements
+  [32m✓[0m should handle multiple tables in one DQT segment
+  [32m✓[0m should validate table ID range
+  [32m✓[0m should validate precision value
+  [32m✓[0m should throw error on incomplete table data
+  [32m✓[0m should parse tables from multiple DQT segments
+  [32m✓[0m should handle table override in multiple segments
+  [32m✓[0m should parse offset parameter correctly
+
+[1mHuffmanDecoder[0m
+  [32m✓[0m should decode DC coefficient category (SSSS)
+  [32m✓[0m should decode DC coefficient value from additional bits
+  [32m✓[0m should handle negative DC values (magnitude encoding)
+  [32m✓[0m should decode AC coefficient run/size symbols
+  [32m✓[0m should handle ZRL (0xF0) - 16 zeros
+  [32m✓[0m should handle EOB (0x00) - end of block
+  [32m✓[0m should decode AC coefficient values from additional bits
+  [32m✓[0m should maintain DC predictor per component
+  [32m✓[0m should decode a complete 8x8 block
+  [32m✓[0m should handle run-length encoding correctly
+  [32m✓[0m should handle magnitude encoding for various categories
+
+[1mInverseZigZag[0m
+  [32m✓[0m should convert 64-element array to 8x8 block
+  [32m✓[0m should use correct inverse zigzag order
+  [32m✓[0m should match encoder zigzag pattern
+  [32m✓[0m should handle all-zero blocks efficiently
+  [32m✓[0m should preserve coefficient values
+  [32m✓[0m should throw error on invalid array length
+  [32m✓[0m should handle Float32Array input
+  [32m✓[0m should verify complete zigzag pattern
+  [32m✓[0m should correctly reorder specific test pattern
+  [32m✓[0m should handle negative coefficients
+
+[1mDequantization[0m
+  [32m✓[0m should multiply coefficients by quantization table values
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+  [32m✓[0m should preserve negative coefficients
+  [32m✓[0m should work with Float32Array input
+  [32m✓[0m should validate block length
+  [32m✓[0m should validate quantization table length
+  [32m✓[0m should handle typical JPEG quantization table
+  [32m✓[0m should process all 64 coefficients
+
+[1mNaive IDCT[0m
+
+[1mAAN IDCT[0m
+  [31m✗[0m should roundtrip with forward DCT for constant block
+    [90mExpected true but got false[0m
+  [31m✗[0m should roundtrip with forward DCT for gradient block
+    [90mExpected true but got false[0m
+  [31m✗[0m should roundtrip with forward DCT for checkerboard pattern
+    [90mExpected true but got false[0m
+  [31m✗[0m should roundtrip with forward DCT for random block
+    [90mExpected true but got false[0m
+  [32m✓[0m should validate coefficient block length
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+  [32m✓[0m should roundtrip with forward DCT for constant block
+  [32m✓[0m should roundtrip with forward DCT for gradient block
+  [32m✓[0m should roundtrip with forward DCT for checkerboard pattern
+  [32m✓[0m should roundtrip with forward DCT for random block
+  [32m✓[0m should validate coefficient block length
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+
+[1mIDCT Switching[0m
+  [32m✓[0m should allow configuring the IDCT method
+  [32m✓[0m should use the configured IDCT method during decoding
+
+[1mYCbCr to RGB Conversion[0m
+  [32m✓[0m should convert black correctly
+  [32m✓[0m should convert white correctly
+  [32m✓[0m should convert pure red correctly
+  [32m✓[0m should convert pure green correctly
+  [32m✓[0m should convert pure blue correctly
+  [32m✓[0m should clamp RGB values to 0-255 range
+  [32m✓[0m should handle grayscale values
+  [32m✓[0m should roundtrip with RGB to YCbCr
+  [32m✓[0m should use JFIF standard formulas
+  [32m✓[0m should handle edge case with Cb=0, Cr=0
+  [32m✓[0m should handle edge case with Cb=255, Cr=255
+
+[1mChroma Upsampling[0m
+  [32m✓[0m should upsample 2x2 to 4x4 using nearest neighbor
+  [32m✓[0m should upsample 2x2 to 4x4 using bilinear interpolation
+  [32m✓[0m should handle 4:2:0 upsampling (2x horizontal, 2x vertical)
+  [32m✓[0m should handle 4:2:2 upsampling (2x horizontal only)
+  [32m✓[0m should handle 4:4:4 (no upsampling needed)
+  [32m✓[0m should handle edge pixels correctly in bilinear
+  [32m✓[0m should upsample with upsampleChroma for 4:2:0
+  [32m✓[0m should not upsample Y component
+  [32m✓[0m should handle 4:2:2 with upsampleChroma
+  [32m✓[0m should preserve values in nearest neighbor upsampling
+  [32m✓[0m should create smooth gradients with bilinear interpolation
+
+[1mBlock Assembly[0m
+  [32m✓[0m should assemble single 8x8 block
+  [32m✓[0m should assemble multiple blocks horizontally
+  [32m✓[0m should assemble multiple blocks vertically
+  [32m✓[0m should handle partial blocks at edges
+  [32m✓[0m should assemble 2x2 grid of blocks
+  [32m✓[0m should convert YCbCr components to RGBA ImageData
+  [32m✓[0m should set alpha channel to 255
+  [32m✓[0m should convert grayscale to RGBA ImageData
+  [32m✓[0m should clamp RGB values in componentsToImageData
+  [32m✓[0m should crop image data correctly
+  [32m✓[0m should not crop if dimensions match
+  [32m✓[0m should handle non-multiple-of-8 dimensions
+
+[1mJpegDecoder Integration[0m
+  [32m✓[0m should validate SOI marker
+  [32m✓[0m should require SOF0 marker
+  [31m✗[0m should decode solid black 8x8 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/solid-black-8x8.jpg'[0m
+  [31m✗[0m should decode solid white 8x8 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/solid-white-8x8.jpg'[0m
+  [31m✗[0m should decode solid red 8x8 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/solid-red-8x8.jpg'[0m
+  [31m✗[0m should decode checkerboard 8x8 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/checkerboard-8x8.jpg'[0m
+  [31m✗[0m should decode gradient 16x16 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/gradient-16x16.jpg'[0m
+  [31m✗[0m should decode color blocks 24x24 JPEG
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/color-blocks-24x24.jpg'[0m
+  [31m✗[0m should set alpha channel to 255
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/solid-black-8x8.jpg'[0m
+  [31m✗[0m should handle different quality settings
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/checkerboard-8x8-q10.jpg'[0m
+  [31m✗[0m should reset state between decodes
+    [90mENOENT: no such file or directory, open '/mnt/f/Code/Olli/Ollie/test/core/fixtures/solid-black-8x8.jpg'[0m
+
+[1mEncoder-Decoder Roundtrip[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 4
+Total JPEG file size: 413 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 4
+Total JPEG file size: 413 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 5
+Total JPEG file size: 414 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 26
+Total JPEG file size: 435 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 3
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 9
+Total JPEG file size: 418 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 21
+Total JPEG file size: 430 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 9
+Total JPEG file size: 418 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 9
+Total JPEG file size: 418 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 26
+Total JPEG file size: 435 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 3
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 3
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 3
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 5
+Total JPEG file size: 414 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 3
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished processing blocks, flushing writer
+Writer flushed, assembling file
+Headers length: 407
+Scan data length: 7
+Total JPEG file size: 416 bytes
+  [32m✓[0m should roundtrip solid black image
+  [32m✓[0m should roundtrip solid white image
+  [32m✓[0m should roundtrip solid color image
+  [32m✓[0m should roundtrip gradient image
+  [32m✓[0m should maintain image dimensions
+  [32m✓[0m should produce acceptable quality at Q=90
+  [32m✓[0m should handle different quality settings
+  [32m✓[0m should preserve alpha channel
+  [32m✓[0m should handle edge case 1x1 image
+  [32m✓[0m should handle 8x8 image (single MCU)
+
+[1mUI Tests[0m
+  [32m✓[0m Download link should be hidden initially
+
+[1mTest Summary:[0m
+  Total:  215
+  [32mPassed: 202[0m
+  [31mFailed: 13[0m

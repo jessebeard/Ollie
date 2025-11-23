@@ -1,5 +1,5 @@
-import { JpegEncoder } from './jpeg-encoder.js';
-import { JpegDecoder } from './jpeg-decoder.js';
+import { JpegEncoder } from './core/jpeg-encoder.js';
+import { JpegDecoder } from './core/jpeg-decoder.js';
 import { idctNaive, idctAAN } from './core/decoder/idct.js';
 import { idctPureRef, idctOptimizedRef, idctFastAAN } from './core/decoder/idct-spec.js';
 import { HuffmanTable } from './core/decoder/huffman-parser.js';

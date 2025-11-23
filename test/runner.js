@@ -90,14 +90,14 @@ async function runTests() {
         resetStats();
 
         // Import all test files
-        await import('./core/colorspace.test.js');
+        await import('./core/encoder/colorspace.test.js');
         await import('./core/encoder/blocks.test.js');
         await import('./core/encoder/headers.test.js');
-        await import('./core/dct.test.js');
-        await import('./core/quantization.test.js');
-        await import('./core/zigzag.test.js');
-        await import('./core/huffman.test.js');
-        await import('./jpeg-encoder.test.js');
+        await import('./core/encoder/dct.test.js');
+        await import('./core/encoder/quantization.test.js');
+        await import('./core/encoder/zigzag.test.js');
+        await import('./core/encoder/huffman.test.js');
+        await import('./core/jpeg-encoder.test.js');
 
         // Decoder Tests
         await import('./core/decoder/frame-parser.test.js');
@@ -114,7 +114,7 @@ async function runTests() {
         await import('./core/decoder/block-assembly.test.js');
 
         // Integration Tests
-        await import('./jpeg-decoder.test.js');
+        await import('./core/jpeg-decoder.test.js');
         await import('./integration/roundtrip.test.js');
 
         await import('./ui.test.js');

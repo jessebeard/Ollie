@@ -1,6 +1,6 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { BitWriter } from '../../src/utils/bit-writer.js';
-import { computeCategory, encodeBlock } from '../../src/core/huffman.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { BitWriter } from '../../../src/utils/bit-writer.js';
+import { computeCategory, encodeBlock } from '../../../src/core/encoder/huffman.js';
 
 describe('Huffman Coding', () => {
     it('computes categories correctly', () => {

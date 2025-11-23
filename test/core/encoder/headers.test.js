@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { JpegEncoder } from '../../../src/jpeg-encoder.js';
+import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
 
 describe('JPEG Headers', () => {
     it('should write correct SOI marker', () => {

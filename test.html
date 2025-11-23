@@ -58,14 +58,14 @@
 
     <script type="module">
         // Encoder Tests
-        import './test/core/colorspace.test.js';
+        import './test/core/encoder/colorspace.test.js';
         import './test/core/encoder/blocks.test.js';
         import './test/core/encoder/headers.test.js';
-        import './test/core/dct.test.js';
-        import './test/core/quantization.test.js';
-        import './test/core/zigzag.test.js';
-        import './test/core/huffman.test.js';
-        import './test/jpeg-encoder.test.js';
+        import './test/core/encoder/dct.test.js';
+        import './test/core/encoder/quantization.test.js';
+        import './test/core/encoder/zigzag.test.js';
+        import './test/core/encoder/huffman.test.js';
+        import './test/core/jpeg-encoder.test.js';
 
         // Decoder Tests - Phase 1-4
         import './test/core/decoder/frame-parser.test.js';
@@ -83,7 +83,7 @@
         import './test/core/decoder/block-assembly.test.js';
 
         // Integration Tests - Phase 6
-        import './test/jpeg-decoder.test.js';
+        import './test/core/jpeg-decoder.test.js';
         import './test/integration/roundtrip.test.js';
     </script>
 </body>
