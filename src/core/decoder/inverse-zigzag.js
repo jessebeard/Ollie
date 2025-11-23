@@ -24,12 +24,12 @@ export const ZIGZAG_ORDER = new Int32Array([
  * @param {Int32Array|Float32Array} zigzagArray - 64-element array in zigzag order
  * @returns {Float32Array} 64-element array in natural 2D order (row-major)
  */
-export function inverseZigZag(zigzagArray) {
+export function inverseZigZag(zigzagArray, outputBuffer = null) {
     if (zigzagArray.length !== 64) {
         throw new Error(`Invalid zigzag array length: ${zigzagArray.length} (expected 64)`);
     }
 
-    const block = new Float32Array(64);
+    const block = outputBuffer || new Float32Array(64);
 
     // Inverse operation: zigzagArray[i] goes to position ZIGZAG_ORDER[i]
     for (let i = 0; i < 64; i++) {

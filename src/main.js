@@ -4,6 +4,7 @@ import { idctNaive, idctAAN } from './core/decoder/idct.js';
 import { idctPureRef, idctOptimizedRef, idctFastAAN } from './core/decoder/idct-spec.js';
 import { HuffmanTable } from './core/decoder/huffman-parser.js';
 import { BitReader } from './utils/bit-reader.js';
+import { dequantize, dequantizeBypass } from './core/decoder/dequantization.js';
 
 function init() {
     const fileInput = document.getElementById('file-input');
@@ -133,6 +134,18 @@ function init() {
                         decoder.setIdctMethod(idctNaive);
                         console.log('Using Legacy Naive IDCT');
                         break;
+                }
+            }
+
+            // Configure Dequantization method
+            const dequantSelect = document.getElementById('dequant-method');
+            if (dequantSelect) {
+                if (dequantSelect.value === 'bypass') {
+                    decoder.setDequantizationMethod(dequantizeBypass);
+                    console.log('Using Bypass Dequantization');
+                } else {
+                    decoder.setDequantizationMethod(dequantize);
+                    console.log('Using Standard Dequantization');
                 }
             }
 

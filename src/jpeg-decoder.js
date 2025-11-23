@@ -35,6 +35,19 @@ export class JpegDecoder {
     hardreset() {
         this.reset();
         this.idctMethod = idctPureRef;
+        this.dequantizeMethod = dequantize;
+    }
+
+    /**
+     * Set the Dequantization implementation to use
+     * @param {Function} method - Dequantization function
+     */
+    setDequantizationMethod(method) {
+        if (typeof method === 'function') {
+            this.dequantizeMethod = method;
+        } else {
+            throw new Error('setDequantizationMethod expects a function');
+        }
     }
 
     /**
@@ -225,13 +238,24 @@ export class JpegDecoder {
             }
 
             // Process each block
+            // Reusable buffers to avoid allocation per block
+            const tempDequant = new Float32Array(64);
+            // Note: idctFastAAN modifies its input in-place, so we can't reuse tempZigZag for it
+            // For other IDCT methods, reuse the buffer for performance
+            const canReuseZigZagBuffer = this.idctMethod !== idctFastAAN;
+            const tempZigZag = canReuseZigZagBuffer ? new Float32Array(64) : null;
+
+            // Process each block
             const processedBlocks = compData.blocks.map(block => {
                 // Dequantize (BEFORE inverse zigzag)
                 // The quantization table is in ZigZag order, and the block is in ZigZag order
-                const dequantized = dequantize(block, quantTable);
+                // Use reusable buffer
+                const dequantized = this.dequantizeMethod(block, quantTable, tempDequant);
 
                 // Inverse zigzag
-                const block2D = inverseZigZag(dequantized);
+                // If using Fast AAN (which modifies in-place), allocate fresh buffer per block
+                // Otherwise, reuse the buffer
+                const block2D = inverseZigZag(dequantized, tempZigZag);
 
                 // IDCT
                 const spatial = this.idctMethod(block2D);
