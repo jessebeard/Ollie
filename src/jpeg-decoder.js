@@ -226,19 +226,20 @@ export class JpegDecoder {
 
             // Process each block
             const processedBlocks = compData.blocks.map(block => {
+                // Dequantize (BEFORE inverse zigzag)
+                // The quantization table is in ZigZag order, and the block is in ZigZag order
+                const dequantized = dequantize(block, quantTable);
+
                 // Inverse zigzag
-                const block2D = inverseZigZag(block);
-
-                // Dequantize
-                const dequantized = dequantize(block2D, quantTable);
+                const block2D = inverseZigZag(dequantized);
 
                 // IDCT
-                // IDCT
-                const spatial = this.idctMethod(dequantized);
+                const spatial = this.idctMethod(block2D);
 
-                // Level shift (+128)
+                // Level shift (+128) and Clamp
                 for (let i = 0; i < 64; i++) {
-                    spatial[i] += 128;
+                    const val = spatial[i] + 128;
+                    spatial[i] = Math.max(0, Math.min(255, val));
                 }
 
                 return spatial;
