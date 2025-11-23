@@ -7,6 +7,8 @@ export class BitReaderNaive {
         this.data = data;
         this.byteOffset = 0;
         this.bitOffset = 0; // 0-7, position within current byte
+        this.destuffedPositions = new Set(); // Track positions where we've removed stuffed bytes
+        this.isPeeking = false; // Flag to prevent array modification during peek
     }
 
     /**
@@ -19,6 +21,11 @@ export class BitReaderNaive {
             this._handleByteStuffing();
         }
 
+        // During peek, if we've gone past end of data, return 0
+        if (this.isPeeking && this.byteOffset >= this.data.length) {
+            return 0;
+        }
+
         const currentByte = this.data[this.byteOffset];
         const bit = (currentByte >> (7 - this.bitOffset)) & 1;
 
@@ -26,6 +33,16 @@ export class BitReaderNaive {
         if (this.bitOffset === 8) {
             this.bitOffset = 0;
             this.byteOffset++;
+
+            // CRITICAL: If we just finished reading an 0xFF and next byte is 0x00 (stuffed byte)
+            // Skip the 0x00 during peek, or it's already removed during actual read
+            if (currentByte === 0xFF && this.byteOffset < this.data.length && this.data[this.byteOffset] === 0x00) {
+                if (this.isPeeking) {
+                    // During peek: skip over the stuffed 0x00
+                    this.byteOffset++;
+                }
+                // During actual read: 0x00 was already removed by _handleByteStuffing, so nothing to do
+            }
         }
 
         return bit;
@@ -53,8 +70,12 @@ export class BitReaderNaive {
         const savedByteOffset = this.byteOffset;
         const savedBitOffset = this.bitOffset;
 
+        // Set peeking flag to prevent array modification
+        this.isPeeking = true;
         const value = this.readBits(length);
+        this.isPeeking = false;
 
+        // Restore position
         this.byteOffset = savedByteOffset;
         this.bitOffset = savedBitOffset;
 
@@ -89,6 +110,11 @@ export class BitReaderNaive {
      */
     _handleByteStuffing() {
         if (this.byteOffset >= this.data.length) {
+            // During peek operations, we might read past end temporarily
+            // This is OK because position will be restored
+            if (this.isPeeking) {
+                return null;
+            }
             throw new Error('Unexpected end of data');
         }
 
@@ -100,13 +126,17 @@ export class BitReaderNaive {
             const nextByte = this.data[this.byteOffset + 1];
 
             if (nextByte === 0x00) {
-                // Byte stuffing: 0xFF 0x00 -> 0xFF
-                // Skip the 0x00 byte by removing it from data
-                this.data = new Uint8Array([
-                    ...this.data.slice(0, this.byteOffset + 1),
-                    ...this.data.slice(this.byteOffset + 2)
-                ]);
-                // Continue reading from current 0xFF byte
+                // Byte stuffing: 0xFF 0x00 -> 0xFF (per JPEG T.81 spec)
+                if (!this.isPeeking && !this.destuffedPositions.has(this.byteOffset)) {
+                    // Only modify array during actual reads, not during peek
+                    this.data = new Uint8Array([
+                        ...this.data.slice(0, this.byteOffset + 1),
+                        ...this.data.slice(this.byteOffset + 2)
+                    ]);
+                    // Mark this position as destuffed
+                    this.destuffedPositions.add(this.byteOffset);
+                }
+                // Continue reading from current 0xFF byte as data
             } else if (nextByte >= 0xD0 && nextByte <= 0xD7) {
                 // Restart marker (RSTm)
                 // Skip both bytes and reset DC predictors (handled by caller)
