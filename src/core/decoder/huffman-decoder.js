@@ -41,25 +41,29 @@ export function decodeDC(bitReader, table, previousDC) {
  * @param {HuffmanTable} table - AC Huffman table
  * @param {Int32Array} block - 64-element block to fill (DC already set at index 0)
  */
-export function decodeAC(bitReader, table, block) {
-    let k = 1; // Start after DC coefficient
+export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
+    let k = Ss;
 
-    while (k < 64) {
+    if (k === 0) k = 1; // AC starts at 1
+
+    while (k <= Se) {
         // Decode run/size symbol
         const symbol = table.decode(bitReader);
 
         if (symbol === 0x00) {
-            // EOB (End of Block) - all remaining coefficients are zero
-            for (let i = k; i < 64; i++) {
-                block[i] = 0;
-            }
+            // EOB (End of Block) - all remaining coefficients in this band are zero
+            // Note: In progressive, this means rest of the band (up to Se) is zero.
+            // Since we initialize block to zeros (or it has previous values?), 
+            // if it's the first AC scan, zeros are fine.
+            // If it's a refinement scan, EOB has different meaning (not implemented yet).
+            // For now assuming Spectral Selection only (Ah=0, Al=0).
             break;
         }
 
         if (symbol === 0xF0) {
             // ZRL (Zero Run Length) - 16 zeros
-            for (let i = 0; i < 16 && k < 64; i++, k++) {
-                block[k] = 0;
+            for (let i = 0; i < 16 && k <= Se; i++, k++) {
+                // block[k] is already 0 if initialized
             }
             continue;
         }
@@ -69,11 +73,11 @@ export function decodeAC(bitReader, table, block) {
         const size = symbol & 0x0F;
 
         // Skip zeros
-        for (let i = 0; i < runLength && k < 64; i++, k++) {
-            block[k] = 0;
+        for (let i = 0; i < runLength && k <= Se; i++, k++) {
+            // block[k] is 0
         }
 
-        if (k >= 64) break;
+        if (k > Se) break;
 
         // Read and decode coefficient value
         if (size > 0) {
@@ -81,11 +85,6 @@ export function decodeAC(bitReader, table, block) {
             block[k] = decodeValue(bits, size);
             k++;
         }
-    }
-
-    // Fill any remaining coefficients with zeros
-    while (k < 64) {
-        block[k++] = 0;
     }
 }
 
@@ -111,23 +110,37 @@ export function decodeValue(bits, size) {
 }
 
 /**
- * Decode a complete 8x8 block of quantized coefficients
+ * Decode a complete or partial 8x8 block of quantized coefficients
  * 
  * @param {BitReader} bitReader - Bit reader positioned at block start
  * @param {HuffmanTable} dcTable - DC Huffman table
  * @param {HuffmanTable} acTable - AC Huffman table
  * @param {number} previousDC - Previous DC value for this component
+ * @param {Int32Array} [block] - Existing block to update (optional)
+ * @param {number} [Ss] - Start of spectral selection (0-63)
+ * @param {number} [Se] - End of spectral selection (0-63)
  * @returns {{block: Int32Array, dc: number}} Decoded block and new DC value
  */
-export function decodeBlock(bitReader, dcTable, acTable, previousDC) {
-    const block = new Int32Array(64);
+export function decodeBlock(bitReader, dcTable, acTable, previousDC, block = null, Ss = 0, Se = 63) {
+    if (!block) {
+        block = new Int32Array(64);
+    }
 
-    // Decode DC coefficient
-    const dc = decodeDC(bitReader, dcTable, previousDC);
-    block[0] = dc;
+    let dc = previousDC;
 
-    // Decode AC coefficients
-    decodeAC(bitReader, acTable, block);
+    // Decode DC coefficient if Ss == 0
+    if (Ss === 0) {
+        dc = decodeDC(bitReader, dcTable, previousDC);
+        block[0] = dc;
+    }
+
+    // Decode AC coefficients if Se > 0
+    // Note: If Ss=0, AC starts at 1. If Ss > 0, AC starts at Ss.
+    if (Se > 0) {
+        // If Ss is 0, we start AC at 1.
+        const acStart = Math.max(1, Ss);
+        decodeAC(bitReader, acTable, block, acStart, Se);
+    }
 
     return { block, dc };
 }

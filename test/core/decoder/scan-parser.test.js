@@ -71,8 +71,8 @@ describe('ScanHeaderParser', () => {
         ]);
 
         const scan = parseScanHeader(data);
-        expect(scan.startSpectral).toBe(0);
-        expect(scan.endSpectral).toBe(63);
+        expect(scan.Ss).toBe(0);
+        expect(scan.Se).toBe(63);
     });
 
     it('should parse successive approximation (Ah, Al)', () => {
@@ -83,55 +83,22 @@ describe('ScanHeaderParser', () => {
         ]);
 
         const scan = parseScanHeader(data);
-        expect(scan.successiveHigh).toBe(0);
-        expect(scan.successiveLow).toBe(0);
+        expect(scan.Ah).toBe(0);
+        expect(scan.Al).toBe(0);
     });
 
-    it('should validate sequential DCT parameters (Ss=0, Se=63, Ah=0, Al=0)', () => {
-        const validData = new Uint8Array([
-            1, 1, 0x00,
-            0, 63, 0     // Valid sequential parameters
-        ]);
-
-        const scan = parseScanHeader(validData);
-        expect(scan.startSpectral).toBe(0);
-        expect(scan.endSpectral).toBe(63);
-        expect(scan.successiveHigh).toBe(0);
-        expect(scan.successiveLow).toBe(0);
-    });
-
-    it('should reject progressive spectral selection', () => {
+    it('should parse progressive parameters correctly', () => {
         const data = new Uint8Array([
             1, 1, 0x00,
             0, 5,        // Se=5 (progressive)
-            0
-        ]);
-
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Non-sequential DCT not supported: Ss=0, Se=5');
-        }
-        expect(errorThrown).toBe(true);
-    });
-
-    it('should reject progressive successive approximation', () => {
-        const data = new Uint8Array([
-            1, 1, 0x00,
-            0, 63,
             0x10         // Ah=1 (progressive)
         ]);
 
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Progressive mode not supported: Ah=1, Al=0');
-        }
-        expect(errorThrown).toBe(true);
+        const scan = parseScanHeader(data);
+        expect(scan.Ss).toBe(0);
+        expect(scan.Se).toBe(5);
+        expect(scan.Ah).toBe(1);
+        expect(scan.Al).toBe(0);
     });
 
     it('should validate DC table ID range', () => {

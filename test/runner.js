@@ -14,6 +14,16 @@ global.document = {
         // Matches: <tag ... id="value" ... > or <tag ... id='value' ... >
         const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
         const match = htmlContent.match(regex);
+        // console.log(`Searching for ID: ${id}`, match ? 'Found' : 'Not Found');
+        if (!match && id === 'progressive-checkbox') {
+            const idx = htmlContent.indexOf(id);
+            if (idx !== -1) {
+                console.log('Context around ID:', htmlContent.substring(idx - 50, idx + 50));
+            } else {
+                console.log('ID string not found in HTML content!');
+            }
+            console.log('Regex used:', regex);
+        }
 
         if (match) {
             const tag = match[0];
@@ -47,6 +57,14 @@ global.document = {
             });
             Object.defineProperty(element, 'download', {
                 get: () => element.getAttribute('download') || '',
+                set: () => { }
+            });
+            Object.defineProperty(element, 'type', {
+                get: () => element.getAttribute('type') || '',
+                set: () => { }
+            });
+            Object.defineProperty(element, 'checked', {
+                get: () => element.getAttribute('checked') !== null,
                 set: () => { }
             });
 

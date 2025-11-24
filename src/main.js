@@ -45,7 +45,10 @@ function init() {
             // Extract raw RGBA pixel data from the canvas. This is what the encoder needs.
             const imageData = ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
 
-            const encoder = new JpegEncoder();
+            const progressiveCheckbox = document.getElementById('progressive-checkbox');
+            const isProgressive = progressiveCheckbox ? progressiveCheckbox.checked : false;
+
+            const encoder = new JpegEncoder({ progressive: isProgressive });
             const jpegBytes = encoder.encode(imageData);
 
             // Convert the raw JPEG bytes into a Blob (Binary Large Object).
@@ -65,6 +68,13 @@ function init() {
                 const downloadLink = document.getElementById('download-link');
                 downloadLink.href = url;
                 downloadLink.style.display = 'inline-block';
+
+                // Update Encoder Info Pane
+                document.getElementById('encoder-info-size').textContent = `${jpegBytes.length} bytes`;
+                document.getElementById('encoder-info-dims').textContent = `${resImg.width}x${resImg.height}`;
+                document.getElementById('encoder-info-colorspace').textContent = 'YCbCr';
+                document.getElementById('encoder-info-progressive').textContent = isProgressive ? 'Yes' : 'No';
+                document.getElementById('encoder-info-chroma').textContent = '4:4:4';
             };
             resImg.src = url;
         } catch (e) {
@@ -178,6 +188,15 @@ function init() {
             ctx.putImageData(imageData, 0, 0);
 
             decodeStatus.textContent = `Decoded! ${result.width}x${result.height}`;
+
+            // Update Info Pane
+            if (result.metadata) {
+                document.getElementById('decoder-info-size').textContent = `${bytes.length} bytes`;
+                document.getElementById('decoder-info-dims').textContent = `${result.metadata.width}x${result.metadata.height}`;
+                document.getElementById('decoder-info-colorspace').textContent = result.metadata.colorSpace;
+                document.getElementById('decoder-info-progressive').textContent = result.metadata.progressive ? 'Yes' : 'No';
+                document.getElementById('decoder-info-chroma').textContent = result.metadata.chromaSubsampling;
+            }
         } catch (e) {
             console.error(e);
             decodeStatus.textContent = 'Error: ' + e.message;

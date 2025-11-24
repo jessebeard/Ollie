@@ -19,6 +19,8 @@ import { idctAAN, idctNaive } from './decoder/idct.js';
 import { upsampleChroma } from './decoder/upsampling.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './decoder/block-assembly.js';
 
+import { parseSpiffHeader } from './decoder/spiff-parser.js';
+
 export class JpegDecoder {
     constructor() {
         this.hardreset();
@@ -30,6 +32,8 @@ export class JpegDecoder {
         this.frameHeader = null;
         this.scanHeader = null;
         this.components = {};
+        this.jfif = null;
+        this.spiff = null;
     }
 
     hardreset() {
@@ -102,6 +106,41 @@ export class JpegDecoder {
             throw new Error('Invalid JPEG: Missing SOI marker');
         }
 
+        // Parse APP0 (JFIF)
+        if (segments.has('APP0')) {
+            const app0Segments = segments.get('APP0');
+            for (const segment of app0Segments) {
+                // Check for JFIF identifier: 0x4A 0x46 0x49 0x46 0x00
+                if (segment.data.length >= 5 &&
+                    segment.data[0] === 0x4A && segment.data[1] === 0x46 &&
+                    segment.data[2] === 0x49 && segment.data[3] === 0x46 &&
+                    segment.data[4] === 0x00) {
+
+                    const view = new DataView(segment.data.buffer, segment.data.byteOffset, segment.data.byteLength);
+                    this.jfif = {
+                        version: { major: segment.data[5], minor: segment.data[6] },
+                        densityUnits: segment.data[7],
+                        xDensity: view.getUint16(8, false),
+                        yDensity: view.getUint16(10, false),
+                        thumbWidth: segment.data[12],
+                        thumbHeight: segment.data[13]
+                    };
+                }
+            }
+        }
+
+        // Parse APP8 (SPIFF)
+        if (segments.has('APP8')) {
+            const app8Segments = segments.get('APP8');
+            for (const segment of app8Segments) {
+                try {
+                    this.spiff = parseSpiffHeader(segment.data);
+                } catch (e) {
+                    console.warn('Failed to parse APP8 (SPIFF) segment:', e.message);
+                }
+            }
+        }
+
         // Parse quantization tables (DQT)
         if (segments.has('DQT')) {
             const dqtSegments = segments.get('DQT');
@@ -124,42 +163,52 @@ export class JpegDecoder {
             }
         }
 
-        // Parse frame header (SOF0)
-        if (!segments.has('SOF0')) {
-            throw new Error('Unsupported JPEG: Only baseline sequential DCT (SOF0) is supported');
+        // Parse frame header (SOF0 or SOF2)
+        let sofData = null;
+        if (segments.has('SOF0')) {
+            sofData = segments.get('SOF0')[0].data;
+        } else if (segments.has('SOF2')) {
+            sofData = segments.get('SOF2')[0].data;
+        } else {
+            throw new Error('Unsupported JPEG: Missing SOF0 or SOF2 marker');
         }
-        this.frameHeader = parseFrameHeader(segments.get('SOF0')[0].data);
 
-        // Parse scan header (SOS)
+        this.frameHeader = parseFrameHeader(sofData);
+        this.frameHeader.sofType = segments.has('SOF2') ? 0xC2 : 0xC0;
+        this.initializeComponents();
+
+        // Phase 2: Decode entropy-coded data (Scans)
+        // We need to process SOS segments in order of appearance
+        // The 'segments' map doesn't preserve order of different marker types relative to each other if we iterate keys.
+        // But parseFileStructure returns a Map where values are arrays of segments.
+        // We need to iterate the original file or rely on the fact that we need to process all SOS segments.
+        // Actually, parseFileStructure might not be enough if we need strict ordering of DQT/DHT vs SOS.
+        // But usually DQT/DHT are before SOS.
+        // Multiple SOS segments are in the 'SOS' array in order.
+
         if (!segments.has('SOS')) {
             throw new Error('Invalid JPEG: Missing SOS marker');
         }
-        const sosSegment = segments.get('SOS')[0];
-        this.scanHeader = parseScanHeader(sosSegment.data, this.frameHeader);
 
-        // Phase 2: Decode entropy-coded data
-        const scanData = sosSegment.scanData;
-        if (!scanData) {
-            throw new Error('Invalid JPEG: Missing scan data');
+        const sosSegments = segments.get('SOS');
+        for (const sosSegment of sosSegments) {
+            const scanHeader = parseScanHeader(sosSegment.data, this.frameHeader);
+            const scanData = sosSegment.scanData;
+
+            if (!scanData) {
+                throw new Error('Invalid JPEG: Missing scan data');
+            }
+
+            this.decodeScan(scanData, scanHeader);
         }
-
-        this.decodeScans(scanData);
 
         // Phase 3: Reconstruct and assemble image
         return this.assembleImage();
     }
 
-    /**
-     * Decode entropy-coded scan data
-     * 
-     * @param {Uint8Array} scanData - Raw scan data bytes
-     */
-    decodeScans(scanData) {
-        const bitReader = new BitReader(scanData);
+    initializeComponents() {
         const { mcuCols, mcuRows } = this.frameHeader;
-        const totalMCUs = mcuCols * mcuRows;
 
-        // Initialize component storage
         this.components = {};
         for (const comp of this.frameHeader.components) {
             const blocksH = mcuCols * comp.hSampling;
@@ -171,20 +220,43 @@ export class JpegDecoder {
             }
 
             this.components[comp.id] = {
-                blocks: new Array(totalBlocks),
+                blocks: new Array(totalBlocks), // Will be filled with Int32Array(64)
                 blocksH,
                 blocksV,
                 hSampling: comp.hSampling,
-                vSampling: comp.vSampling
+                vSampling: comp.vSampling,
+                dcPredictor: 0 // Maintain DC predictor per component across scans? No, reset per scan usually.
+                // Wait, DC predictor is reset at start of scan (or restart interval).
             };
-        }
 
-        // DC predictors (one per component)
+            // Pre-allocate blocks? Or allocate on demand?
+            // On demand is fine, but we need to know if it exists to update it.
+            // Let's pre-allocate to avoid checks.
+            for (let i = 0; i < totalBlocks; i++) {
+                this.components[comp.id].blocks[i] = new Int32Array(64);
+            }
+        }
+    }
+
+    /**
+     * Decode entropy-coded scan data
+     * 
+     * @param {Uint8Array} scanData - Raw scan data bytes
+     * @param {Object} scanHeader - Parsed scan header
+     */
+    decodeScan(scanData, scanHeader) {
+        const bitReader = new BitReader(scanData);
+        const { mcuCols, mcuRows } = this.frameHeader;
+        const totalMCUs = mcuCols * mcuRows;
+
+        const { Ss, Se, Ah, Al } = scanHeader;
+
+        // DC predictors are reset at the start of the scan
         const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
 
         // Decode MCUs
         for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
-            for (const scanComp of this.scanHeader.components) {
+            for (const scanComp of scanHeader.components) {
                 const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
 
                 if (!frameComp) {
@@ -194,25 +266,43 @@ export class JpegDecoder {
                 const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
                 const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
 
-                if (!dcTable || !acTable) {
-                    throw new Error(`Missing Huffman table for component ${scanComp.selector}`);
+                // Note: dcTable is needed only if Ss=0. acTable only if Se>0.
+                // But we check existence anyway.
+                if (Ss === 0 && !dcTable) {
+                    throw new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
+                }
+                if (Se > 0 && !acTable) {
+                    throw new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
                 }
 
                 // Decode blocks for this component in this MCU
                 const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
                 for (let i = 0; i < blocksInMCU; i++) {
                     const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-                    const { dc, block } = decodeBlock(bitReader, dcTable, acTable, dcPredictors[compIndex]);
-                    dcPredictors[compIndex] = dc;
 
-                    // Store block
+                    // Calculate block index
                     const mcuRow = Math.floor(mcuIndex / mcuCols);
                     const mcuCol = mcuIndex % mcuCols;
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
                     const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
                     const blockIndex = blockRow * this.components[scanComp.selector].blocksH + blockCol;
 
-                    this.components[scanComp.selector].blocks[blockIndex] = block;
+                    const block = this.components[scanComp.selector].blocks[blockIndex];
+
+                    const { dc } = decodeBlock(
+                        bitReader,
+                        dcTable,
+                        acTable,
+                        dcPredictors[compIndex],
+                        block,
+                        Ss,
+                        Se
+                    );
+
+                    // Update predictor only if we decoded DC (Ss=0)
+                    if (Ss === 0) {
+                        dcPredictors[compIndex] = dc;
+                    }
                 }
             }
         }
@@ -303,10 +393,34 @@ export class JpegDecoder {
                         cropped[dstOffset + 3] = fullImageData[srcOffset + 3];
                     }
                 }
-                return { data: cropped, width, height };
+                return {
+                    data: cropped,
+                    width,
+                    height,
+                    metadata: {
+                        width: yComp.width,
+                        height: yComp.height,
+                        components: components.length,
+                        colorSpace: 'Grayscale',
+                        progressive: this.frameHeader.sofType === 0xC2,
+                        chromaSubsampling: '4:4:4'
+                    }
+                };
             }
 
-            return { data: fullImageData, width: yComp.width, height: yComp.height };
+            return {
+                data: fullImageData,
+                width: yComp.width,
+                height: yComp.height,
+                metadata: {
+                    width: yComp.width,
+                    height: yComp.height,
+                    components: components.length,
+                    colorSpace: 'Grayscale',
+                    progressive: this.frameHeader.sofType === 0xC2,
+                    chromaSubsampling: '4:4:4'
+                }
+            };
         } else {
             // Color - upsample chroma if needed
             // Standard JPEG component IDs: 1=Y, 2=Cb, 3=Cr
@@ -344,10 +458,50 @@ export class JpegDecoder {
                         cropped[dstOffset + 3] = fullImageData[srcOffset + 3];
                     }
                 }
-                return { data: cropped, width, height };
+                return {
+                    data: cropped,
+                    width,
+                    height,
+                    metadata: {
+                        width: yComp.width,
+                        height: yComp.height,
+                        components: components.length,
+                        colorSpace: 'YCbCr',
+                        progressive: this.frameHeader.sofType === 0xC2,
+                        chromaSubsampling: this.getChromaSubsamplingString(components)
+                    }
+                };
             }
 
-            return { data: fullImageData, width: yComp.width, height: yComp.height };
+            return {
+                data: fullImageData,
+                width: yComp.width,
+                height: yComp.height,
+                metadata: {
+                    width: yComp.width,
+                    height: yComp.height,
+                    components: components.length,
+                    colorSpace: 'YCbCr',
+                    progressive: this.frameHeader.sofType === 0xC2,
+                    chromaSubsampling: this.getChromaSubsamplingString(components)
+                }
+            };
+        }
+    }
+
+    getChromaSubsamplingString(components) {
+        const y = components[0];
+        const cb = components[1];
+        const cr = components[2];
+
+        if (y.hSampling === 1 && y.vSampling === 1 && cb.hSampling === 1 && cb.vSampling === 1 && cr.hSampling === 1 && cr.vSampling === 1) {
+            return '4:4:4';
+        } else if (y.hSampling === 2 && y.vSampling === 1 && cb.hSampling === 1 && cb.vSampling === 1 && cr.hSampling === 1 && cr.vSampling === 1) {
+            return '4:2:2';
+        } else if (y.hSampling === 2 && y.vSampling === 2 && cb.hSampling === 1 && cb.vSampling === 1 && cr.hSampling === 1 && cr.vSampling === 1) {
+            return '4:2:0';
+        } else {
+            return `${y.hSampling}x${y.vSampling},${cb.hSampling}x${cb.vSampling},${cr.hSampling}x${cr.vSampling}`;
         }
     }
 }

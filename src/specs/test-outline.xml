@@ -13,12 +13,16 @@
                     <file name="huffman.test.js" description="Tests for Huffman coding logic." />
                     <file name="quantization.test.js" description="Tests for quantization tables and logic." />
                     <file name="zigzag.test.js" description="Tests for ZigZag reordering." />
+                    <file name="spiff-generation.test.js" description="Tests for SPIFF APP8 marker generation." />
+                    <file name="progressive-encoding.test.js" description="Tests for Progressive JPEG encoding (multi-scan)." />
                 </directory>
                 <directory name="decoder" description="Unit tests for decoder algorithms">
                     <file name="quantization-parser.test.js" description="Tests for DQT segment parsing." />
                     <file name="huffman-parser.test.js" description="Tests for DHT segment parsing." />
                     <file name="frame-parser.test.js" description="Tests for SOF0 frame header parsing." />
                     <file name="scan-parser.test.js" description="Tests for SOS scan header parsing." />
+                    <file name="spiff-parsing.test.js" description="Tests for SPIFF APP8 marker parsing." />
+                    <file name="progressive-decoding.test.js" description="Tests for Progressive JPEG decoding." />
                     <file name="huffman-decoder.test.js" description="Tests for Huffman entropy decoding." />
                     <file name="inverse-zigzag.test.js" description="Tests for inverse zigzag reordering." />
                     <file name="dequantization.test.js" description="Tests for dequantization." />

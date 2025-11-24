@@ -78,7 +78,7 @@ sequenceDiagram
     %% ---------------- ENCODING ----------------
 
     Note over RGB: RGB Data Matrix (png)
-    RGB->>Color: RGB Bitstream Data
+    RGB->>Color: RGB Data
 
     Note over Color: Encoding Step: Color Space Conversion<br>- RGB → YCbCr<br>- Optional chroma subsampling<br>- Center shift (subtract 128)
     Color->>Blocks: Y, Cb, Cr component data
@@ -106,7 +106,7 @@ sequenceDiagram
 
     %% ---------------- DECODING ----------------
     Note over Bitstream: Decoding Step: Huffman Decoding
-    Bitstream->>Headers: Headers
+    Bitstream->>Headers: Jpeg File
 
     Note over Headers: Decoding Step: Headers<br>- Read frame header<br>- Read scan header<br>- Read quantization tables<br>- Read Huffman tables
     Headers->>Huffman: Huffman table

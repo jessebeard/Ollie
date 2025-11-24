@@ -19,10 +19,10 @@ describe('Huffman Coding', () => {
         writer.writeBits(0b11, 2);
 
         // Should have 5 bits: 10111
-        // Flushed to byte: 10111000 (0xB8)
+        // Flushed to byte: 10111111 (0xBF) - JPEG uses 1-padding
         const bytes = writer.flush();
         expect(bytes.length).toBe(1);
-        expect(bytes[0]).toBe(0xB8);
+        expect(bytes[0]).toBe(0xBF);
     });
 
     it('expands buffer dynamically', () => {

@@ -81,54 +81,65 @@ const STD_AC_LUMINANCE_VALUES = [
 
 export const AC_LUMA_TABLE = generateHuffmanTable(STD_AC_LUMINANCE_NRCODES, STD_AC_LUMINANCE_VALUES);
 
-export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, acTable = AC_LUMA_TABLE) {
+export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, acTable = AC_LUMA_TABLE, Ss = 0, Se = 63) {
     // 1. Encode DC
-    const dcVal = block[0];
-    const diff = dcVal - previousDC;
-    const dcCat = computeCategory(diff);
-    const dcCode = dcTable[dcCat];
+    if (Ss === 0) {
+        const dcVal = block[0];
+        const diff = dcVal - previousDC;
+        const dcCat = computeCategory(diff);
+        const dcCode = dcTable[dcCat];
 
-    writer.writeBits(dcCode.code, dcCode.length);
-    if (dcCat > 0) {
-        writer.writeBits(getBitRepresentation(diff), dcCat);
-    }
-
-    // 2. Encode AC
-    let zeroRun = 0;
-    for (let i = 1; i < 64; i++) {
-        const val = block[i];
-        if (val === 0) {
-            zeroRun++;
-        } else {
-            let safety = 0;
-            while (zeroRun >= 16) {
-                safety++;
-                if (safety > 100) { throw new Error('Infinite loop in Huffman zeroRun'); }
-                // ZRL: F/0 = 0xF0
-                const zrl = acTable[0xF0];
-                writer.writeBits(zrl.code, zrl.length);
-                zeroRun -= 16;
-            }
-
-            const cat = computeCategory(val);
-            const symbol = (zeroRun << 4) | cat;
-            const acCode = acTable[symbol];
-
-            writer.writeBits(acCode.code, acCode.length);
-            writer.writeBits(getBitRepresentation(val), cat);
-
-            zeroRun = 0;
+        writer.writeBits(dcCode.code, dcCode.length);
+        if (dcCat > 0) {
+            writer.writeBits(getBitRepresentation(diff), dcCat);
         }
     }
 
-    // EOB: 0/0 = 0x00
-    if (zeroRun > 0) {
-        const eob = acTable[0x00];
-        writer.writeBits(eob.code, eob.length);
-    } else {
-        // EOB is not required if all coefficients are coded.
-        // But we usually write it if there are trailing zeros. 
+    // 2. Encode AC
+    // Only if the scan includes AC coefficients
+    if (Se > 0) {
+        let zeroRun = 0;
+        const start = Math.max(1, Ss);
+
+        for (let i = start; i <= Se; i++) {
+            const val = block[i];
+            if (val === 0) {
+                zeroRun++;
+            } else {
+                let safety = 0;
+                while (zeroRun >= 16) {
+                    safety++;
+                    if (safety > 100) { throw new Error('Infinite loop in Huffman zeroRun'); }
+                    // ZRL: F/0 = 0xF0
+                    const zrl = acTable[0xF0];
+                    writer.writeBits(zrl.code, zrl.length);
+                    zeroRun -= 16;
+                }
+
+                const cat = computeCategory(val);
+                const symbol = (zeroRun << 4) | cat;
+                const acCode = acTable[symbol];
+
+                writer.writeBits(acCode.code, acCode.length);
+                writer.writeBits(getBitRepresentation(val), cat);
+
+                zeroRun = 0;
+            }
+        }
+
+        // EOB: 0/0 = 0x00
+        // We write EOB if there are trailing zeros in this band, OR if we reached the end of the block (Se=63) and have a run.
+        // Actually, standard EOB means "all remaining coefficients in this block are zero".
+        // So if we are scanning 1..63 and have trailing zeros, we write EOB.
+        // If we are scanning 1..5 and have trailing zeros (val 6..63 are not checked), we write EOB to say "rest of 1..5 are zero"?
+        // No, EOB means "rest of the block (up to 63) is zero" in baseline.
+        // In progressive, EOB means "rest of the band (up to Se) is zero".
+
+        if (zeroRun > 0) {
+            const eob = acTable[0x00];
+            writer.writeBits(eob.code, eob.length);
+        }
     }
 
-    return dcVal; // Return new DC value
+    return block[0]; // Return new DC value
 }

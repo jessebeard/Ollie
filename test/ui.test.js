@@ -6,4 +6,21 @@ describe('UI Tests', () => {
         expect(downloadLink).toBeDefined();
         expect(downloadLink.style.display).toBe('none');
     });
+
+    it('Should have a progressive encoding checkbox', () => {
+        const checkbox = document.getElementById('progressive-checkbox');
+        expect(checkbox).toBeDefined();
+        expect(checkbox.type).toBe('checkbox');
+        expect(checkbox.checked).toBe(false); // Default should be false
+    });
+
+    it('Should have a file info pane for decoder', () => {
+        const infoPane = document.getElementById('decoder-info');
+        expect(infoPane).not.toBe(null);
+    });
+
+    it('Should have a file info pane for encoder', () => {
+        const infoPane = document.getElementById('encoder-info');
+        expect(infoPane).not.toBe(null);
+    });
 });

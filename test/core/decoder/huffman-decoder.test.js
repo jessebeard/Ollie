@@ -96,13 +96,13 @@ describe('HuffmanDecoder', () => {
         const acTable = new HuffmanTable(bits, values, 1, 0);
 
         const block = new Int32Array(64);
-        block[1] = 99; // Set a value to verify it gets cleared
+        // block[1] = 99; // Removed: decodeAC no longer clears pre-existing values (progressive support)
 
         const data = new Uint8Array([0b00000000]);
         const reader = new BitReader(data);
         decodeAC(reader, acTable, block);
 
-        // All AC coefficients should be zero
+        // All AC coefficients should be zero (remained zero)
         for (let i = 1; i < 64; i++) {
             expect(block[i]).toBe(0);
         }

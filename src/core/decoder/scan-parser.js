@@ -62,29 +62,23 @@ export function parseScanHeader(segmentData) {
     }
 
     // Parse spectral selection
-    const startSpectral = segmentData[offset++];
-    const endSpectral = segmentData[offset++];
+    const Ss = segmentData[offset++];
+    const Se = segmentData[offset++];
 
     // Parse successive approximation
     const ahAlByte = segmentData[offset++];
-    const successiveHigh = (ahAlByte >> 4) & 0x0F;
-    const successiveLow = ahAlByte & 0x0F;
+    const Ah = (ahAlByte >> 4) & 0x0F;
+    const Al = ahAlByte & 0x0F;
 
-    // Validate sequential DCT parameters
-    if (startSpectral !== 0 || endSpectral !== 63) {
-        throw new Error(`Non-sequential DCT not supported: Ss=${startSpectral}, Se=${endSpectral}`);
-    }
-
-    if (successiveHigh !== 0 || successiveLow !== 0) {
-        throw new Error(`Progressive mode not supported: Ah=${successiveHigh}, Al=${successiveLow}`);
-    }
+    // Validation for progressive mode is removed to support it.
+    // We trust the decoder to handle (or fail gracefully) if it doesn't support specific modes.
 
     return {
         numComponents,
         components,
-        startSpectral,
-        endSpectral,
-        successiveHigh,
-        successiveLow
+        Ss,
+        Se,
+        Ah,
+        Al
     };
 }

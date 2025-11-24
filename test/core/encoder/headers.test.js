@@ -122,22 +122,5 @@ describe('JPEG Headers', () => {
         expect(dhtCount).toBeGreaterThanOrEqual(2);
     });
 
-    it('should write SOS marker', () => {
-        const encoder = new JpegEncoder();
-        encoder.writeHeaders(null, 100, 100);
-        const headers = encoder.headers;
 
-        // Find SOS (FF DA)
-        let sosIdx = -1;
-        for (let i = 0; i < headers.length - 1; i++) {
-            if (headers[i] === 0xFF && headers[i + 1] === 0xDA) {
-                sosIdx = i;
-                break;
-            }
-        }
-        expect(sosIdx).not.toBe(-1);
-
-        // Number of components (3)
-        expect(headers[sosIdx + 4]).toBe(3);
-    });
 });

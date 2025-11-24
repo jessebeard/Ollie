@@ -12,8 +12,13 @@ import { BitWriter } from '../utils/bit-writer.js';
  * This class implements a basic JPEG encoder.
  */
 export class JpegEncoder {
-    constructor(quality = 50) {
+    constructor(quality = 50, options = {}) {
         this.quality = quality;
+        this.options = {
+            writeSpiff: options.writeSpiff || false, // Default to false as JFIF is more common
+            progressive: options.progressive || false,
+            ...options
+        };
     }
 
     /**
@@ -30,20 +35,25 @@ export class JpegEncoder {
         this.headers = [];
         const writer = new BitWriter();
 
-        // Write the standard JPEG markers (SOI, APP0, DQT, SOF0, DHT, SOS)
+        // Write the standard JPEG markers (SOI, APP0, DQT, SOF0/SOF2, DHT)
+        // Note: SOS is written per scan now
         this.writeHeaders(writer, width, height);
 
         const padded = padDimensions(width, height);
-        let prevDC_Y = 0;
-        let prevDC_Cb = 0;
-        let prevDC_Cr = 0;
+
+        // Collect all blocks first
+        const blocks = {
+            Y: [],
+            Cb: [],
+            Cr: []
+        };
 
         let blockCount = 0;
         // Process the image in 8x8 blocks
         for (let y = 0; y < padded.height; y += 8) {
             for (let x = 0; x < padded.width; x += 8) {
                 blockCount++;
-                if (blockCount % 10 === 0) console.log('Processing block ' + blockCount);
+                if (blockCount % 1000 === 0) console.log('Processing block ' + blockCount);
 
                 const Y = new Float32Array(64);
                 const Cb = new Float32Array(64);
@@ -60,8 +70,6 @@ export class JpegEncoder {
                         const b = data[idx + 2];
 
                         // Convert RGB to YCbCr.
-                        // Y is brightness (Luma), Cb and Cr are color (Chroma).
-                        // We subtract 128 to center the values around 0 for DCT.
                         const ycbcr = rgbToYcbcr(r, g, b);
                         Y[row * 8 + col] = ycbcr.y - 128;
                         Cb[row * 8 + col] = ycbcr.cb - 128;
@@ -69,29 +77,58 @@ export class JpegEncoder {
                     }
                 }
 
-                // Process each channel separately.
-                // Note: We pass the previous DC value because DC coefficients are delta-encoded.
-                prevDC_Y = this.processBlock(Y, prevDC_Y, QUANTIZATION_TABLE_LUMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
-                prevDC_Cb = this.processBlock(Cb, prevDC_Cb, QUANTIZATION_TABLE_CHROMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
-                prevDC_Cr = this.processBlock(Cr, prevDC_Cr, QUANTIZATION_TABLE_CHROMA, writer, DC_LUMA_TABLE, AC_LUMA_TABLE);
+                blocks.Y.push(this.prepareBlock(Y, QUANTIZATION_TABLE_LUMA));
+                blocks.Cb.push(this.prepareBlock(Cb, QUANTIZATION_TABLE_CHROMA));
+                blocks.Cr.push(this.prepareBlock(Cr, QUANTIZATION_TABLE_CHROMA));
             }
         }
 
-        console.log('Finished processing blocks, flushing writer');
+        console.log('Finished preparing blocks. Writing scans...');
+
+        if (this.options.progressive) {
+            // Scan 1: DC (Ss=0, Se=0, Ah=0, Al=0)
+            this.writeScan(writer, blocks, 0, 0);
+            // Scan 2: AC (Ss=1, Se=63, Ah=0, Al=0)
+            this.writeScan(writer, blocks, 1, 63);
+        } else {
+            // Baseline: Single scan (Ss=0, Se=63)
+            this.writeScan(writer, blocks, 0, 63);
+        }
+
+        console.log('Finished writing scans, flushing writer');
         const body = writer.flush();
         console.log('Writer flushed, assembling file');
         return this.assembleFile(body);
     }
 
-    processBlock(blockData, prevDC, qTable, writer, dcTable, acTable) {
-        // 1. Forward DCT: Convert 8x8 pixel block to frequency domain
+    prepareBlock(blockData, qTable) {
+        // 1. Forward DCT
         const dct = forwardDCT(blockData);
-        // 2. Quantization: Divide by quantization table to reduce precision (compression happens here)
+        // 2. Quantization
         const quantized = quantize(dct, qTable);
-        // 3. ZigZag: Reorder 2D block to 1D array to group zeros at the end
-        const zigzagged = zigZag(quantized);
-        // 4. Huffman Encode: Compress the resulting coefficients
-        return encodeBlock(zigzagged, prevDC, writer, dcTable, acTable);
+        // 3. ZigZag
+        return zigZag(quantized);
+    }
+
+    writeScan(writer, blocks, Ss, Se) {
+        console.log(`Writing Scan: Ss=${Ss}, Se=${Se}`);
+
+        // Write SOS marker
+        this.writeSOS(writer, Ss, Se);
+
+        let prevDC_Y = 0;
+        let prevDC_Cb = 0;
+        let prevDC_Cr = 0;
+
+        const numBlocks = blocks.Y.length;
+        for (let i = 0; i < numBlocks; i++) {
+            // Interleaved scan: Y, Cb, Cr for each MCU (assuming 1x1 subsampling for now as per loop above)
+            // Note: The loop above generates 4:4:4 blocks (1 Y, 1 Cb, 1 Cr per 8x8 pixel area)
+
+            prevDC_Y = encodeBlock(blocks.Y[i], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+            prevDC_Cb = encodeBlock(blocks.Cb[i], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+            prevDC_Cr = encodeBlock(blocks.Cr[i], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+        }
     }
 
     writeHeaders(writer, width, height) {
@@ -121,6 +158,41 @@ export class JpegEncoder {
         writeByte(0);
         writeByte(0);
 
+        // APP8 (SPIFF) - Optional
+        if (this.options.writeSpiff) {
+            writeWord(0xFFE8);
+            // Length: 2 + 6 ("SPIFF\0") + 2 (ver) + 1 (prof) + 1 (comp) + 4 (h) + 4 (w) + 1 (color) + 1 (bps) + 1 (compr) + 1 (unit) + 4 (vRes) + 4 (hRes)
+            // = 2 + 6 + 2 + 1 + 1 + 4 + 4 + 1 + 1 + 1 + 1 + 4 + 4 = 32 bytes total length field value
+            writeWord(32);
+            writeArray([0x53, 0x50, 0x49, 0x46, 0x46, 0x00]); // "SPIFF\0"
+            writeByte(1); writeByte(2); // Version 1.2
+            writeByte(1); // Profile ID (1 = Continuous-tone base)
+            writeByte(3); // Component count (3 for YCbCr)
+
+            // Height (4 bytes)
+            writeByte((height >> 24) & 0xFF);
+            writeByte((height >> 16) & 0xFF);
+            writeByte((height >> 8) & 0xFF);
+            writeByte(height & 0xFF);
+
+            // Width (4 bytes)
+            writeByte((width >> 24) & 0xFF);
+            writeByte((width >> 16) & 0xFF);
+            writeByte((width >> 8) & 0xFF);
+            writeByte(width & 0xFF);
+
+            writeByte(4); // Color space (4 = YCbCr 3 - ITU-R BT.601-1)
+            writeByte(8);  // Bits per sample
+            writeByte(5);  // Compression type (5 = JPEG)
+            writeByte(1);  // Resolution units (1 = dpi)
+
+            // Vertical resolution (72 dpi)
+            writeWord(0); writeWord(72);
+
+            // Horizontal resolution (72 dpi)
+            writeWord(0); writeWord(72);
+        }
+
         // DQT (Quantization Tables)
         writeWord(0xFFDB);
         writeWord(2 + 1 + 64);
@@ -134,8 +206,13 @@ export class JpegEncoder {
         const chromaZigZag = zigZag(QUANTIZATION_TABLE_CHROMA);
         for (let i = 0; i < 64; i++) writeByte(chromaZigZag[i]);
 
-        // SOF0 (Start of Frame, Baseline DCT)
-        writeWord(0xFFC0);
+        // SOF0 (Baseline) or SOF2 (Progressive)
+        if (this.options.progressive) {
+            writeWord(0xFFC2); // SOF2
+        } else {
+            writeWord(0xFFC0); // SOF0
+        }
+
         writeWord(8 + 3 * 3);
         writeByte(8);
         writeWord(height);
@@ -155,26 +232,9 @@ export class JpegEncoder {
         writeByte(1);
 
         // DHT (Huffman Tables)
+        // DHT (Huffman Tables)
         this.writeDHT(writeByte, writeWord, writeArray, 0, 0, DC_LUMA_TABLE);
         this.writeDHT(writeByte, writeWord, writeArray, 0, 1, AC_LUMA_TABLE);
-
-        // SOS (Start of Scan)
-        writeWord(0xFFDA);
-        writeWord(12);
-        writeByte(3);
-
-        writeByte(1);
-        writeByte(0x00);
-
-        writeByte(2);
-        writeByte(0x00);
-
-        writeByte(3);
-        writeByte(0x00);
-
-        writeByte(0);
-        writeByte(63);
-        writeByte(0);
     }
 
     writeDHT(writeByte, writeWord, writeArray, id, type, tableObj) {
@@ -218,6 +278,26 @@ export class JpegEncoder {
         // DC array has index 0 that should be skipped, AC array starts at index for length 1
         writeArray(type === 0 ? dcCounts.slice(1) : dcCounts);
         writeArray(dcValues);
+    }
+
+    writeSOS(writer, Ss, Se) {
+        // SOS (Start of Scan)
+        // Use writeMarker/writeRawByte to avoid byte stuffing and ensure alignment
+        writer.writeMarker(0xFFDA);
+
+        // Length (12 bytes)
+        writer.writeRawByte(0);
+        writer.writeRawByte(12);
+
+        writer.writeRawByte(3); // Component count
+
+        writer.writeRawByte(1); writer.writeRawByte(0x00); // Y
+        writer.writeRawByte(2); writer.writeRawByte(0x00); // Cb
+        writer.writeRawByte(3); writer.writeRawByte(0x00); // Cr
+
+        writer.writeRawByte(Ss);
+        writer.writeRawByte(Se);
+        writer.writeRawByte(0); // Ah=0, Al=0
     }
 
     assembleFile(scanData) {

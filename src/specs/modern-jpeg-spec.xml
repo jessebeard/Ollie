@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jpegTDDImplementationPlan
+    standardFamily="ISO/IEC 10918 (T.81, T.83, T.84, T.86, T.871)"
+    version="1.0">
+
+    <!-- ========================================================= -->
+    <!-- 1. SYSTEM OVERVIEW                                        -->
+    <!-- ========================================================= -->
+    <systemOverview>
+        <objective>
+            Implement a fully compliant JPEG encoder and decoder,
+            supporting baseline requirements and modular extensions
+            as outlined in Parts 1-5 of ISO/IEC 10918.
+        </objective>
+
+        <scope>
+            <encodingModes>
+                <baselineDCT16Bit>false</baselineDCT16Bit>
+                <baselineDCT8Bit>true</baselineDCT8Bit>
+                <progressiveMode>true</progressiveMode>
+                <arithmeticCoding>true</arithmeticCoding>
+                <losslessMode>true</losslessMode>
+                <hierarchicalCoding>true</hierarchicalCoding>
+            </encodingModes>
+            <fileFormats>
+                <jfifSupport>true</jfifSupport>
+                <spiffSupport>true</spiffSupport>
+            </fileFormats>
+        </scope>
+    </systemOverview>
+
+
+    <!-- ========================================================= -->
+    <!-- 2. FUNCTIONAL REQUIREMENTS (DERIVED FROM 10918-1)         -->
+    <!-- ========================================================= -->
+    <functionalRequirements>
+
+        <!-- ========== IMAGE INPUT HANDLING ========== -->
+        <requirement id="FR-01">
+            <description>Accept raw image inputs (RGB, YCbCr, grayscale).</description>
+            <tests>
+                <test id="FR-01-T1">Load 8-bit per channel RGB image.</test>
+                <test id="FR-01-T2">Load YCbCr 4:2:0 subsampled input.</test>
+                <test id="FR-01-T3">Reject unsupported bit depths (>12 bits).</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== COLOR TRANSFORM ========== -->
+        <requirement id="FR-02">
+            <description>Implement RGB→YCbCr forward transform and inverse transform.</description>
+            <tests>
+                <test id="FR-02-T1">Verify integer BT.601 matrix accuracy within decoder tolerances.</test>
+                <test id="FR-02-T2">Ensure reversible transform for grayscale.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== BLOCKING & SAMPLING ========== -->
+        <requirement id="FR-03">
+            <description>Perform 8x8 block generation and component sampling.</description>
+            <tests>
+                <test id="FR-03-T1">Verify correct block layout for 4:2:0, 4:2:2, 4:4:4.</test>
+                <test id="FR-03-T2">Validate MCU order according to JPEG spec.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== DCT PROCESS ========== -->
+        <requirement id="FR-04">
+            <description>Implement forward and inverse DCT with required precision.</description>
+            <tests>
+                <test id="FR-04-T1">Check transform accuracy against IEEE 1180-like tolerances.</test>
+                <test id="FR-04-T2">Verify integer DCT rounding behavior.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== QUANTIZATION ========== -->
+        <requirement id="FR-05">
+            <description>Support custom and standard quantization tables.</description>
+            <tests>
+                <test id="FR-05-T1">Correct quantization and dequantization of DCT blocks.</test>
+                <test id="FR-05-T2">Verify marker DQT parsing and emission.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== ENTROPY CODING ========== -->
+        <requirement id="FR-06">
+            <description>Implement Huffman and arithmetic coding where applicable.</description>
+            <tests>
+                <test id="FR-06-T1">Verify DC differential coding.</test>
+                <test id="FR-06-T2">Verify AC run-length coding including EOB and ZRL rules.</test>
+                <test id="FR-06-T3">Validate Huffman table parsing and build process.</test>
+                <test id="FR-06-T4">Arithmetic coder compliance tests.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== BITSTREAM SYNTAX ========== -->
+        <requirement id="FR-07">
+            <description>Generate and parse JPEG marker-based syntax.</description>
+            <tests>
+                <test id="FR-07-T1">Correct SOI, SOF0/2, DQT, DHT, SOS, EOI order.</test>
+                <test id="FR-07-T2">Restart interval marker tests.</test>
+                <test id="FR-07-T3">Scan header correctness.</test>
+            </tests>
+        </requirement>
+
+        <!-- ========== DECODER PIPELINE ========== -->
+        <requirement id="FR-08">
+            <description>Reconstruct full-band images using standard JPEG decoding.</description>
+            <tests>
+                <test id="FR-08-T1">Decode canonical test images from libjpeg, mozjpeg, and others.</test>
+                <test id="FR-08-T2">Validate progressive scan refinement.</test>
+            </tests>
+        </requirement>
+
+    </functionalRequirements>
+
+
+    <!-- ========================================================= -->
+    <!-- 3. EXTENDED REQUIREMENTS (10918-3, 10918-5)               -->
+    <!-- ========================================================= -->
+    <extendedRequirements>
+
+        <requirement id="EXT-01">
+            <description>Support JFIF APP0 parsing and emission.</description>
+            <tests>
+                <test id="EXT-01-T1">Parse JFIF version, density, and thumbnail.</test>
+                <test id="EXT-01-T2">Reject malformed APP0 headers.</test>
+            </tests>
+        </requirement>
+
+        <requirement id="EXT-02">
+            <description>Implement SPIFF header parsing and generation.</description>
+            <tests>
+                <test id="EXT-02-T1">Validate SPIFF profile field.</test>
+                <test id="EXT-02-T2">Verify SPIFF/JPEG alignment.</test>
+            </tests>
+        </requirement>
+
+        <requirement id="EXT-03">
+            <description>Hierarchical coding (multi-resolution).</description>
+            <tests>
+                <test id="EXT-03-T1">Decode multi-level hierarchy bitstreams.</test>
+                <test id="EXT-03-T2">Validate delta-frame prediction.</test>
+            </tests>
+        </requirement>
+
+    </extendedRequirements>
+
+
+    <!-- ========================================================= -->
+    <!-- 4. COMPLIANCE TESTING (10918-2)                           -->
+    <!-- ========================================================= -->
+    <complianceTesting>
+
+        <testSuite id="CTS-01">
+            <category>Marker Parsing</category>
+            <tests>
+                <test id="CTS-01-T1">Reject invalid marker length values.</test>
+                <test id="CTS-01-T2">Detect EOS before EOI.</test>
+            </tests>
+        </testSuite>
+
+        <testSuite id="CTS-02">
+            <category>DCT Precision</category>
+            <tests>
+                <test id="CTS-02-T1">Confirm IDCT numeric error rates within allowable tolerances.</test>
+            </tests>
+        </testSuite>
+
+        <testSuite id="CTS-03">
+            <category>Entropy Coding Validity</category>
+            <tests>
+                <test id="CTS-03-T1">Check canonical Huffman tree properties.</test>
+                <test id="CTS-03-T2">Validate arithmetic coder contexts.</test>
+            </tests>
+        </testSuite>
+
+    </complianceTesting>
+
+
+    <!-- ========================================================= -->
+    <!-- 5. REGISTRATION AUTHORITY (10918-4)                       -->
+    <!-- ========================================================= -->
+    <registrationAuthority>
+        <requirements>
+            <requirement id="RA-01">
+                <description>
+                    Support RA-assigned identifiers for color spaces, APP markers,
+                    SPIFF tags, and arithmetic conditioning templates.
+                </description>
+                <tests>
+                    <test id="RA-01-T1">Reject unregistered identifier ranges unless vendor-private.</test>
+                </tests>
+            </requirement>
+        </requirements>
+    </registrationAuthority>
+
+
+    <!-- ========================================================= -->
+    <!-- 6. IMPLEMENTATION ROADMAP                                 -->
+    <!-- ========================================================= -->
+    <implementationRoadmap>
+
+        <phase id="P1">
+            <name>Core Infrastructure</name>
+            <tasks>
+                <task>Set up project, CI, and TDD framework.</task>
+                <task>Create modular pipeline interfaces.</task>
+                <task>Define bitstream structures and marker classes.</task>
+            </tasks>
+        </phase>
+
+        <phase id="P2">
+            <name>Baseline Encoder</name>
+            <tasks>
+                <task>Color transform + sampling.</task>
+                <task>Block generation and DCT.</task>
+                <task>Quantization tables.</task>
+                <task>Baseline Huffman entropy coding.</task>
+            </tasks>
+        </phase>
+
+        <phase id="P3">
+            <name>Baseline Decoder</name>
+            <tasks>
+                <task>Marker parser.</task>
+                <task>Entropy decoding.</task>
+                <task>IDCT and dequantization.</task>
+                <task>Color space reconstruction.</task>
+            </tasks>
+        </phase>
+
+        <phase id="P4">
+            <name>Extended JPEG Modes</name>
+            <tasks>
+                <task>Progressive scans.</task>
+                <task>Arithmetic coding.</task>
+                <task>Lossless mode.</task>
+                <task>Hierarchical mode.</task>
+            </tasks>
+        </phase>
+
+        <phase id="P5">
+            <name>File Format Integration</name>
+            <tasks>
+                <task>JFIF container + APP0.</task>
+                <task>SPIFF wrapper + metadata.</task>
+            </tasks>
+        </phase>
+
+        <phase id="P6">
+            <name>Compliance Verification</name>
+            <tasks>
+                <task>Execute full CTS test suite.</task>
+                <task>Cross-validate with libjpeg/mozilla test images.</task>
+            </tasks>
+        </phase>
+
+    </implementationRoadmap>
+
+</jpegTDDImplementationPlan>
