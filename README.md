@@ -71,7 +71,8 @@ sequenceDiagram
     participant Frequency as "Frequency Coefficients"
     participant Quantized as "Quantized Coefficients"
     participant ZigzagRLE as "Zigzag & RLE"
-    participant Huffman as "Huffman"
+    participant Huffman as "De/Encode Huffman Block"
+    participant Headers as "De/EncodeHeaders"
     participant Bitstream as "JPEG Bitstream"
 
     %% ---------------- ENCODING ----------------
@@ -88,36 +89,49 @@ sequenceDiagram
     Note over Frequency: Encoding Step: Forward DCT<br>- Apply 2D DCT<br>- Produce 64 frequency coefficients
     Frequency->>Quantized: DCT coefficients<br>(Frequency Blocks)
 
-    Note over Quantized: Encoding Step: Quantization<br>- Divide by quant matrix<br>- Round to nearest integer<br>- Zero high-frequency terms
+    Note over Quantized: Encoding Step: Quantization<br>(compression step)<br>- Divide by quant matrix<br>- Round to nearest integer<br>- Zero high-frequency terms
     Quantized->>ZigzagRLE: Quantized coefficients
 
     Note over ZigzagRLE: Encoding Step: Zigzag & RLE<br>- Zigzag reorder<br>- DC differencing<br>- AC run-length encoding<br>- Insert EOB
     ZigzagRLE->>Huffman: RLE coefficients
 
     Note over Huffman: Encoding Step: Huffman Encoding<br>- Encode using Huffman tables<br>- Output variable-length codes
-    Huffman->>Bitstream: JPEG bitstream
+    Huffman->>Headers: Huffman block
+    Huffman->>Headers: Huffman table
+    Color->>Headers: Color space(unimplemented)
+    Quantized->>Headers: Quantization table
+    Note over Headers: Encoding Step: Headers<br>- Write frame header<br>- Write scan header<br>- Write quantization tables<br>- Write Huffman tables
+   
+    Headers->>Bitstream: JPEG bitstream
 
     %% ---------------- DECODING ----------------
     Note over Bitstream: Decoding Step: Huffman Decoding
-    Bitstream->>Huffman: Huffman bitstream
+    Bitstream->>Headers: Headers
+
+    Note over Headers: Decoding Step: Headers<br>- Read frame header<br>- Read scan header<br>- Read quantization tables<br>- Read Huffman tables
+    Headers->>Huffman: Huffman table
+    Headers->>Huffman: Huffman bitstream
 
     Note over Huffman: Sub-steps:<br>- Decode Huffman codes<br>- Recover DC/AC symbols
     Huffman->>ZigzagRLE: Symbol sequence
 
     Note over ZigzagRLE: Decoding Step: Zigzag & RLE<br>- Reverse DC differencing<br>- Expand AC runs<br>- Inverse zigzag
     ZigzagRLE->>Quantized: Reordered coefficients
+    Headers->>Quantized: Quantization table
 
-    Note over Quantized: Decoding Step: Dequantization<br>- Multiply by quant matrix<br>- Approximate original DCT values
+    Note over Quantized: Decoding Step: Dequantization<br>(decompression step)<br>- Multiply by quant matrix<br>- Approximate original DCT values
     Quantized->>Frequency: Dequantized blocks
+
 
     Note over Frequency: Decoding Step: Inverse DCT<br>- Apply 2D IDCT<br>- Convert frequency → spatial
     Frequency->>Blocks: Spatial 8×8 blocks
 
     Note over Blocks: Decoding Step: Block Reassembly<br>- Reassemble MCUs<br>- Merge Y, Cb, Cr planes
     Blocks->>Color: Reconstructed image
+    Headers->>Color: Color space(unimplemented)
 
     Note over Color: Decoding Step: Color Conversion<br>- YCbCr → RGB<br>- Clamp to valid range
-    RGB->>Color: RGB Bitstream Data
+    Color->>RGB: RGB Bitstream Data
     Note over RGB: RGB Data Matrix (png)
 
 
