@@ -134,6 +134,13 @@
                         <input type="checkbox" id="progressive-checkbox">
                         <label for="progressive-checkbox">Progressive Encoding</label>
                     </div>
+                    <div style="margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 4px;">
+                        <label for="secret-input" style="font-weight: bold; display: block; margin-bottom: 5px;">Data
+                            Stuffing (Steganography)</label>
+                        <input type="file" id="secret-input">
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Select a file to hide inside the
+                            image.</div>
+                    </div>
                     <button id="encode-btn">Encode to JPEG</button>
                     <button id="test-btn" style="background: #28a745; margin-left: 10px;">Run Diagnostic</button>
                     <a id="download-link" style="display:none" download="encoded.jpg">
@@ -223,6 +230,13 @@
                     <div>Color Space: <span id="decoder-info-colorspace">-</span></div>
                     <div>Progressive: <span id="decoder-info-progressive">-</span></div>
                     <div>Chroma Subsampling: <span id="decoder-info-chroma">-</span></div>
+                    <div id="secret-data-section"
+                        style="display: none; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ccc;">
+                        <div style="font-weight: bold; color: #28a745;">Secret Data Found!</div>
+                        <div style="margin-top: 5px;">Size: <span id="secret-data-size">-</span> bytes</div>
+                        <button id="download-secret-btn"
+                            style="margin-top: 5px; width: 100%; background: #28a745;">Download Secret Data</button>
+                    </div>
                 </div>
             </div>
 

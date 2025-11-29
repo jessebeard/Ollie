@@ -20,6 +20,7 @@ import { upsampleChroma } from './decoder/upsampling.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './decoder/block-assembly.js';
 
 import { parseSpiffHeader } from './decoder/spiff-parser.js';
+import { Jsteg } from './steganography/jsteg.js';
 
 export class JpegDecoder {
     constructor() {
@@ -202,8 +203,37 @@ export class JpegDecoder {
             this.decodeScan(scanData, scanHeader);
         }
 
+        // Steganography: Attempt to extract secret data BEFORE assembleImage
+        // We need to extract from the quantized coefficients, not after dequantization/IDCT
+        let extractedSecretData = null;
+        try {
+            const allBlocks = [];
+            // Must match encoder order: All blocks of Comp 1, then Comp 2, then Comp 3...
+            // Iterate components in frame header order
+            for (const comp of this.frameHeader.components) {
+                const compData = this.components[comp.id];
+                if (compData && compData.blocks) {
+                    allBlocks.push(...compData.blocks);
+                }
+            }
+
+            extractedSecretData = Jsteg.extract(allBlocks);
+            if (extractedSecretData) {
+                console.log(`Extracted secret data: ${extractedSecretData.length} bytes`);
+            }
+        } catch (e) {
+            console.warn('Failed to extract secret data:', e);
+        }
+
         // Phase 3: Reconstruct and assemble image
-        return this.assembleImage();
+        const result = this.assembleImage();
+
+        // Add extracted data to result
+        if (extractedSecretData) {
+            result.secretData = extractedSecretData;
+        }
+
+        return result;
     }
 
     initializeComponents() {

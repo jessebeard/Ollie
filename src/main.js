@@ -48,7 +48,21 @@ function init() {
             const progressiveCheckbox = document.getElementById('progressive-checkbox');
             const isProgressive = progressiveCheckbox ? progressiveCheckbox.checked : false;
 
-            const encoder = new JpegEncoder({ progressive: isProgressive });
+            // Read secret data if selected
+            const secretInput = document.getElementById('secret-input');
+            let secretData = null;
+            if (secretInput && secretInput.files.length > 0) {
+                const secretFile = secretInput.files[0];
+                const buffer = await secretFile.arrayBuffer();
+                secretData = new Uint8Array(buffer);
+                console.log(`Loaded secret data: ${secretData.length} bytes`);
+            }
+
+
+            const encoder = new JpegEncoder(90, {
+                progressive: isProgressive,
+                secretData: secretData
+            });
             const jpegBytes = encoder.encode(imageData);
 
             // Convert the raw JPEG bytes into a Blob (Binary Large Object).
@@ -196,6 +210,30 @@ function init() {
                 document.getElementById('decoder-info-colorspace').textContent = result.metadata.colorSpace;
                 document.getElementById('decoder-info-progressive').textContent = result.metadata.progressive ? 'Yes' : 'No';
                 document.getElementById('decoder-info-chroma').textContent = result.metadata.chromaSubsampling;
+            }
+
+            // Handle Secret Data
+            const secretSection = document.getElementById('secret-data-section');
+            const secretSize = document.getElementById('secret-data-size');
+            const downloadSecretBtn = document.getElementById('download-secret-btn');
+
+            if (result.secretData) {
+                secretSection.style.display = 'block';
+                secretSize.textContent = result.secretData.length;
+
+                downloadSecretBtn.onclick = () => {
+                    const blob = new Blob([result.secretData], { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'secret_data.bin'; // We don't know the original filename/type
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+            } else {
+                secretSection.style.display = 'none';
             }
         } catch (e) {
             console.error(e);

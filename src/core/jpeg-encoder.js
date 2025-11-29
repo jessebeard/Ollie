@@ -5,6 +5,7 @@ import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA } from './
 import { zigZag } from './encoder/zigzag.js';
 import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from './encoder/huffman.js';
 import { BitWriter } from '../utils/bit-writer.js';
+import { Jsteg } from './steganography/jsteg.js';
 
 /**
  * JpegEncoder
@@ -17,6 +18,7 @@ export class JpegEncoder {
         this.options = {
             writeSpiff: options.writeSpiff || false, // Default to false as JFIF is more common
             progressive: options.progressive || false,
+            secretData: options.secretData || null,
             ...options
         };
     }
@@ -80,6 +82,38 @@ export class JpegEncoder {
                 blocks.Y.push(this.prepareBlock(Y, QUANTIZATION_TABLE_LUMA));
                 blocks.Cb.push(this.prepareBlock(Cb, QUANTIZATION_TABLE_CHROMA));
                 blocks.Cr.push(this.prepareBlock(Cr, QUANTIZATION_TABLE_CHROMA));
+            }
+        }
+
+
+
+        // Steganography: Embed secret data if provided
+        if (this.options.secretData) {
+            console.log('Embedding secret data...');
+            const allBlocks = [];
+            // Flatten blocks for embedding. Order matters!
+            // We must traverse in the same order as we write scans if we want to stream,
+            // but here we have all blocks.
+            // The decoder will reconstruct blocks and we can extract from them.
+            // The order of blocks in `blocks.Y`, `blocks.Cb`, `blocks.Cr` matches the order they were created (raster scan of MCUs).
+            // However, `writeScan` interleaves them per MCU.
+            // Jsteg doesn't care about interleaving as long as we pass the blocks in a deterministic order.
+            // Let's pass them in component order (all Y, then all Cb, then all Cr) OR interleaved?
+            // If we pass them as [All Y, All Cb, All Cr], the decoder must extract in that order.
+            // The decoder usually decodes MCU by MCU.
+            // If we want to extract *after* decoding the whole image, we will have [All Y, All Cb, All Cr] arrays in the decoder components.
+            // So passing [All Y, All Cb, All Cr] is easiest for post-decode extraction.
+
+            allBlocks.push(...blocks.Y);
+            allBlocks.push(...blocks.Cb);
+            allBlocks.push(...blocks.Cr);
+
+            const capacity = Jsteg.calculateCapacity(allBlocks);
+            console.log(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes`);
+
+            if (!Jsteg.embed(allBlocks, this.options.secretData)) {
+                console.warn('Secret data too large for image capacity! Truncated or failed.');
+                // We could throw, but let's just warn for now.
             }
         }
 
