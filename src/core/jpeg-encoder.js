@@ -111,9 +111,12 @@ export class JpegEncoder {
             const capacity = Jsteg.calculateCapacity(allBlocks);
             console.log(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes`);
 
+            if (this.options.secretData.length > capacity) {
+                throw new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`);
+            }
+
             if (!Jsteg.embed(allBlocks, this.options.secretData)) {
-                console.warn('Secret data too large for image capacity! Truncated or failed.');
-                // We could throw, but let's just warn for now.
+                throw new Error('Failed to embed secret data into image.');
             }
         }
 

@@ -29,100 +29,34 @@ export class Jsteg {
      * @param {Uint8Array} data - Data to embed
      * @returns {boolean} True if successful, false if data didn't fit
      */
-    static embed(blocks, data) {
-        const totalBits = (data.length + 4) * 8; // +4 bytes for length header
-        let bitsEmbedded = 0;
-
-        // Prepare data stream with length header
-        const dataWithHeader = new Uint8Array(data.length + 4);
-        const view = new DataView(dataWithHeader.buffer);
-        view.setUint32(0, data.length, false); // Big Endian length
-        dataWithHeader.set(data, 4);
-
+    /**
+     * Embeds raw data into the provided blocks without adding a length header.
+     * Modifies the blocks in-place.
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks
+     * @param {Uint8Array} data - Data to embed
+     * @returns {boolean} True if successful, false if data didn't fit
+     */
+    static embedRaw(blocks, data) {
         let byteIndex = 0;
         let bitIndex = 0;
 
         for (const block of blocks) {
             // Skip DC (index 0)
             for (let i = 1; i < 64; i++) {
-                if (byteIndex >= dataWithHeader.length) {
+                if (byteIndex >= data.length) {
                     return true; // Done
                 }
 
                 const val = block[i];
 
-                // Skip zeros (and potentially 1s if we wanted strict Jsteg, but let's try just skipping 0s)
-                // Actually, let's skip 0s.
+                // Skip zeros
                 if (val === 0) continue;
 
                 // Get current bit to embed
-                const bit = (dataWithHeader[byteIndex] >> (7 - bitIndex)) & 1;
+                const bit = (data[byteIndex] >> (7 - bitIndex)) & 1;
 
                 // Embed bit into LSB
-                // If val is even and bit is 1 -> val + 1
-                // If val is even and bit is 0 -> val
-                // If val is odd and bit is 1 -> val
-                // If val is odd and bit is 0 -> val - 1 (or +1? usually we want to minimize change)
-
-                // Standard LSB replacement:
-                // val = (val & ~1) | bit;
-                // But wait, if val is negative?
-                // -3 (1111...1101) & ~1 = -4 (1111...1100). | 1 = -3. Correct.
-                // -2 (1111...1110) & ~1 = -2. | 1 = -1. Correct.
-                // So bitwise ops work on signed integers in JS (treated as 32-bit two's complement).
-
-                // However, we must ensure we don't turn a non-zero into a zero!
-                // If val is 1 and we embed 0 -> 0. This destroys the carrier.
-                // If val is -1 and we embed 0 -> -2. Safe.
-                // So if val is 1, we CANNOT embed 0 if we simply use LSB replacement.
-                // This is why Jsteg skips 1s (and -1s usually).
-
-                // Let's implement strict Jsteg: Skip 0, 1, -1.
-                // Or, handle 1/-1 specially?
-                // If we skip 1/-1, we lose a LOT of capacity in JPEG (most ACs are 1/-1).
-
-                // Alternative: F5 algorithm? Too complex for now.
-                // Alternative: "LSB matching" or +/-1 embedding?
-                // If val is 1 and we want 0, change to 2? Or 0 (but 0 is skipped by decoder)?
-                // If we change 1 to 0, the decoder will skip it and miss the bit.
-                // So we must NEVER produce a 0.
-
-                // Strategy:
-                // If val is 1 and bit is 0 -> change to 2? (Distortion +1)
-                // If val is -1 and bit is 0 -> change to -2? (Distortion -1)
-                // If val is even, LSB replacement is fine (never becomes 0).
-                // If val is odd (e.g. 3), LSB replacement makes it 2 or 3. Safe.
-
-                // So the only danger is 1 and -1.
-                // If we allow changing 1->2 and -1->-2, we preserve the "non-zero" property.
-                // But wait, decoder just reads LSB.
-                // If encoder: 1 (odd) -> embed 0 -> becomes 0? No, we need it to be even.
-                // 0 is even. But 0 is skipped.
-                // So 1 -> embed 0 must become 2 (even, non-zero).
-                // -1 (odd) -> embed 0 must become -2 (even, non-zero).
-
-                // Decoder:
-                // Reads 2 (even) -> extracts 0. Correct.
-                // Reads -2 (even) -> extracts 0. Correct.
-
-                // What about 1 -> embed 1? Remains 1.
-                // Decoder reads 1 (odd) -> extracts 1. Correct.
-
-                // So the rule is:
-                // If val is 1 or -1:
-                //   If bit match LSB (1), keep it.
-                //   If bit mismatch (0), change magnitude to 2 (1->2, -1->-2).
-                // For all other non-zeros:
-                //   Standard LSB replacement.
-
-                // Let's verify "other non-zeros" don't become 0.
-                // 2 -> embed 0 -> 2.
-                // 2 -> embed 1 -> 3.
-                // -2 -> embed 0 -> -2.
-                // -2 -> embed 1 -> -1 (Wait, -1 is safe to read, just dangerous to write to 0).
-                // So yes, standard LSB works for |val| > 1.
-
-                // Implementation:
                 if (val === 1) {
                     if (bit === 0) block[i] = 2;
                 } else if (val === -1) {
@@ -131,7 +65,6 @@ export class Jsteg {
                     block[i] = (val & ~1) | bit;
                 }
 
-                bitsEmbedded++;
                 bitIndex++;
                 if (bitIndex === 8) {
                     bitIndex = 0;
@@ -141,6 +74,195 @@ export class Jsteg {
         }
 
         return false; // Ran out of space
+    }
+
+    /**
+     * Embeds data into the provided blocks.
+     * Modifies the blocks in-place.
+     * Legacy format: [Length (32-bit BE)][Data Payload]
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks (64 elements each)
+     * @param {Uint8Array} data - Data to embed
+     * @returns {boolean} True if successful, false if data didn't fit
+     */
+    static embed(blocks, data) {
+        // Prepare data stream with length header
+        const dataWithHeader = new Uint8Array(data.length + 4);
+        const view = new DataView(dataWithHeader.buffer);
+        view.setUint32(0, data.length, false); // Big Endian length
+        dataWithHeader.set(data, 4);
+
+        return this.embedRaw(blocks, dataWithHeader);
+    }
+
+    /**
+     * Embeds data using the new container format.
+     * Format: [Magic:4][Version:1][Flags:1][MetaLen:2][Metadata:N][PayloadLen:4][Payload:N][CRC:4]
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks 
+     * @param {Uint8Array} data 
+     * @param {Object} metadata 
+     */
+    static embedContainer(blocks, data, metadata) {
+        const magic = new TextEncoder().encode('JSTG');
+        const version = 1;
+        const flags = 0;
+
+        const metaStr = JSON.stringify(metadata);
+        const metaBytes = new TextEncoder().encode(metaStr);
+        const metaLen = metaBytes.length;
+
+        const payloadLen = data.length;
+
+        // Calculate total size
+        // Magic(4) + Ver(1) + Flags(1) + MetaLen(2) + Meta(N) + PayloadLen(4) + Payload(N) + CRC(4)
+        const totalSize = 4 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4;
+
+        const container = new Uint8Array(totalSize);
+        const view = new DataView(container.buffer);
+        let offset = 0;
+
+        // Magic
+        container.set(magic, offset);
+        offset += 4;
+
+        // Version
+        view.setUint8(offset, version);
+        offset += 1;
+
+        // Flags
+        view.setUint8(offset, flags);
+        offset += 1;
+
+        // Metadata Length
+        view.setUint16(offset, metaLen, false); // BE
+        offset += 2;
+
+        // Metadata
+        container.set(metaBytes, offset);
+        offset += metaLen;
+
+        // Payload Length
+        view.setUint32(offset, payloadLen, false); // BE
+        offset += 4;
+
+        // Payload
+        container.set(data, offset);
+        offset += payloadLen;
+
+        // CRC32
+        // Calculate CRC over everything before the CRC field (Magic...Payload)
+        const dataToCrc = container.subarray(0, offset);
+        const crc = this.crc32(dataToCrc);
+
+        view.setUint32(offset, crc, false);
+        offset += 4;
+
+        return this.embedRaw(blocks, container);
+    }
+
+    /**
+     * Auto-detects format and extracts data.
+     * Returns Uint8Array for legacy format, or {data, metadata} for container format.
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks 
+     * @returns {Uint8Array|Object|null}
+     */
+    static extractAuto(blocks) {
+        // Peek at first 4 bytes to check for magic
+        const reader = new JstegReader(blocks);
+        const magicBytes = reader.readBytes(4);
+
+        if (!magicBytes) return null;
+
+        const magic = new TextDecoder().decode(magicBytes);
+
+        if (magic === 'JSTG') {
+            // Container format - use extractContainer
+            return this.extractContainer(blocks);
+        } else {
+            // Legacy format - use extract
+            return this.extract(blocks);
+        }
+    }
+
+    /**
+     * Extracts data from the provided blocks using the new container format.
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks 
+     * @returns {Object|null} { data, metadata } or null if invalid
+     */
+    static extractContainer(blocks) {
+        const reader = new JstegReader(blocks);
+
+        // 1. Magic (4 bytes)
+        const magicBytes = reader.readBytes(4);
+        if (!magicBytes) return null;
+        const magic = new TextDecoder().decode(magicBytes);
+        if (magic !== 'JSTG') return null;
+
+        // 2. Version (1 byte)
+        const version = reader.readByte();
+        if (version === null || version !== 1) return null;
+
+        // 3. Flags (1 byte)
+        const flags = reader.readByte();
+        if (flags === null) return null;
+
+        // 4. Metadata Length (2 bytes)
+        const metaLenBytes = reader.readBytes(2);
+        if (!metaLenBytes) return null;
+        const metaLen = (metaLenBytes[0] << 8) | metaLenBytes[1];
+
+        // 5. Metadata (N bytes)
+        const metaBytes = reader.readBytes(metaLen);
+        if (!metaBytes) return null;
+        let metadata;
+        try {
+            metadata = JSON.parse(new TextDecoder().decode(metaBytes));
+        } catch (e) {
+            return null;
+        }
+
+        // 6. Payload Length (4 bytes)
+        const payloadLenBytes = reader.readBytes(4);
+        if (!payloadLenBytes) return null;
+        const payloadLen = (payloadLenBytes[0] << 24) | (payloadLenBytes[1] << 16) | (payloadLenBytes[2] << 8) | payloadLenBytes[3];
+
+        // 7. Payload (N bytes)
+        const payload = reader.readBytes(payloadLen);
+        if (!payload) return null;
+
+        // 8. CRC (4 bytes)
+        const crcBytes = reader.readBytes(4);
+        if (!crcBytes) return null;
+        const expectedCrc = ((crcBytes[0] << 24) | (crcBytes[1] << 16) | (crcBytes[2] << 8) | crcBytes[3]) >>> 0;
+
+        // Verify CRC
+        // Reconstruct the data stream to calculate CRC
+        const totalSize = 4 + 1 + 1 + 2 + metaLen + 4 + payloadLen;
+        const checkBuffer = new Uint8Array(totalSize);
+        const checkView = new DataView(checkBuffer.buffer);
+        let checkOffset = 0;
+
+        checkBuffer.set(magicBytes, checkOffset); checkOffset += 4;
+        checkBuffer.set([version], checkOffset); checkOffset += 1;
+        checkBuffer.set([flags], checkOffset); checkOffset += 1;
+        checkView.setUint16(checkOffset, metaLen, false); checkOffset += 2;
+        checkBuffer.set(metaBytes, checkOffset); checkOffset += metaLen;
+        checkView.setUint32(checkOffset, payloadLen, false); checkOffset += 4;
+        checkBuffer.set(payload, checkOffset); checkOffset += payloadLen;
+
+        const actualCrc = this.crc32(checkBuffer);
+
+        if (actualCrc !== expectedCrc) {
+            return null;
+        }
+
+        return {
+            data: payload,
+            metadata: metadata
+        };
     }
 
     /**
@@ -224,5 +346,71 @@ export class Jsteg {
         }
         // Subtract 32 bits for header
         return Math.max(0, Math.floor((capacityBits - 32) / 8));
+    }
+    /**
+     * Calculates CRC32 checksum.
+     * 
+     * @param {Uint8Array} data 
+     * @returns {number} Unsigned 32-bit integer
+     */
+    static crc32(data) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < data.length; i++) {
+            crc ^= data[i];
+            for (let j = 0; j < 8; j++) {
+                if ((crc & 1) !== 0) {
+                    crc = (crc >>> 1) ^ 0xEDB88320;
+                } else {
+                    crc = crc >>> 1;
+                }
+            }
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+}
+
+class JstegReader {
+    constructor(blocks) {
+        this.blocks = blocks;
+        this.blockIndex = 0;
+        this.pixelIndex = 1; // Skip DC
+        this.bitCount = 0; // Track total bits read
+    }
+
+    readBit() {
+        while (this.blockIndex < this.blocks.length) {
+            const block = this.blocks[this.blockIndex];
+            while (this.pixelIndex < 64) {
+                const val = block[this.pixelIndex];
+                this.pixelIndex++;
+
+                if (val === 0) continue;
+                this.bitCount++;
+                return val & 1;
+            }
+            this.pixelIndex = 1;
+            this.blockIndex++;
+        }
+        return null; // EOF
+    }
+
+    readByte() {
+        let byte = 0;
+        for (let i = 0; i < 8; i++) {
+            const bit = this.readBit();
+            if (bit === null) return null;
+            byte = (byte << 1) | bit;
+        }
+        return byte;
+    }
+
+    readBytes(count) {
+        const bytes = new Uint8Array(count);
+        for (let i = 0; i < count; i++) {
+            const byte = this.readByte();
+            if (byte === null) return null;
+            bytes[i] = byte;
+        }
+        return bytes;
     }
 }

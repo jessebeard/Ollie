@@ -136,6 +136,7 @@ async function runTests() {
         await import('./integration/roundtrip.test.js');
         await import('./integration/steganography-roundtrip.test.js');
         await import('./core/steganography.test.js');
+        await import('./core/container-format.test.js');
 
         await import('./ui.test.js');
 

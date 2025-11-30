@@ -217,9 +217,17 @@ export class JpegDecoder {
                 }
             }
 
-            extractedSecretData = Jsteg.extract(allBlocks);
+            extractedSecretData = Jsteg.extractAuto(allBlocks);
             if (extractedSecretData) {
-                console.log(`Extracted secret data: ${extractedSecretData.length} bytes`);
+                // Handle both legacy (Uint8Array) and container (Object) formats
+                if (extractedSecretData instanceof Uint8Array) {
+                    console.log(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
+                } else if (extractedSecretData.data) {
+                    console.log(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
+                    console.log('Metadata:', extractedSecretData.metadata);
+                    // For backward compatibility, flatten to just the data
+                    extractedSecretData = extractedSecretData.data;
+                }
             }
         } catch (e) {
             console.warn('Failed to extract secret data:', e);
