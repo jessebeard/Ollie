@@ -132,6 +132,33 @@ export function expect(actual) {
                 throw new Error(`Expected value to be defined`);
             }
         },
+        toBeTruthy: () => {
+            if (!actual) {
+                throw new Error(`Expected ${actual} to be truthy`);
+            }
+        },
+        toThrow: (expectedError) => {
+            let threw = false;
+            try {
+                actual();
+            } catch (e) {
+                threw = true;
+                if (expectedError) {
+                    if (expectedError instanceof RegExp) {
+                        if (!expectedError.test(e.message)) {
+                            throw new Error(`Expected error matching ${expectedError} but got "${e.message}"`);
+                        }
+                    } else if (typeof expectedError === 'string') {
+                        if (!e.message.includes(expectedError)) {
+                            throw new Error(`Expected error including "${expectedError}" but got "${e.message}"`);
+                        }
+                    }
+                }
+            }
+            if (!threw) {
+                throw new Error('Expected function to throw an error');
+            }
+        },
         not: {
             toBe: (expected) => {
                 if (actual === expected) {

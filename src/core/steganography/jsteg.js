@@ -20,6 +20,10 @@
  * Data Format:
  * [Length (32-bit BE)][Data Payload]
  */
+import { ErrorCorrection } from './error-correction.js';
+import { Encryption } from '../crypto/encryption.js';
+import { KeyDerivation } from '../crypto/key-derivation.js';
+
 export class Jsteg {
     /**
      * Embeds data into the provided blocks.
@@ -103,16 +107,47 @@ export class Jsteg {
      * @param {Uint8Array} data 
      * @param {Object} metadata 
      */
-    static embedContainer(blocks, data, metadata) {
+    /**
+     * Embeds data using the new container format.
+     * Format: [Magic:4][Version:1][Flags:1][MetaLen:2][Metadata:N][PayloadLen:4][Payload:N][CRC:4]
+     * 
+     * @param {Array<Int32Array|Float32Array>} blocks 
+     * @param {Uint8Array} data 
+     * @param {Object} metadata 
+     * @param {Object} options - { password: '...' }
+     */
+    static async embedContainer(blocks, data, metadata, options = {}) {
         const magic = new TextEncoder().encode('JSTG');
         const version = 1;
         const flags = 0;
+
+        // 0. Encryption (if password provided)
+        let payloadToEmbed = data;
+        if (options.password) {
+            metadata.encrypted = true;
+            const salt = KeyDerivation.generateSalt();
+            const key = await KeyDerivation.deriveKey(options.password, salt);
+            const { ciphertext, iv } = await Encryption.encrypt(data, key);
+
+            // Construct encrypted payload: [Salt(16)][IV(12)][Ciphertext(N)]
+            const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+            encryptedPayload.set(salt, 0);
+            encryptedPayload.set(iv, salt.length);
+            encryptedPayload.set(new Uint8Array(ciphertext), salt.length + iv.length);
+
+            payloadToEmbed = encryptedPayload;
+        }
 
         const metaStr = JSON.stringify(metadata);
         const metaBytes = new TextEncoder().encode(metaStr);
         const metaLen = metaBytes.length;
 
-        const payloadLen = data.length;
+        // Prepare Payload (with ECC if enabled)
+        let protectedPayload = payloadToEmbed;
+        if (metadata.ecc) {
+            protectedPayload = ErrorCorrection.protect(payloadToEmbed);
+        }
+        const payloadLen = protectedPayload.length;
 
         // Calculate total size
         // Magic(4) + Ver(1) + Flags(1) + MetaLen(2) + Meta(N) + PayloadLen(4) + Payload(N) + CRC(4)
@@ -147,7 +182,7 @@ export class Jsteg {
         offset += 4;
 
         // Payload
-        container.set(data, offset);
+        container.set(protectedPayload, offset);
         offset += payloadLen;
 
         // CRC32
@@ -166,9 +201,10 @@ export class Jsteg {
      * Returns Uint8Array for legacy format, or {data, metadata} for container format.
      * 
      * @param {Array<Int32Array|Float32Array>} blocks 
-     * @returns {Uint8Array|Object|null}
+     * @param {Object} options
+     * @returns {Promise<Uint8Array|Object|null>}
      */
-    static extractAuto(blocks) {
+    static async extractAuto(blocks, options = {}) {
         // Peek at first 4 bytes to check for magic
         const reader = new JstegReader(blocks);
         const magicBytes = reader.readBytes(4);
@@ -179,7 +215,7 @@ export class Jsteg {
 
         if (magic === 'JSTG') {
             // Container format - use extractContainer
-            return this.extractContainer(blocks);
+            return this.extractContainer(blocks, options);
         } else {
             // Legacy format - use extract
             return this.extract(blocks);
@@ -190,9 +226,10 @@ export class Jsteg {
      * Extracts data from the provided blocks using the new container format.
      * 
      * @param {Array<Int32Array|Float32Array>} blocks 
-     * @returns {Object|null} { data, metadata } or null if invalid
+     * @param {Object} options
+     * @returns {Promise<Object|null>} { data, metadata } or null if invalid
      */
-    static extractContainer(blocks) {
+    static async extractContainer(blocks, options = {}) {
         const reader = new JstegReader(blocks);
 
         // 1. Magic (4 bytes)
@@ -227,10 +264,15 @@ export class Jsteg {
         // 6. Payload Length (4 bytes)
         const payloadLenBytes = reader.readBytes(4);
         if (!payloadLenBytes) return null;
-        const payloadLen = (payloadLenBytes[0] << 24) | (payloadLenBytes[1] << 16) | (payloadLenBytes[2] << 8) | payloadLenBytes[3];
+        const payloadLen = ((payloadLenBytes[0] << 24) | (payloadLenBytes[1] << 16) | (payloadLenBytes[2] << 8) | payloadLenBytes[3]) >>> 0;
+
+        // Sanity check length
+        if (payloadLen > 100 * 1024 * 1024) { // 100MB limit
+            return null;
+        }
 
         // 7. Payload (N bytes)
-        const payload = reader.readBytes(payloadLen);
+        let payload = reader.readBytes(payloadLen);
         if (!payload) return null;
 
         // 8. CRC (4 bytes)
@@ -256,7 +298,42 @@ export class Jsteg {
         const actualCrc = this.crc32(checkBuffer);
 
         if (actualCrc !== expectedCrc) {
-            return null;
+            // CRC failed. If ECC is enabled, try to recover.
+            if (!metadata.ecc) {
+                return null;
+            }
+            console.warn('CRC mismatch, attempting ECC recovery...');
+        }
+
+        // If ECC is enabled, recover data (strips parity and fixes errors)
+        if (metadata.ecc) {
+            try {
+                payload = ErrorCorrection.recover(payload);
+            } catch (e) {
+                console.error('ECC recovery failed:', e);
+                return null;
+            }
+        }
+
+        // Decryption
+        if (metadata.encrypted) {
+            if (!options.password) {
+                console.warn('Data is encrypted but no password provided.');
+                return null;
+            }
+
+            try {
+                // Parse [Salt(16)][IV(12)][Ciphertext(N)]
+                const salt = payload.slice(0, 16);
+                const iv = payload.slice(16, 28);
+                const ciphertext = payload.slice(28);
+
+                const key = await KeyDerivation.deriveKey(options.password, salt);
+                payload = await Encryption.decrypt(ciphertext, key, iv);
+            } catch (e) {
+                console.error('Decryption failed:', e);
+                return null;
+            }
         }
 
         return {

@@ -21,7 +21,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('solid-black-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
@@ -40,7 +40,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('solid-white-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
@@ -58,7 +58,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('solid-red-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
@@ -76,7 +76,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('checkerboard-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
@@ -92,7 +92,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('gradient-16x16.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(16);
         expect(result.height).toBe(16);
@@ -103,7 +103,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('color-blocks-24x24.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         expect(result.width).toBe(24);
         expect(result.height).toBe(24);
@@ -114,7 +114,7 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('solid-black-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result = await await decoder.decode(jpegBytes);
+        const result = decoder.decode(jpegBytes);
 
         // Check all alpha values
         for (let i = 3; i < result.data.length; i += 4) {
@@ -128,8 +128,8 @@ describe('JpegDecoder Integration', async () => {
 
         const decoder = new JpegDecoder();
 
-        const result10 = await decoder.decode(q10);
-        const result90 = await decoder.decode(q90);
+        const result10 = decoder.decode(q10);
+        const result90 = decoder.decode(q90);
 
         expect(result10.width).toBe(8);
         expect(result90.width).toBe(8);
@@ -137,13 +137,13 @@ describe('JpegDecoder Integration', async () => {
         expect(result90.height).toBe(8);
     });
 
-    it('should validate SOI marker', async () => {
+    it('should validate SOI marker', () => {
         const invalidBytes = new Uint8Array([0xFF, 0xD0]); // Not SOI
         const decoder = new JpegDecoder();
 
         let errorThrown = false;
         try {
-            await decoder.decode(invalidBytes);
+            decoder.decode(invalidBytes);
         } catch (e) {
             errorThrown = true;
             expect(e.message.includes('SOI')).toBe(true);
@@ -151,7 +151,7 @@ describe('JpegDecoder Integration', async () => {
         expect(errorThrown).toBe(true);
     });
 
-    it('should require SOF0 marker', async () => {
+    it('should require SOF0 marker', () => {
         // Create minimal JPEG with SOI but no SOF0
         const bytes = new Uint8Array([
             0xFF, 0xD8, // SOI
@@ -161,7 +161,7 @@ describe('JpegDecoder Integration', async () => {
 
         let errorThrown = false;
         try {
-            await decoder.decode(bytes);
+            decoder.decode(bytes);
         } catch (e) {
             errorThrown = true;
             expect(e.message.includes('SOF0') || e.message.includes('baseline')).toBe(true);
@@ -173,8 +173,8 @@ describe('JpegDecoder Integration', async () => {
         const jpegBytes = await loadFixture('solid-black-8x8.jpg');
         const decoder = new JpegDecoder();
 
-        const result1 = await decoder.decode(jpegBytes);
-        const result2 = await decoder.decode(jpegBytes);
+        const result1 = decoder.decode(jpegBytes);
+        const result2 = decoder.decode(jpegBytes);
 
         expect(result1.width).toBe(result2.width);
         expect(result1.height).toBe(result2.height);

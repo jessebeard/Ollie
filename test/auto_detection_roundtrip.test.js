@@ -14,18 +14,18 @@ describe('Steganography Auto-Detection Roundtrip', () => {
         return { width, height, data };
     }
 
-    it('should roundtrip with legacy format (current encoder behavior)', () => {
+    it('should roundtrip with legacy format (current encoder behavior)', async () => {
         const imageData = createTestImage(64, 64);
         const secretText = 'Hello, World!';
         const secretData = new TextEncoder().encode(secretText);
 
         // Encode with secret data (uses legacy format)
         const encoder = new JpegEncoder(90, { secretData });
-        const jpegBytes = encoder.encode(imageData);
+        const jpegBytes = await encoder.encode(imageData);
 
         // Decode (should auto-detect legacy format)
         const decoder = new JpegDecoder();
-        const decoded = decoder.decode(jpegBytes);
+        const decoded = await decoder.decode(jpegBytes);
 
         expect(decoded.secretData).toBeDefined();
         expect(decoded.secretData.length).toBe(secretData.length);
@@ -34,14 +34,14 @@ describe('Steganography Auto-Detection Roundtrip', () => {
         expect(decodedText).toBe(secretText);
     });
 
-    it('should handle images without secret data', () => {
+    it('should handle images without secret data', async () => {
         const imageData = createTestImage(64, 64);
 
         const encoder = new JpegEncoder(90);
-        const jpegBytes = encoder.encode(imageData);
+        const jpegBytes = await encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        const decoded = decoder.decode(jpegBytes);
+        const decoded = await decoder.decode(jpegBytes);
 
         // Should not have secretData or it should be null/undefined
         expect(decoded.secretData === null || decoded.secretData === undefined).toBe(true);

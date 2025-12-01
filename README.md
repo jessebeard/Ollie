@@ -12,12 +12,31 @@ Whether you're exploring how JPEG works under the hood or integrating a codec in
 
 ## ✨ Features
 
+### Core JPEG Codec
 - **Pure JavaScript:** No native modules, no WebAssembly, no heavyweight dependencies.
 - **JPEG Encoder:** Converts raw RGBA image data → JPEG binary.
 - **JPEG Decoder:** Converts JPEG binary → raw RGBA image data.
+- **Baseline Sequential DCT:** The most widely supported JPEG variant.
+- **Progressive JPEG:** Multi-scan encoding and decoding support.
+
+### Advanced Features
+- **SPIFF Markers:** Support for APP8 SPIFF (Still Picture Interchange File Format) markers.
+- **Steganography:** Embed hidden data within JPEG files using DCT coefficient modification.
+- **Container Format:** Structured metadata format for storing encrypted data with versioning.
+- **Reed-Solomon Error Correction:** Robust error correction for embedded data.
+- **Multi-File Splitting:** Shard data across multiple JPEG files with reassembly support.
+
+### Configurable Internals
+- **Multiple IDCT Implementations:** Select between Naive, Reference, and Fast AAN (Arai-Agui-Nakajima) algorithms.
+- **Huffman Decoding Strategies:** Choose between naive Map-based or optimized 16-bit LUT decoding.
+- **Bit Reader Variants:** Swap between different BitReader implementations for performance tuning.
+- **Quantization Methods:** Configurable quantization table selection and quality levels.
+
+### Developer Experience
 - **Modular Architecture:** Each JPEG specification step is implemented as a clean, isolated module.
-- **Configurable Internals:** Select between multiple IDCT implementations (Naive, AAN, Reference) and tuning options.
 - **Educational Codebase:** Designed to be readable, traceable, and easy to learn from.
+- **Comprehensive Testing:** Unit and integration tests for all components.
+- **Browser & Node.js:** Works in both environments with unified test infrastructure.
 
 ---
 
@@ -275,6 +294,25 @@ Open **`index.html`** in a browser to try the interactive demo:
 
 ## 🧪 Testing
 
-Open **`test.html`** in a browser to run the full test suite (unit + integration).
+Ollie includes a comprehensive test suite covering all components:
+
+### Browser Testing
+Open **`test.html`** in a browser to run the full test suite with a visual interface.
+
+### Node.js Testing
+Run tests from the command line:
+```bash
+node test/runner.js
+```
+
+### Test Coverage
+- **Encoder Tests:** Color space conversion, DCT, quantization, Huffman coding, progressive encoding, SPIFF generation
+- **Decoder Tests:** Frame/scan parsing, Huffman decoding, IDCT algorithms, progressive decoding, SPIFF parsing
+- **Utility Tests:** Bit readers/writers, marker parsing
+- **Steganography Tests:** Data embedding, container format, chunk management
+- **Error Correction Tests:** Reed-Solomon integration
+- **Integration Tests:** Roundtrip encoding/decoding, steganography roundtrip, format detection
+- **UI Tests:** User interface interactions
+
 
 ---

@@ -59,11 +59,15 @@ function init() {
             }
 
 
+            const passwordInput = document.getElementById('encrypt-password');
+            const password = passwordInput ? passwordInput.value : null;
+
             const encoder = new JpegEncoder(90, {
                 progressive: isProgressive,
-                secretData: secretData
+                secretData: secretData,
+                password: password
             });
-            const jpegBytes = encoder.encode(imageData);
+            const jpegBytes = await encoder.encode(imageData);
 
             // Convert the raw JPEG bytes into a Blob (Binary Large Object).
             const blob = new Blob([jpegBytes.buffer], { type: 'image/jpeg' });
@@ -79,9 +83,16 @@ function init() {
                 statusDiv.textContent = `Encoded! Size: ${jpegBytes.length} bytes`;
 
                 // Enable download
-                const downloadLink = document.getElementById('download-link');
-                downloadLink.href = url;
-                downloadLink.style.display = 'inline-block';
+                const downloadBtn = document.getElementById('download-link');
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'encoded_image.jpg';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+                downloadBtn.style.display = 'inline-block';
 
                 // Update Encoder Info Pane
                 document.getElementById('encoder-info-size').textContent = `${jpegBytes.length} bytes`;
@@ -193,7 +204,10 @@ function init() {
                 console.log('Using Optimized BitReader');
             }
 
-            const result = decoder.decode(bytes);
+            const passwordInput = document.getElementById('decrypt-password');
+            const password = passwordInput ? passwordInput.value : null;
+
+            const result = await decoder.decode(bytes, { password });
 
             decodedCanvas.width = result.width;
             decodedCanvas.height = result.height;

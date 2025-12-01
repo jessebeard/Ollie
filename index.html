@@ -125,29 +125,34 @@
             <button class="tab-btn" data-tab="decode">Decoder</button>
         </div>
 
+        <!-- ENCODER TAB -->
         <div id="encode-tab" class="tab-content active">
             <div class="controls">
                 <div class="controls-inputs">
                     <h3>JPEG Encoder</h3>
                     <input type="file" id="file-input" accept="image/*">
+
                     <div style="margin: 10px 0;">
-                        <input type="checkbox" id="progressive-checkbox">
-                        <label for="progressive-checkbox">Progressive Encoding</label>
+                        <label><input type="checkbox" id="progressive-checkbox"> Progressive Encoding</label>
                     </div>
-                    <div style="margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 4px;">
-                        <label for="secret-input" style="font-weight: bold; display: block; margin-bottom: 5px;">Data
-                            Stuffing (Steganography)</label>
+
+                    <div style="margin: 10px 0;">
+                        <label style="display: block; margin-bottom: 5px;">Steganography File (Optional):</label>
                         <input type="file" id="secret-input">
-                        <div style="font-size: 12px; color: #666; margin-top: 5px;">Select a file to hide inside the
-                            image.</div>
+                        <input type="password" id="encrypt-password" placeholder="Password (optional)"
+                            style="padding: 5px; width: 200px; margin-top: 5px;">
                     </div>
-                    <button id="encode-btn">Encode to JPEG</button>
-                    <button id="test-btn" style="background: #28a745; margin-left: 10px;">Run Diagnostic</button>
-                    <a id="download-link" style="display:none" download="encoded.jpg">
-                        <button style="background: #6c757d; margin-left: 10px;">Download JPEG</button>
-                    </a>
-                    <div id="status" style="margin-top: 10px; color: #666;">Select an image to begin</div>
+
+                    <button id="encode-btn">Encode Image</button>
+                    <button id="test-btn" style="margin-top: 20px; background: #6c757d;">Run Diagnostic</button>
+
+                    <div style="margin: 10px 0;">
+                        <button id="download-link" style="display: none;" download="image.jpg">Download Encoded
+                            JPEG</button>
+                        <div id="status" style="margin-top: 10px; color: #666;">Select an image to begin</div>
+                    </div>
                 </div>
+
                 <div id="encoder-info" class="info-pane">
                     <div style="font-weight: bold; margin-bottom: 10px;">Encoder Info</div>
                     <div>Size: <span id="encoder-info-size">-</span></div>
@@ -158,7 +163,50 @@
                 </div>
             </div>
 
-            <div class="canvases">
+
+
+            <div style="margin-bottom: 10px;">
+                <label for="idct-method" style="margin-right: 10px; font-weight: bold;">IDCT Method:</label>
+                <select id="idct-method" style="padding: 5px;">
+                    <option value="pureRef">Pure Ref (Spec Formula)</option>
+                    <option value="optimizedRef">Optimized Ref (Separable)</option>
+                    <option value="fastAAN">Fast AAN</option>
+                    <option value="naive">Legacy Naive (O(N³))</option>
+                    <option value="aan">Legacy AAN (O(N))</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label for="dequant-method"
+                    style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">Dequantization:</label>
+                <select id="dequant-method" style="padding: 5px;">
+                    <option value="standard">Standard (Float32)</option>
+                    <option value="bypass">Bypass (Debug)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label for="huffman-method"
+                    style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">Huffman
+                    Method:</label>
+                <select id="huffman-method" style="padding: 5px;">
+                    <option value="optimized">Optimized (Lookup Table)</option>
+                    <option value="naive">Naive (Tree Traversal)</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="bitreader-method"
+                    style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">BitReader
+                    Method:</label>
+                <select id="bitreader-method" style="padding: 5px;">
+                    <option value="optimized">Optimized (Buffer)</option>
+                    <option value="naive">Naive (Byte-by-Byte)</option>
+                </select>
+            </div>
+
+
+            <div class="canvases" style="margin-bottom: 20px;">
                 <div class="canvas-wrapper">
                     <h2>Original</h2>
                     <canvas id="original-canvas"></canvas>
@@ -170,57 +218,18 @@
             </div>
         </div>
 
+        <!-- DECODER TAB -->
         <div id="decode-tab" class="tab-content">
             <div class="controls">
                 <div class="controls-inputs">
                     <h3>JPEG Decoder</h3>
-                    <input type="file" id="decode-input" accept=".jpg,.jpeg">
-                    <button id="decode-btn">Decode JPEG</button>
-                    <div id="decode-status" style="margin-top: 10px; color: #666;">Select a JPEG to decode</div>
-
-                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                        <div style="margin-bottom: 10px;">
-                            <label for="idct-method"
-                                style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">IDCT
-                                Method:</label>
-                            <select id="idct-method" style="padding: 5px;">
-                                <option value="pureRef">Pure Ref (Spec Formula)</option>
-                                <option value="optimizedRef">Optimized Ref (Separable)</option>
-                                <option value="fastAAN">Fast AAN</option>
-                                <option value="naive">Legacy Naive (O(N³))</option>
-                                <option value="aan">Legacy AAN (O(N))</option>
-                            </select>
-                        </div>
-
-                        <div style="margin-bottom: 10px;">
-                            <label for="dequant-method"
-                                style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">Dequantization:</label>
-                            <select id="dequant-method" style="padding: 5px;">
-                                <option value="standard">Standard (Float32)</option>
-                                <option value="bypass">Bypass (Debug)</option>
-                            </select>
-                        </div>
-
-                        <div style="margin-bottom: 10px;">
-                            <label for="huffman-method"
-                                style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">Huffman
-                                Method:</label>
-                            <select id="huffman-method" style="padding: 5px;">
-                                <option value="optimized">Optimized (Lookup Table)</option>
-                                <option value="naive">Naive (Tree Traversal)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="bitreader-method"
-                                style="margin-right: 10px; font-weight: bold; display: inline-block; width: 150px;">BitReader
-                                Method:</label>
-                            <select id="bitreader-method" style="padding: 5px;">
-                                <option value="optimized">Optimized (Buffer)</option>
-                                <option value="naive">Naive (Byte-by-Byte)</option>
-                            </select>
-                        </div>
+                    <input type="file" id="decode-input" accept="image/jpeg">
+                    <div style="margin: 10px 0;">
+                        <input type="password" id="decrypt-password" placeholder="Password (if encrypted)"
+                            style="padding: 5px; width: 200px;">
                     </div>
+                    <button id="decode-btn">Decode</button>
+                    <div id="decode-status" style="margin-top: 10px; color: #666;">Select a JPEG to decode</div>
                 </div>
 
                 <div id="decoder-info" class="info-pane">
@@ -235,7 +244,8 @@
                         <div style="font-weight: bold; color: #28a745;">Secret Data Found!</div>
                         <div style="margin-top: 5px;">Size: <span id="secret-data-size">-</span> bytes</div>
                         <button id="download-secret-btn"
-                            style="margin-top: 5px; width: 100%; background: #28a745;">Download Secret Data</button>
+                            style="margin-top: 5px; width: 100%; background: #28a745;">Download Secret
+                            Data</button>
                     </div>
                 </div>
             </div>
@@ -247,6 +257,7 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     <script type="module" src="./src/main.js?v=debug"></script>

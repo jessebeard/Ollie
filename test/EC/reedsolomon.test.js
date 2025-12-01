@@ -17,8 +17,8 @@
  */
 
 
-var assert = require('assert');
-var rs = require('../reedsolomon.js');
+import assert from 'assert';
+import * as rs from '../../src/core/EC/reedsolomon.js';
 
 var GenericGF = rs.GenericGF;
 var GenericGFPoly = rs.GenericGFPoly;
@@ -66,7 +66,6 @@ function testEncodeDecodeRandom(field, dataSize, ecSize) {
     var random = getPseudoRandom();
     var iterations = field.getSize() > 256 ? 1 : DECODER_RANDOM_TEST_ITERATIONS;
     for (var i = 0; i < iterations; i++) {
-        console.log('testEncodeDecodeRandom', i);
         // generate random data
         for (var k = 0; k < dataSize; k++) {
             dataWords[k] = random.nextInt(field.getSize());
@@ -103,7 +102,6 @@ function testDecoder(field, dataWords, ecWords) {
     var iterations = field.getSize() > 256 ? 1 : DECODER_TEST_ITERATIONS;
     for (var j = 0; j < iterations; j++) {
         for (var i = 0; i < ecWords.length; i++) {
-            console.log('testDecoder', j, i);
             if (i > 10 && i < ecWords.length / 2 - 10) {
                 // performance improvement - skip intermediate cases in long-running tests 
                 i += ecWords.length / 10;
@@ -146,8 +144,8 @@ function assertDataEquals(expected, received, message) {
 
 (function testDataMatrix() {
     // real life test cases
-    testEncodeDecode(GenericGF.DATA_MATRIX_FIELD_256(), new Int32Array([142, 164, 186]), new Int32Array([114, 25, 5, 88, 102]));
-    testEncodeDecode(GenericGF.DATA_MATRIX_FIELD_256(), new Int32Array([
+    testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([142, 164, 186]), new Int32Array([114, 25, 5, 88, 102]));
+    testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([
         0x69, 0x75, 0x75, 0x71, 0x3B, 0x30, 0x30, 0x64,
         0x70, 0x65, 0x66, 0x2F, 0x68, 0x70, 0x70, 0x68,
         0x6D, 0x66, 0x2F, 0x64, 0x70, 0x6E, 0x30, 0x71,
@@ -158,20 +156,20 @@ function assertDataEquals(expected, received, message) {
             0xF0, 0x1C, 0xF1, 0xD0, 0x6D, 0x00, 0x98, 0xDA,
             0x80, 0x88, 0xBE, 0xFF, 0xB7, 0xFA, 0xA9, 0x95]));
     // synthetic test cases
-    testEncodeDecodeRandom(GenericGF.DATA_MATRIX_FIELD_256(), 10, 240);
-    testEncodeDecodeRandom(GenericGF.DATA_MATRIX_FIELD_256(), 128, 127);
-    testEncodeDecodeRandom(GenericGF.DATA_MATRIX_FIELD_256(), 220, 35);
+    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 10, 240);
+    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 128, 127);
+    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 220, 35);
 })();
 
 (function testQRCode() {
     // Test case from example given in ISO 18004, Annex I
-    testEncodeDecode(GenericGF.QR_CODE_FIELD_256(), new Int32Array([
+    testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
         0x10, 0x20, 0x0C, 0x56, 0x61, 0x80, 0xEC, 0x11,
         0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11]),
         new Int32Array([
             0xA5, 0x24, 0xD4, 0xC1, 0xED, 0x36, 0xC7, 0x87,
             0x2C, 0x55]));
-    testEncodeDecode(GenericGF.QR_CODE_FIELD_256(), new Int32Array([
+    testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
         0x72, 0x67, 0x2F, 0x77, 0x69, 0x6B, 0x69, 0x2F,
         0x4D, 0x61, 0x69, 0x6E, 0x5F, 0x50, 0x61, 0x67,
         0x65, 0x3B, 0x3B, 0x00, 0xEC, 0x11, 0xEC, 0x11,
@@ -182,7 +180,7 @@ function assertDataEquals(expected, received, message) {
             0x08, 0x62]));
     // real life test cases
     // synthetic test cases
-    testEncodeDecodeRandom(GenericGF.QR_CODE_FIELD_256(), 10, 240);
-    testEncodeDecodeRandom(GenericGF.QR_CODE_FIELD_256(), 128, 127);
-    testEncodeDecodeRandom(GenericGF.QR_CODE_FIELD_256(), 220, 35);
+    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 10, 240);
+    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 128, 127);
+    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 220, 35);
 })();

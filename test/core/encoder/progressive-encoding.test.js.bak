@@ -2,7 +2,7 @@ import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
 import { describe, it, expect } from '../../../test/utils/test-runner.js';
 
 describe('Progressive Encoding', () => {
-    it('should generate multiple SOS markers when progressive mode is enabled', async () => {
+    it('should generate multiple SOS markers when progressive mode is enabled', () => {
         const encoder = new JpegEncoder(50, { progressive: true });
         const width = 16;
         const height = 16;
@@ -12,7 +12,7 @@ describe('Progressive Encoding', () => {
             data: new Uint8ClampedArray(width * height * 4).fill(128)
         };
 
-        const jpegBytes = await await encoder.encode(imageData);
+        const jpegBytes = encoder.encode(imageData);
 
         // Count SOS markers (FF DA)
         let sosCount = 0;
@@ -26,7 +26,7 @@ describe('Progressive Encoding', () => {
         expect(sosCount).toBeGreaterThan(1);
     });
 
-    it('should generate SOF2 (Progressive DCT) instead of SOF0 (Baseline DCT)', async () => {
+    it('should generate SOF2 (Progressive DCT) instead of SOF0 (Baseline DCT)', () => {
         const encoder = new JpegEncoder(50, { progressive: true });
         const width = 8;
         const height = 8;
@@ -36,7 +36,7 @@ describe('Progressive Encoding', () => {
             data: new Uint8ClampedArray(width * height * 4).fill(0)
         };
 
-        const jpegBytes = await await encoder.encode(imageData);
+        const jpegBytes = encoder.encode(imageData);
 
         // Check for SOF2 (FF C2)
         let hasSOF2 = false;

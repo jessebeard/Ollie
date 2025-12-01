@@ -41,7 +41,7 @@ describe('Jsteg Container Format', () => {
         return bytes;
     }
 
-    it('should embed data with JSTG magic bytes', () => {
+    it('should embed data with JSTG magic bytes', async () => {
         const blocks = createMockBlocks(100);
         const data = new Uint8Array([1, 2, 3]);
         const metadata = { filename: 'test.txt' };
@@ -49,7 +49,7 @@ describe('Jsteg Container Format', () => {
         // This should embed: [Magic:4][Version:1][Flags:1][MetaLen:2][Meta...][Len:4][Data...][CRC:4]
         // Magic = "JSTG" = 0x4A535447
 
-        Jsteg.embedContainer(blocks, data, metadata);
+        await Jsteg.embedContainer(blocks, data, metadata);
 
         const header = readRawBytes(blocks, 4);
         const magic = new TextDecoder().decode(header);
@@ -57,12 +57,12 @@ describe('Jsteg Container Format', () => {
         expect(magic).toBe('JSTG');
     });
 
-    it('should embed version and flags', () => {
+    it('should embed version and flags', async () => {
         const blocks = createMockBlocks(100);
         const data = new Uint8Array([1]);
         const metadata = {};
 
-        Jsteg.embedContainer(blocks, data, metadata);
+        await Jsteg.embedContainer(blocks, data, metadata);
 
         // Magic(4) + Version(1) + Flags(1)
         const header = readRawBytes(blocks, 6);
@@ -74,12 +74,12 @@ describe('Jsteg Container Format', () => {
         expect(flags).toBe(0);
     });
 
-    it('should embed metadata', () => {
+    it('should embed metadata', async () => {
         const blocks = createMockBlocks(200);
         const data = new Uint8Array([1]);
         const metadata = { foo: 'bar', baz: 123 };
 
-        Jsteg.embedContainer(blocks, data, metadata);
+        await Jsteg.embedContainer(blocks, data, metadata);
 
         // Read header to get metadata length
         // Magic(4) + Ver(1) + Flags(1) + MetaLen(2)
@@ -95,14 +95,14 @@ describe('Jsteg Container Format', () => {
         expect(extractedMeta.baz).toBe(123);
     });
 
-    it('should extract container with metadata and payload', () => {
+    it('should extract container with metadata and payload', async () => {
         const blocks = createMockBlocks(200);
         const data = new Uint8Array([10, 20, 30, 40]);
         const metadata = { test: true };
 
-        Jsteg.embedContainer(blocks, data, metadata);
+        await Jsteg.embedContainer(blocks, data, metadata);
 
-        const result = Jsteg.extractContainer(blocks);
+        const result = await Jsteg.extractContainer(blocks);
 
         expect(result).toBeDefined();
         expect(result.metadata.test).toBe(true);
@@ -111,12 +111,12 @@ describe('Jsteg Container Format', () => {
         expect(result.data[3]).toBe(40);
     });
 
-    it('should verify CRC32 integrity', () => {
+    it('should verify CRC32 integrity', async () => {
         const blocks = createMockBlocks(200);
         const data = new Uint8Array([1, 2, 3, 4]);
         const metadata = {};
 
-        Jsteg.embedContainer(blocks, data, metadata);
+        await Jsteg.embedContainer(blocks, data, metadata);
 
         // Corrupt the payload (flip a bit in the first byte of payload)
         // Magic(4) + Ver(1) + Flags(1) + MetaLen(2) + Meta({}) + PayloadLen(4)
@@ -165,7 +165,156 @@ describe('Jsteg Container Format', () => {
 
         expect(corrupted).toBe(true);
 
-        const result = Jsteg.extractContainer(blocks);
+        const result = await Jsteg.extractContainer(blocks);
         expect(result).toBe(null);
     });
+
+    it('should embed with ECC when flag is set', async () => {
+        const blocks = createMockBlocks(300);
+        const data = new Uint8Array([1, 2, 3, 4, 5]);
+        const metadata = { ecc: true };
+
+        await Jsteg.embedContainer(blocks, data, metadata);
+
+        // Header size = 14 bytes (approx)
+        // Data = 5 bytes
+        // ECC parity = 4 bytes (default)
+        // Total payload = 9 bytes
+        // Total used bytes = 14 + 9 + 4 (CRC) = 27 bytes
+
+        const result = await Jsteg.extractContainer(blocks);
+        expect(result).toBeDefined();
+        expect(result.data.length).toBe(5);
+        expect(result.metadata.ecc).toBe(true);
+        expect(result.data[0]).toBe(1);
+    });
+
+    it('should recover from corruption when ECC is enabled', async () => {
+        const blocks = createMockBlocks(300);
+        const data = new Uint8Array([10, 20, 30, 40, 50]);
+        const metadata = { ecc: true };
+
+        await Jsteg.embedContainer(blocks, data, metadata);
+
+        // Corrupt the payload (flip a bit in the first byte of payload)
+        // Payload starts after header.
+        // Header is variable length due to metadata, but we can find it.
+        // Or we can just corrupt a few bytes in the middle of the block stream 
+        // where we know the payload resides.
+
+        // Let's corrupt the 24th byte embedded (should be part of payload/parity)
+        let byteIndex = 0;
+        let bitIndex = 0;
+        const targetByteIndex = 24;
+        let corrupted = false;
+
+        for (const block of blocks) {
+            for (let i = 1; i < 64; i++) {
+                if (block[i] === 0) continue;
+
+                if (byteIndex === targetByteIndex) {
+                    // Flip LSB
+                    const val = block[i];
+                    if (Math.abs(val) === 1) {
+                        block[i] = (val > 0) ? 2 : -2;
+                    } else {
+                        block[i] ^= 1;
+                    }
+                    corrupted = true;
+                    break;
+                }
+
+                bitIndex++;
+                if (bitIndex === 8) {
+                    bitIndex = 0;
+                    byteIndex++;
+                }
+            }
+            if (corrupted) break;
+        }
+
+        expect(corrupted).toBe(true);
+
+        const result = await Jsteg.extractContainer(blocks);
+        expect(result).toBeDefined();
+        expect(result.data.length).toBe(5);
+        expect(result.data[0]).toBe(10);
+        expect(result.data[4]).toBe(50);
+    });
+
+    it('should encrypt and decrypt data with password', async () => {
+        const blocks = createMockBlocks(400);
+        const data = new Uint8Array([1, 2, 3, 4, 5]);
+        const metadata = { encrypted: true };
+        const password = 'secret-password';
+
+        await Jsteg.embedContainer(blocks, data, metadata, { password });
+
+        const result = await Jsteg.extractContainer(blocks, { password });
+
+        expect(result).toBeDefined();
+        expect(result.metadata.encrypted).toBe(true);
+        expect(result.data.length).toBe(5);
+        expect(result.data[0]).toBe(1);
+        expect(result.data[4]).toBe(5);
+    });
+
+    it('should fail to decrypt with wrong password', async () => {
+        const blocks = createMockBlocks(400);
+        const data = new Uint8Array([1, 2, 3, 4, 5]);
+        const metadata = { encrypted: true };
+        const password = 'secret-password';
+
+        await Jsteg.embedContainer(blocks, data, metadata, { password });
+
+        const result = await Jsteg.extractContainer(blocks, { password: 'wrong-password' });
+
+        expect(result).toBe(null);
+    });
+
+    it('should combine encryption and ECC', async () => {
+        const blocks = createMockBlocks(500);
+        const data = new Uint8Array([10, 20, 30]);
+        const metadata = { encrypted: true, ecc: true };
+        const password = 'secure-ecc';
+
+        await Jsteg.embedContainer(blocks, data, metadata, { password });
+
+        // Corrupt a byte (simulate bit rot)
+        // We need to find where the payload is.
+        // Header is roughly 14+ bytes.
+        // Encrypted payload is larger (Salt 16 + IV 12 + Data 3 + Tag 16 = 47 bytes).
+        // ECC adds 4 bytes.
+        // Total ~65 bytes.
+
+        // Corrupt byte 70 (should be inside the encrypted payload)
+        let byteIndex = 0;
+        let bitIndex = 0;
+        const targetByteIndex = 70;
+        let corrupted = false;
+
+        for (const block of blocks) {
+            for (let i = 1; i < 64; i++) {
+                if (block[i] === 0) continue;
+                if (byteIndex === targetByteIndex) {
+                    const val = block[i];
+                    if (Math.abs(val) === 1) block[i] = (val > 0) ? 2 : -2;
+                    else block[i] ^= 1;
+                    corrupted = true;
+                    break;
+                }
+                bitIndex++;
+                if (bitIndex === 8) { bitIndex = 0; byteIndex++; }
+            }
+            if (corrupted) break;
+        }
+        expect(corrupted).toBe(true);
+
+        const result = await Jsteg.extractContainer(blocks, { password });
+
+        expect(result).toBeDefined();
+        expect(result.data[0]).toBe(10);
+        expect(result.data[2]).toBe(30);
+    });
 });
+

@@ -65,26 +65,54 @@
         import './test/core/encoder/quantization.test.js';
         import './test/core/encoder/zigzag.test.js';
         import './test/core/encoder/huffman.test.js';
+        import './test/core/encoder/progressive-encoding.test.js';
+        import './test/core/encoder/spiff-generation.test.js';
         import './test/core/jpeg-encoder.test.js';
 
-        // Decoder Tests - Phase 1-4
+        // Decoder Tests
         import './test/core/decoder/frame-parser.test.js';
         import './test/core/decoder/scan-parser.test.js';
         import './test/core/decoder/huffman-parser.test.js';
         import './test/core/decoder/quantization-parser.test.js';
         import './test/core/decoder/huffman-decoder.test.js';
+        import './test/core/decoder/huffman-naive.test.js';
         import './test/core/decoder/inverse-zigzag.test.js';
         import './test/core/decoder/dequantization.test.js';
         import './test/core/decoder/idct.test.js';
-
-        // Decoder Tests - Phase 5
+        import './test/core/decoder/idct-spec.test.js';
+        import './test/core/decoder/idct-switching.test.js';
         import './test/core/decoder/colorspace-decoder.test.js';
         import './test/core/decoder/upsampling.test.js';
         import './test/core/decoder/block-assembly.test.js';
+        import './test/core/decoder/progressive-decoding.test.js';
+        import './test/core/decoder/spiff-parsing.test.js';
 
-        // Integration Tests - Phase 6
+        // Utility Tests
+        import './test/utils/bit-reader.test.js';
+        import './test/utils/bit-reader-switching.test.js';
+        import './test/utils/marker-parser.test.js';
+
+        // Steganography Tests
+        import './test/core/steganography.test.js';
+        import './test/core/steganography/container.test.js';
+        import './test/core/steganography/chunk-manager.test.js';
+        import './test/core/container-format.test.js';
+
+        // Error Correction Tests
+        import './test/core/EC/reed-solomon-integration.test.js';
+        // Note: reedsolomon.test.js uses Node.js 'assert' module - run via 'npm test' instead
+        // import './test/EC/reedsolomon.test.js';
+
+        // Integration Tests
         import './test/core/jpeg-decoder.test.js';
         import './test/integration/roundtrip.test.js';
+        import './test/integration/steganography-roundtrip.test.js';
+        import './test/auto_detection_roundtrip.test.js';
+        import './test/capacity_validation.test.js';
+        import './test/format_detection.test.js';
+
+        // UI Tests
+        import './test/ui.test.js';
     </script>
 </body>
 

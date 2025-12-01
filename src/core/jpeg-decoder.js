@@ -94,9 +94,10 @@ export class JpegDecoder {
      * Decode a JPEG byte array into ImageData
      * 
      * @param {Uint8Array} jpegBytes - JPEG file bytes
-     * @returns {{data: Uint8ClampedArray, width: number, height: number}} ImageData-compatible object
+     * @param {Object} options - { password: '...' }
+     * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number, secretData: any}>} ImageData-compatible object
      */
-    decode(jpegBytes) {
+    async decode(jpegBytes, options = {}) {
         this.reset();
 
         // Phase 1: Parse file structure and headers
@@ -217,7 +218,7 @@ export class JpegDecoder {
                 }
             }
 
-            extractedSecretData = Jsteg.extractAuto(allBlocks);
+            extractedSecretData = await Jsteg.extractAuto(allBlocks, options);
             if (extractedSecretData) {
                 // Handle both legacy (Uint8Array) and container (Object) formats
                 if (extractedSecretData instanceof Uint8Array) {

@@ -28,7 +28,7 @@ export class JpegEncoder {
      * @param {ImageData|Object} imageData - Object containing width, height, and data (RGBA).
      * @returns {Uint8Array} The raw JPEG file bytes.
      */
-    encode(imageData) {
+    async encode(imageData) {
         console.log('JpegEncoder.encode called');
         const width = imageData.width;
         const height = imageData.height;
@@ -115,7 +115,7 @@ export class JpegEncoder {
                 throw new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`);
             }
 
-            if (!Jsteg.embed(allBlocks, this.options.secretData)) {
+            if (!await Jsteg.embedContainer(allBlocks, this.options.secretData, { ecc: true }, { password: this.options.password })) {
                 throw new Error('Failed to embed secret data into image.');
             }
         }

@@ -9,7 +9,7 @@ const implementations = [
 
 implementations.forEach(({ name, fn: idct }) => {
     describe(name, () => {
-        it('should validate coefficient block length', async () => {
+        it('should validate coefficient block length', () => {
             const invalid = new Float32Array(32);
 
             let errorThrown = false;
@@ -27,7 +27,7 @@ implementations.forEach(({ name, fn: idct }) => {
             // expect(errorThrown).toBe(true);
         });
 
-        it('should handle all-zero blocks', async () => {
+        it('should handle all-zero blocks', () => {
             const coefficients = new Float32Array(64);
             const result = idct(coefficients);
 
@@ -36,7 +36,7 @@ implementations.forEach(({ name, fn: idct }) => {
             }
         });
 
-        it('should handle DC-only blocks', async () => {
+        it('should handle DC-only blocks', () => {
             const coefficients = new Float32Array(64);
             coefficients[0] = 100;
 
@@ -58,7 +58,7 @@ implementations.forEach(({ name, fn: idct }) => {
             }
         });
 
-        it('should roundtrip with forward DCT for constant block', async () => {
+        it('should roundtrip with forward DCT for constant block', () => {
             // Create a constant block (all same value)
             const original = new Float32Array(64);
             original.fill(128);
@@ -71,15 +71,11 @@ implementations.forEach(({ name, fn: idct }) => {
 
             // Should reconstruct original values (within tolerance)
             for (let i = 0; i < 64; i++) {
-                const diff = Math.abs(reconstructed[i] - original[i]);
-                if (diff >= 1) {
-                    console.log(`Constant block mismatch at ${i}: expected ${original[i]}, got ${reconstructed[i]}, diff ${diff}`);
-                }
-                expect(diff < 1).toBe(true);
+                expect(Math.abs(reconstructed[i] - original[i]) < 1).toBe(true);
             }
         });
 
-        it('should roundtrip with forward DCT for gradient block', async () => {
+        it('should roundtrip with forward DCT for gradient block', () => {
             // Create a gradient block
             const original = new Float32Array(64);
             for (let y = 0; y < 8; y++) {
@@ -93,15 +89,11 @@ implementations.forEach(({ name, fn: idct }) => {
 
             // Should reconstruct original values (within tolerance)
             for (let i = 0; i < 64; i++) {
-                const diff = Math.abs(reconstructed[i] - original[i]);
-                if (diff >= 2) {
-                    console.log(`Gradient block mismatch at ${i}: expected ${original[i]}, got ${reconstructed[i]}, diff ${diff}`);
-                }
-                expect(diff < 2).toBe(true); // Increased tolerance for AAN
+                expect(Math.abs(reconstructed[i] - original[i]) < 2).toBe(true); // Increased tolerance for AAN
             }
         });
 
-        it('should roundtrip with forward DCT for checkerboard pattern', async () => {
+        it('should roundtrip with forward DCT for checkerboard pattern', () => {
             // Create a checkerboard pattern
             const original = new Float32Array(64);
             for (let y = 0; y < 8; y++) {
@@ -119,7 +111,7 @@ implementations.forEach(({ name, fn: idct }) => {
             }
         });
 
-        it('should roundtrip with forward DCT for random block', async () => {
+        it('should roundtrip with forward DCT for random block', () => {
             // Create a random block
             const original = new Float32Array(64);
             for (let i = 0; i < 64; i++) {

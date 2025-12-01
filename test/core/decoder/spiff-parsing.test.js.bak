@@ -3,7 +3,7 @@ import { JpegDecoder } from '../../../src/core/jpeg-decoder.js';
 import { describe, it, expect } from '../../../test/utils/test-runner.js';
 
 describe('SPIFF Parsing', () => {
-    it('should parse a valid SPIFF APP8 marker', async () => {
+    it('should parse a valid SPIFF APP8 marker', () => {
         // Use Encoder to generate valid SPIFF JPEG
         const encoder = new JpegEncoder(50, { writeSpiff: true });
         const width = 16;
@@ -14,10 +14,10 @@ describe('SPIFF Parsing', () => {
             data: new Uint8ClampedArray(width * height * 4).fill(128)
         };
 
-        const jpegBytes = await await encoder.encode(imageData);
+        const jpegBytes = encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        await decoder.decode(jpegBytes);
+        decoder.decode(jpegBytes);
 
         expect(decoder.spiff).toBeDefined();
         expect(decoder.spiff.version.major).toBe(1);
@@ -34,7 +34,7 @@ describe('SPIFF Parsing', () => {
         expect(decoder.spiff.horizontalResolution).toBe(72);
     });
 
-    it('should ignore SPIFF marker if not present', async () => {
+    it('should ignore SPIFF marker if not present', () => {
         const encoder = new JpegEncoder(50, { writeSpiff: false });
         const width = 8;
         const height = 8;
@@ -44,10 +44,10 @@ describe('SPIFF Parsing', () => {
             data: new Uint8ClampedArray(width * height * 4).fill(0)
         };
 
-        const jpegBytes = await await encoder.encode(imageData);
+        const jpegBytes = encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        await decoder.decode(jpegBytes);
+        decoder.decode(jpegBytes);
 
         expect(decoder.spiff).toBe(null);
     });

@@ -19,27 +19,31 @@
                 <directory name="decoder" description="Unit tests for decoder algorithms">
                     <file name="quantization-parser.test.js" description="Tests for DQT segment parsing." />
                     <file name="huffman-parser.test.js" description="Tests for DHT segment parsing." />
+                    <file name="huffman-decoder.test.js" description="Tests for Huffman entropy decoding." />
+                    <file name="huffman-naive.test.js" description="Tests for naive Huffman decoding implementation." />
                     <file name="frame-parser.test.js" description="Tests for SOF0 frame header parsing." />
                     <file name="scan-parser.test.js" description="Tests for SOS scan header parsing." />
                     <file name="spiff-parsing.test.js" description="Tests for SPIFF APP8 marker parsing." />
                     <file name="progressive-decoding.test.js" description="Tests for Progressive JPEG decoding." />
-                    <file name="huffman-decoder.test.js" description="Tests for Huffman entropy decoding." />
                     <file name="inverse-zigzag.test.js" description="Tests for inverse zigzag reordering." />
                     <file name="dequantization.test.js" description="Tests for dequantization." />
                     <file name="idct.test.js" description="Tests for Inverse DCT." />
+                    <file name="idct-spec.test.js" description="Tests for IDCT specification compliance and correctness." />
+                    <file name="idct-switching.test.js" description="Tests for switching between IDCT implementations." />
                     <file name="colorspace-decoder.test.js" description="Tests for YCbCr to RGB conversion." />
                     <file name="upsampling.test.js" description="Tests for chroma upsampling." />
                     <file name="block-assembly.test.js" description="Tests for block assembly." />
                 </directory>
+                <directory name="steganography" description="Steganography system tests">
+                    <file name="container.test.js" description="Tests for steganography container format." />
+                    <file name="chunk-manager.test.js" description="Tests for data chunking and reassembly." />
+                </directory>
+                <directory name="EC" description="Error correction tests">
+                    <file name="reed-solomon-integration.test.js" description="Tests for Reed-Solomon error correction integration." />
+                </directory>
             </directory>
-            <directory name="fixtures" description="Test JPEG files for decoder testing">
-                <file name="generate-fixtures.js" description="Script to generate test JPEG files using the encoder." />
-                <file name="README.md" description="Documentation for test fixtures." />
-            </directory>
-            <directory name="integration" description="Integration tests">
-                <file name="roundtrip.test.js" description="Tests for encoder-decoder roundtrip compatibility." />
-                <file name="real-files.test.js" description="Tests for decoding real JPEG files." />
-            </directory>
+            <file name="steganography.test.js" description="Core steganography functionality tests." />
+            <file name="container-format.test.js" description="Container format parsing and generation tests." />
             <directory name="utils" description="Test infrastructure and utility classes">
                 <file name="test-runner.js" description="Unified test runner that works in both Node.js and browser environments. Exports describe/it/expect API.">
                     <function name="describe" params="name, fn" description="Defines a test suite." />
@@ -57,9 +61,27 @@
                     <function name="getStats" return="{total, passed, failed}" description="Returns test statistics (Node.js only)." />
                     <function name="resetStats" description="Resets test statistics (Node.js only)." />
                 </file>
+                <file name="assert.js" description="Custom assertion utilities for tests." />
+                <file name="bit-reader.test.js" description="Tests for BitReader functionality." />
+                <file name="bit-reader-switching.test.js" description="Tests for switching between BitReader implementations." />
+                <file name="marker-parser.test.js" description="Tests for JPEG marker parsing." />
                 <file name="test-runner-browser.js" description="Browser-specific test runner implementation (legacy, kept for reference)." />
                 <file name="test-runner-node.js" description="Node-specific test runner implementation (unused, kept for reference)." />
             </directory>
+            <directory name="EC" description="Error correction library tests">
+                <file name="reedsolomon.test.js" description="Tests for Reed-Solomon codec implementation." />
+            </directory>
+            <directory name="fixtures" description="Test JPEG files for decoder testing">
+                <file name="generate-fixtures.js" description="Script to generate test JPEG files using the encoder." />
+                <file name="README.md" description="Documentation for test fixtures." />
+            </directory>
+            <directory name="integration" description="Integration tests">
+                <file name="roundtrip.test.js" description="Tests for encoder-decoder roundtrip compatibility." />
+                <file name="steganography-roundtrip.test.js" description="Tests for steganography embed/extract roundtrip." />
+            </directory>
+            <file name="auto_detection_roundtrip.test.js" description="Tests for automatic format detection in roundtrip scenarios." />
+            <file name="capacity_validation.test.js" description="Tests for steganography capacity calculation and validation." />
+            <file name="format_detection.test.js" description="Tests for JPEG format detection and classification." />
         </directory>
     </structure>
 </project>

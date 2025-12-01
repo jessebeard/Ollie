@@ -13,7 +13,7 @@ describe('Capacity Validation', () => {
         return { width, height, data };
     }
 
-    it('should throw error when secret data exceeds capacity', () => {
+    it('should throw error when secret data exceeds capacity', async () => {
         const imageData = createTestImage(8, 8); // Very small image
         const largeSecret = new Uint8Array(1000); // Way too large
 
@@ -23,7 +23,7 @@ describe('Capacity Validation', () => {
         let errorMessage = '';
 
         try {
-            encoder.encode(imageData);
+            await encoder.encode(imageData);
         } catch (e) {
             errorThrown = true;
             errorMessage = e.message;
@@ -34,7 +34,7 @@ describe('Capacity Validation', () => {
         expect(errorMessage.includes('1000 bytes')).toBe(true);
     });
 
-    it('should succeed when secret data fits', () => {
+    it('should succeed when secret data fits', async () => {
         const imageData = createTestImage(64, 64);
         const smallSecret = new Uint8Array(10);
 
@@ -42,7 +42,7 @@ describe('Capacity Validation', () => {
 
         let success = false;
         try {
-            const jpegBytes = encoder.encode(imageData);
+            const jpegBytes = await encoder.encode(imageData);
             success = jpegBytes.length > 0;
         } catch (e) {
             success = false;

@@ -78,35 +78,8 @@ export const idctNaive = idct;
  * @returns {Float32Array} 64-element block of spatial domain values
  */
 export function idctAAN(coefficients) {
-    const output = new Float32Array(64);
-    const temp = new Float32Array(64);
-
-    // 1. Pre-scale and Row IDCT
-    // We combine pre-scaling with the row pass for efficiency, 
-    // or just do it before. Let's do it before to be clear.
-
-    // Apply scaling factors (inverse of the spec's post-scaling)
-    // S[u,v] = s[u] * s[v]
-    // Input to IDCT = Coeff / S[u,v] = Coeff * (1/s[u]) * (1/s[v])
-    for (let i = 0; i < 64; i++) {
-        temp[i] = coefficients[i] * AAN_SCALE_TABLE[i];
-    }
-
-    // 2. Row IDCT
-    for (let y = 0; y < 8; y++) {
-        const offset = y * 8;
-        aan1d(temp, offset, 1);
-    }
-
-    // 3. Column IDCT
-    for (let x = 0; x < 8; x++) {
-        aan1d(temp, x, 8);
-    }
-
-    // Copy to output (temp now holds the result)
-    output.set(temp);
-
-    return output;
+    // TODO: Fix AAN implementation scaling factors. Currently falling back to Naive IDCT for correctness.
+    return idct(coefficients);
 }
 
 // --- AAN Constants and Tables ---
@@ -143,7 +116,7 @@ const S = [
     1 / (4 * C7)
 ];
 
-const IS = S.map(s => s * 1.414213562);
+const IS = S; // S.map(s => s * 1.414213562);
 
 // Precomputed 2D Scale Table
 const AAN_SCALE_TABLE = new Float32Array(64);

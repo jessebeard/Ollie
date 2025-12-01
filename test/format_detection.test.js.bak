@@ -12,7 +12,7 @@ describe('Jsteg Format Detection', () => {
         return blocks;
     }
 
-    it('should extract legacy format with extract()', async () => {
+    it('should extract legacy format with extract()', () => {
         const blocks = createMockBlocks(100);
         const data = new Uint8Array([1, 2, 3, 4, 5]);
 
@@ -24,25 +24,25 @@ describe('Jsteg Format Detection', () => {
         expect(extracted[0]).toBe(1);
     });
 
-    it('should extract container format with extractContainer()', async () => {
+    it('should extract container format with extractContainer()', () => {
         const blocks = createMockBlocks(200);
         const data = new Uint8Array([10, 20, 30]);
         const metadata = { filename: 'test.bin' };
 
-        await Jsteg.embedContainer(blocks, data, metadata);
-        const result = await Jsteg.extractContainer(blocks);
+        Jsteg.embedContainer(blocks, data, metadata);
+        const result = Jsteg.extractContainer(blocks);
 
         expect(result).toBeDefined();
         expect(result.data.length).toBe(3);
         expect(result.metadata.filename).toBe('test.bin');
     });
 
-    it('should NOT extract container format with legacy extract()', async () => {
+    it('should NOT extract container format with legacy extract()', () => {
         const blocks = createMockBlocks(200);
         const data = new Uint8Array([10, 20, 30]);
         const metadata = { filename: 'test.bin' };
 
-        await Jsteg.embedContainer(blocks, data, metadata);
+        Jsteg.embedContainer(blocks, data, metadata);
 
         // Try to extract with legacy method
         const extracted = Jsteg.extract(blocks);

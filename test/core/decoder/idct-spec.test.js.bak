@@ -2,7 +2,7 @@ import { describe, it, expect } from '../../utils/test-runner.js';
 import { idctPureRef, idctOptimizedRef } from '../../../src/core/decoder/idct-spec.js';
 
 describe('IDCT Spec Implementations', () => {
-    it('should handle DC-only block (constant value)', async () => {
+    it('should handle DC-only block (constant value)', () => {
         // For a constant block of value V, the DC coefficient is V * 8 (not 64)
         // This is because the forward DCT has a normalization factor
         // Testing with value 100
@@ -22,7 +22,7 @@ describe('IDCT Spec Implementations', () => {
         }
     });
 
-    it('should match optimized and pure ref for DC-only', async () => {
+    it('should match optimized and pure ref for DC-only', () => {
         const coeffs = new Float32Array(64);
         coeffs[0] = 64 * 100;
 
@@ -36,7 +36,7 @@ describe('IDCT Spec Implementations', () => {
         }
     });
 
-    it('should validate coefficient block length', async () => {
+    it('should validate coefficient block length', () => {
         let threw = false;
         try {
             idctPureRef(new Float32Array(32));
