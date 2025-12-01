@@ -41,6 +41,10 @@
                 <directory name="EC" description="Error correction tests">
                     <file name="reed-solomon-integration.test.js" description="Tests for Reed-Solomon error correction integration." />
                 </directory>
+                <directory name="crypto" description="Cryptography tests">
+                    <file name="encryption.test.js" description="Tests for AES-GCM encryption/decryption." />
+                    <file name="key-derivation.test.js" description="Tests for PBKDF2 key derivation." />
+                </directory>
             </directory>
             <file name="steganography.test.js" description="Core steganography functionality tests." />
             <file name="container-format.test.js" description="Container format parsing and generation tests." />
@@ -82,6 +86,15 @@
             <file name="auto_detection_roundtrip.test.js" description="Tests for automatic format detection in roundtrip scenarios." />
             <file name="capacity_validation.test.js" description="Tests for steganography capacity calculation and validation." />
             <file name="format_detection.test.js" description="Tests for JPEG format detection and classification." />
+            <directory name="debug" description="Debug and diagnostic scripts (not part of automated test suite)">
+                <file name="bench_huffman.js" description="Huffman coding benchmarking script." />
+                <file name="debug-aan.js" description="AAN IDCT debugging and analysis script." />
+                <file name="debug-artifacts.md" description="Notes on debug artifacts and findings." />
+                <file name="test-jsteg-debug.js" description="Jsteg steganography debugging script." />
+                <file name="test-roundtrip-debug.js" description="Roundtrip encoding/decoding debugging script." />
+                <file name="verify-fixes.js" description="Verification script for bug fixes." />
+                <file name="quick-test.js" description="Quick test runner for rapid iteration." />
+            </directory>
         </directory>
     </structure>
 </project>
