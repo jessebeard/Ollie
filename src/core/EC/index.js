@@ -1,13 +1,7 @@
-/*
- * Backward compatibility re-export for existing code.
- * This file preserves the old import path while delegating to the new modular structure.
- */
-
+// Public API for EC (Error Correction) module
 export {
     GenericGF,
     GenericGFPoly,
-    ReedSolomonEncoder,
-    ReedSolomonDecoder,
     GenericGF_AZTEC_DATA_12,
     GenericGF_AZTEC_DATA_10,
     GenericGF_AZTEC_DATA_6,
@@ -16,4 +10,6 @@ export {
     GenericGF_DATA_MATRIX_FIELD_256,
     GenericGF_AZTEC_DATA_8,
     GenericGF_MAXICODE_FIELD_64
-} from './index.js';
+} from './galois-field.js';
+
+export { ReedSolomonEncoder, ReedSolomonDecoder } from './reed-solomon.js';
