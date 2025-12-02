@@ -34,7 +34,30 @@ export class Jsteg {
      * @returns {boolean} True if successful, false if data didn't fit
      */
     /**
+     * Gets the Huffman category for a coefficient value.
+     * Category determines how many bits are needed to encode the magnitude.
+     * 
+     * @param {number} absVal - Absolute value of coefficient
+     * @returns {number} Category (0-10+)
+     */
+    static getCategory(absVal) {
+        if (absVal === 0) return 0;
+        if (absVal === 1) return 1;
+        if (absVal <= 3) return 2;
+        if (absVal <= 7) return 3;
+        if (absVal <= 15) return 4;
+        if (absVal <= 31) return 5;
+        if (absVal <= 63) return 6;
+        if (absVal <= 127) return 7;
+        if (absVal <= 255) return 8;
+        if (absVal <= 511) return 9;
+        if (absVal <= 1023) return 10;
+        return 11; // For larger values
+    }
+
+    /**
      * Embeds raw data into the provided blocks without adding a length header.
+     * Uses category-aware embedding to prevent Huffman encoding expansion.
      * Modifies the blocks in-place.
      * 
      * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks
@@ -53,20 +76,47 @@ export class Jsteg {
                 }
 
                 const val = block[i];
+                const absVal = Math.abs(val);
 
                 // Skip zeros
                 if (val === 0) continue;
 
+                // Skip |val| = 1: these always cause category changes
+                // 1→0 crosses to zero, 1→2 changes category 1→2
+                if (absVal === 1) continue;
+
                 // Get current bit to embed
                 const bit = (data[byteIndex] >> (7 - bitIndex)) & 1;
 
-                // Embed bit into LSB
-                if (val === 1) {
-                    if (bit === 0) block[i] = 2;
-                } else if (val === -1) {
-                    if (bit === 0) block[i] = -2;
+                // Category-aware LSB embedding
+                if (absVal === 2) {
+                    // Category 2: [2, 3]
+                    // 2→3 is safe (stays in cat 2)
+                    // 2→1 is unsafe (crosses to cat 1)
+                    // So we can only flip to 3, never to 1
+                    if (val > 0) {
+                        block[i] = bit === 1 ? 3 : 2;
+                    } else {
+                        block[i] = bit === 1 ? -3 : -2;
+                    }
+                } else if (absVal === 3) {
+                    // Category 2: [2, 3]
+                    // 3→2 is safe (stays in cat 2)
+                    // 3→4 crosses to cat 3 - unsafe!
+                    // So standard LSB works: 3→2 or 3→3
+                    if (val > 0) {
+                        block[i] = (val & ~1) | bit;
+                    } else {
+                        block[i] = -(Math.abs(val & ~1) | bit);
+                    }
                 } else {
-                    block[i] = (val & ~1) | bit;
+                    // |val| >= 4: All LSB flips stay within same category
+                    // This is completely safe for Huffman encoding
+                    if (val > 0) {
+                        block[i] = (val & ~1) | bit;
+                    } else {
+                        block[i] = -(Math.abs(val & ~1) | bit);
+                    }
                 }
 
                 bitIndex++;
@@ -410,6 +460,7 @@ export class Jsteg {
 
     /**
      * Calculates the maximum capacity in bytes for the given blocks.
+     * Accounts for category-aware embedding that skips |val|=1 coefficients.
      * 
      * @param {Array<Int32Array|Float32Array>} blocks 
      * @returns {number} Capacity in bytes
@@ -418,10 +469,21 @@ export class Jsteg {
         let capacityBits = 0;
         for (const block of blocks) {
             for (let i = 1; i < 64; i++) {
-                if (block[i] !== 0) capacityBits++;
+                const val = block[i];
+                const absVal = Math.abs(val);
+
+                // Skip zeros
+                if (val === 0) continue;
+
+                // Skip |val| = 1 (causes category changes)
+                if (absVal === 1) continue;
+
+                // All other non-zero coefficients can be used
+                capacityBits++;
             }
         }
-        // Subtract 32 bits for header
+        // Subtract 32 bits for header in legacy format
+        // For container format, the actual overhead is higher (magic, version, metadata, CRC)
         return Math.max(0, Math.floor((capacityBits - 32) / 8));
     }
     /**
@@ -461,7 +523,12 @@ class JstegReader {
                 const val = block[this.pixelIndex];
                 this.pixelIndex++;
 
+                // Skip zeros
                 if (val === 0) continue;
+
+                // Skip |val| = 1 to match embedding logic
+                if (Math.abs(val) === 1) continue;
+
                 this.bitCount++;
                 return val & 1;
             }
