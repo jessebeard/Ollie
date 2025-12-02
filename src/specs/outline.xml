@@ -2,7 +2,13 @@
 <project name="Ollie - Pure JavaScript JPEG Codec" description="A comprehensive JPEG encoder and decoder with advanced features">
     <structure>
         <directory name="src" description="Source code">
-            <file name="main.js" description="Main entry point and UI controller for the JPEG codec demo." />
+            <file name="main.js" description="Minimal entry point - initializes UI modules and starts the application." />
+            
+            <directory name="ui" description="User interface modules">
+                <file name="tabs.js" description="Tab switching logic for encoder/decoder views." />
+                <file name="encoder-ui.js" description="Encoder UI logic and event handlers." />
+                <file name="decoder-ui.js" description="Decoder UI logic and event handlers." />
+            </directory>
             
             <directory name="core" description="Core JPEG codec implementation">
                 <file name="jpeg-encoder.js" description="High-level JPEG encoder orchestrator supporting baseline and progressive encoding.">
@@ -112,17 +118,23 @@
                 </directory>
 
                 <directory name="steganography" description="Steganography and data embedding">
+                    <file name="index.js" description="Public API for steganography module." />
                     <file name="jsteg.js" description="Core steganography implementation using DCT coefficient modification." />
-                    <file name="container.js" description="Container format for structured metadata and encrypted data." />
                     <file name="chunk-manager.js" description="Manages data chunking, splitting, and reassembly across multiple files." />
+                    <file name="error-correction.js" description="Wrapper for Reed-Solomon error correction integration." />
                 </directory>
 
-                <directory name="EC" description="Error correction">
-                    <file name="error-correction.js" description="Reed-Solomon error correction wrapper for embedded data." />
+                <directory name="EC" description="Error correction (Reed-Solomon)">
+                    <file name="index.js" description="Public API for EC module." />
+                    <file name="galois-field.js" description="Galois Field (GF) arithmetic - GenericGF and GenericGFPoly classes." />
+                    <file name="reed-solomon.js" description="Reed-Solomon encoder and decoder implementations." />
+                    <file name="reedsolomon.js" description="Backward compatibility re-export (delegates to index.js)." />
                 </directory>
 
                 <directory name="crypto" description="Cryptography utilities">
-                    <file name="encryption.js" description="AES encryption/decryption for embedded data." />
+                    <file name="index.js" description="Public API for crypto module." />
+                    <file name="encryption.js" description="AES-GCM encryption/decryption for embedded data." />
+                    <file name="key-derivation.js" description="PBKDF2-based key derivation from passwords." />
                 </directory>
 
                 <directory name="utils" description="Utility helper classes">

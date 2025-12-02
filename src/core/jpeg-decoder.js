@@ -452,8 +452,8 @@ export class JpegDecoder {
                 width: yComp.width,
                 height: yComp.height,
                 metadata: {
-                    width: yComp.width,
-                    height: yComp.height,
+                    width,  // Original dimensions from SOF
+                    height, // Original dimensions from SOF
                     components: components.length,
                     colorSpace: 'Grayscale',
                     progressive: this.frameHeader.sofType === 0xC2,
@@ -502,8 +502,8 @@ export class JpegDecoder {
                     width,
                     height,
                     metadata: {
-                        width: yComp.width,
-                        height: yComp.height,
+                        width,  // Original dimensions from SOF
+                        height, // Original dimensions from SOF
                         components: components.length,
                         colorSpace: 'YCbCr',
                         progressive: this.frameHeader.sofType === 0xC2,
@@ -517,8 +517,8 @@ export class JpegDecoder {
                 width: yComp.width,
                 height: yComp.height,
                 metadata: {
-                    width: yComp.width,
-                    height: yComp.height,
+                    width,  // Original dimensions from SOF
+                    height, // Original dimensions from SOF
                     components: components.length,
                     colorSpace: 'YCbCr',
                     progressive: this.frameHeader.sofType === 0xC2,
