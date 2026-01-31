@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollie Vault</title>
+    <link rel="stylesheet" href="src/ui/vault/vault.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="vault-app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2>🔐 Ollie Vault</h2>
+
+            <div class="nav-group">
+                <button class="btn btn-secondary w-full" id="createBtn" style="width:100%; margin-bottom: 0.5rem">✨ New
+                    Vault</button>
+                <button class="btn btn-secondary w-full" id="saveBtn" style="width:100%">💾 Save Vault</button>
+            </div>
+
+            <div style="margin-top: 2rem">
+                <h4 style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Tags</h4>
+                <div id="tagList" style="margin-top: 1rem">
+                    <!-- Tags populated here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content (Drop Zone) -->
+        <main class="drop-zone" id="dropZone">
+            <header class="app-header">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Locked</span>
+                </div>
+
+                <div class="actions">
+                    <button class="btn btn-primary" id="addBtn">➕ Add Entry</button>
+                </div>
+            </header>
+
+            <div id="vaultList">
+                <div class="empty-state">
+                    <div class="empty-icon">📂</div>
+                    <h3>Drop Vault Here</h3>
+                    <p>Drag and drop a folder of images to load your vault.</p>
+                </div>
+            </div>
+
+            <div class="status-bar"
+                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+                <span id="itemCount">0 Items</span>
+                <span>Ollie v2.0 (Secure)</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; color: white;">
+        <div style="font-size: 2rem; margin-bottom: 1rem;">⏳</div>
+        <p>Processing...</p>
+    </div>
+
+    <script type="module" src="src/ui/vault/vault-ui.js"></script>
+</body>
+
+</html>

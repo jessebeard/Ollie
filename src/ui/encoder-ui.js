@@ -40,7 +40,6 @@ export function initEncoderUI() {
             const progressiveCheckbox = document.getElementById('progressive-checkbox');
             const isProgressive = progressiveCheckbox ? progressiveCheckbox.checked : false;
 
-            // Read secret data if selected
             const secretInput = document.getElementById('secret-input');
             let secretData = null;
             if (secretInput && secretInput.files.length > 0) {
@@ -53,10 +52,20 @@ export function initEncoderUI() {
             const passwordInput = document.getElementById('encrypt-password');
             const password = passwordInput ? passwordInput.value : null;
 
+            // Read ECC options
+            const eccCheckbox = document.getElementById('ecc-checkbox');
+            const eccProfileSelect = document.getElementById('ecc-profile');
+            const useEcc = eccCheckbox ? eccCheckbox.checked : true;
+            const eccProfile = eccProfileSelect ? eccProfileSelect.value : 'Medium';
+
             const encoder = new JpegEncoder(90, {
                 progressive: isProgressive,
                 secretData: secretData,
-                password: password
+                password: password,
+                metadata: {
+                    ecc: useEcc,
+                    eccProfile: eccProfile
+                }
             });
             const jpegBytes = await encoder.encode(imageData);
 
@@ -71,7 +80,6 @@ export function initEncoderUI() {
                 pCtx.drawImage(resImg, 0, 0);
                 statusDiv.textContent = `Encoded! Size: ${jpegBytes.length} bytes`;
 
-                // Enable download
                 const downloadBtn = document.getElementById('download-link');
                 downloadBtn.onclick = () => {
                     const a = document.createElement('a');
@@ -83,7 +91,6 @@ export function initEncoderUI() {
                 };
                 downloadBtn.style.display = 'inline-block';
 
-                // Update Encoder Info Pane
                 document.getElementById('encoder-info-size').textContent = `${jpegBytes.length} bytes`;
                 document.getElementById('encoder-info-dims').textContent = `${resImg.width}x${resImg.height}`;
                 document.getElementById('encoder-info-colorspace').textContent = 'YCbCr';

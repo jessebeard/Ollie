@@ -1,5 +1,6 @@
 import { describe, it, expect } from '../utils/test-runner.js';
 import { ContainerFormat, FLAGS } from '../../src/core/steganography/container-format.js';
+import { crc32 } from '../../src/utils/crc32.js';
 
 describe('ContainerFormat', () => {
     describe('encode/decode roundtrip', () => {
@@ -81,7 +82,7 @@ describe('ContainerFormat', () => {
 
         it('should reject metadata that is too large', () => {
             const data = new Uint8Array([1]);
-            const hugeMetadata = { data: 'x'.repeat(70000) }; // > 65535 bytes when JSON encoded
+            const hugeMetadata = { data: 'x'.repeat(70000) };
 
             expect(() => {
                 ContainerFormat.encode(data, hugeMetadata);
@@ -94,7 +95,6 @@ describe('ContainerFormat', () => {
             const data = new TextEncoder().encode('Original data');
             const container = ContainerFormat.encode(data, {});
 
-            // Corrupt a byte in the payload
             container[container.length - 10] ^= 0xFF;
 
             expect(() => {
@@ -107,7 +107,6 @@ describe('ContainerFormat', () => {
             const metadata = { test: 'value' };
             const container = ContainerFormat.encode(data, metadata);
 
-            // Corrupt a byte in the metadata section (after header)
             container[10] ^= 0xFF;
 
             expect(() => {
@@ -127,7 +126,7 @@ describe('ContainerFormat', () => {
 
         it('should reject invalid magic bytes', () => {
             const invalid = new Uint8Array(20);
-            invalid[0] = 0x00; // Wrong magic
+            invalid[0] = 0x00;
 
             expect(() => {
                 ContainerFormat.decode(invalid);
@@ -138,15 +137,13 @@ describe('ContainerFormat', () => {
             const data = new Uint8Array([1, 2, 3]);
             let container = ContainerFormat.encode(data, {});
 
-            // Change version byte (after magic bytes)
-            container[4] = 99; // Unsupported version
+            container[4] = 99;
 
-            // Also need to fix CRC for this specific corruption
-            const crc = ContainerFormat.crc32(container.subarray(0, container.length - 4));
-            container[container.length - 4] = (crc >> 24) & 0xFF;
-            container[container.length - 3] = (crc >> 16) & 0xFF;
-            container[container.length - 2] = (crc >> 8) & 0xFF;
-            container[container.length - 1] = crc & 0xFF;
+            const crcVal = crc32(container.subarray(0, container.length - 4));
+            container[container.length - 4] = (crcVal >> 24) & 0xFF;
+            container[container.length - 3] = (crcVal >> 16) & 0xFF;
+            container[container.length - 2] = (crcVal >> 8) & 0xFF;
+            container[container.length - 1] = crcVal & 0xFF;
 
             expect(() => {
                 ContainerFormat.decode(container);
@@ -157,7 +154,6 @@ describe('ContainerFormat', () => {
             const data = new TextEncoder().encode('Full data here');
             const container = ContainerFormat.encode(data, { test: 'meta' });
 
-            // Truncate the container
             const truncated = container.subarray(0, container.length - 10);
 
             expect(() => {
@@ -189,7 +185,7 @@ describe('ContainerFormat', () => {
 
     describe('large data', () => {
         it('should handle large payloads', () => {
-            // Create 1MB of data
+
             const largeData = new Uint8Array(1024 * 1024);
             for (let i = 0; i < largeData.length; i++) {
                 largeData[i] = i & 0xFF;

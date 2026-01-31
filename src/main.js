@@ -8,12 +8,11 @@ import { initTabs } from './ui/tabs.js';
 import { JpegEncoder } from './core/jpeg-encoder.js';
 
 function init() {
-    // Initialize UI modules
+    
     initTabs();
     initEncoderUI();
     initDecoderUI();
 
-    // Test/diagnostic button
     const testBtn = document.getElementById('test-btn');
     if (testBtn) {
         testBtn.addEventListener('click', () => {
@@ -29,25 +28,22 @@ function init() {
                 const height = 64;
                 const data = new Uint8ClampedArray(width * height * 4);
 
-                // Create a gradient pattern
                 for (let y = 0; y < height; y++) {
                     for (let x = 0; x < width; x++) {
                         const idx = (y * width + x) * 4;
-                        data[idx] = x * 4;     // Red
-                        data[idx + 1] = y * 4; // Green
-                        data[idx + 2] = 128;   // Blue
-                        data[idx + 3] = 255;   // Alpha
+                        data[idx] = x * 4;     
+                        data[idx + 1] = y * 4; 
+                        data[idx + 2] = 128;   
+                        data[idx + 3] = 255;   
                     }
                 }
 
-                // Show original
                 originalCanvas.width = width;
                 originalCanvas.height = height;
                 const ctx = originalCanvas.getContext('2d');
                 const imgDataObj = new ImageData(data, width, height);
                 ctx.putImageData(imgDataObj, 0, 0);
 
-                // Encode
                 const encoder = new JpegEncoder();
                 const jpegBytes = encoder.encode({ width, height, data });
 

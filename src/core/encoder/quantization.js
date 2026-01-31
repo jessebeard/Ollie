@@ -28,3 +28,42 @@ export function quantize(block, table) {
     }
     return result;
 }
+
+const tableCache = new Map();
+
+/**
+ * Computes scaled quantization tables based on quality (1-100).
+ * Uses the standard IJG (Independent JPEG Group) scaling algorithm.
+ * Results are cached for performance when encoding multiple images.
+ * 
+ * @param {number} quality - Quality factor (1-100). Higher = better quality, larger file.
+ * @returns {{ luma: Int32Array, chroma: Int32Array }} Scaled quantization tables.
+ */
+export function getScaledQuantizationTables(quality) {
+    
+    quality = Math.max(1, Math.min(100, Math.round(quality)));
+
+    if (tableCache.has(quality)) {
+        return tableCache.get(quality);
+    }
+
+    let scale;
+    if (quality < 50) {
+        scale = 5000 / quality;
+    } else {
+        scale = 200 - 2 * quality;
+    }
+
+    const luma = new Int32Array(64);
+    const chroma = new Int32Array(64);
+
+    for (let i = 0; i < 64; i++) {
+        
+        luma[i] = Math.max(1, Math.min(255, Math.floor((QUANTIZATION_TABLE_LUMA[i] * scale + 50) / 100)));
+        chroma[i] = Math.max(1, Math.min(255, Math.floor((QUANTIZATION_TABLE_CHROMA[i] * scale + 50) / 100)));
+    }
+
+    const tables = { luma, chroma };
+    tableCache.set(quality, tables);
+    return tables;
+}

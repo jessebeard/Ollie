@@ -1,19 +1,17 @@
 import { BitReaderNaive } from '../../src/utils/bit-reader-naive.js';
 import { BitReaderOptimized } from '../../src/utils/bit-reader-optimized.js';
 
-// Test skipBits across stuffed bytes
 const testData = new Uint8Array([
-    0xFF, 0x00,  // Stuffed FF
+    0xFF, 0x00,  
     0xAA,
     0xBB,
-    0xFF, 0x00,  // Stuffed FF
+    0xFF, 0x00,  
     0xCC
 ]);
 
 console.log('Testing skipBits with data:', Array.from(testData).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 console.log('');
 
-// Test 1: Skip 8 bits (should skip the FF, land at AA)
 console.log('=== TEST 1: Skip 8 bits ===');
 const n1 = new BitReaderNaive(new Uint8Array(testData));
 const o1 = new BitReaderOptimized(new Uint8Array(testData));
@@ -29,7 +27,6 @@ console.log(`Optimized: 0x${o1_byte.toString(16)} at offset ${o1.byteOffset}`);
 console.log(`Match: ${n1_byte === o1_byte ? 'YES' : 'NO'}`);
 console.log('');
 
-// Test 2: Skip 16 bits (should skip FF and AA, land at BB)
 console.log('=== TEST 2: Skip 16 bits ===');
 const n2 = new BitReaderNaive(new Uint8Array(testData));
 const o2 = new BitReaderOptimized(new Uint8Array(testData));
@@ -45,7 +42,6 @@ console.log(`Optimized: 0x${o2_byte.toString(16)} at offset ${o2.byteOffset}`);
 console.log(`Match: ${n2_byte === o2_byte ? 'YES' : 'NO'}`);
 console.log('');
 
-// Test 3: Skip 24 bits (should skip FF, AA, BB, land at second FF)
 console.log('=== TEST 3: Skip 24 bits ===');
 const n3 = new BitReaderNaive(new Uint8Array(testData));
 const o3 = new BitReaderOptimized(new Uint8Array(testData));
@@ -61,7 +57,6 @@ console.log(`Optimized: 0x${o3_byte.toString(16)} at offset ${o3.byteOffset}`);
 console.log(`Match: ${n3_byte === o3_byte ? 'YES' : 'NO'}`);
 console.log('');
 
-// Test 4: Read 4 bits, skip 12 bits (partial byte skip)
 console.log('=== TEST 4: Read 4 bits, skip 12, read 4 ===');
 const n4 = new BitReaderNaive(new Uint8Array(testData));
 const o4 = new BitReaderOptimized(new Uint8Array(testData));

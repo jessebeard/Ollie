@@ -46,26 +46,20 @@ export function upsampleNearest(component, srcWidth, srcHeight, dstWidth, dstHei
 export function upsampleBilinear(component, srcWidth, srcHeight, dstWidth, dstHeight) {
     const result = new Float32Array(dstWidth * dstHeight);
 
-    // Handle edge case where src dimensions are 1
     if (srcWidth === 1 && srcHeight === 1) {
         result.fill(component[0]);
         return result;
     }
 
-    // JPEG uses centered sampling for chroma subsampling
-    // Each chroma sample represents the CENTER of a 2x2 (or 2x1, 1x2) luma block
-    // So we need to use centered coordinates, not edge-aligned
     const scaleX = srcWidth / dstWidth;
     const scaleY = srcHeight / dstHeight;
 
     for (let y = 0; y < dstHeight; y++) {
         for (let x = 0; x < dstWidth; x++) {
-            // Map to centered source coordinates
-            // Add 0.5 to dst coord to get center, multiply by scale, subtract 0.5 to get src pixel coord
+
             const srcX = (x + 0.5) * scaleX - 0.5;
             const srcY = (y + 0.5) * scaleY - 0.5;
 
-            // Clamp to valid range
             const x0 = Math.max(0, Math.floor(srcX));
             const y0 = Math.max(0, Math.floor(srcY));
             const x1 = Math.min(x0 + 1, srcWidth - 1);
@@ -74,7 +68,6 @@ export function upsampleBilinear(component, srcWidth, srcHeight, dstWidth, dstHe
             const fx = Math.max(0, Math.min(1, srcX - x0));
             const fy = Math.max(0, Math.min(1, srcY - y0));
 
-            // Bilinear interpolation
             const v00 = component[y0 * srcWidth + x0];
             const v10 = component[y0 * srcWidth + x1];
             const v01 = component[y1 * srcWidth + x0];
@@ -110,14 +103,12 @@ export function upsampleChroma(components, samplingFactors, width, height) {
         Cr: components.Cr
     };
 
-    // Upsample Cb if needed
     if (samplingFactors.Cb.h < maxH || samplingFactors.Cb.v < maxV) {
         const cbWidth = Math.ceil(width / maxH) * samplingFactors.Cb.h;
         const cbHeight = Math.ceil(height / maxV) * samplingFactors.Cb.v;
         result.Cb = upsampleBilinear(components.Cb, cbWidth, cbHeight, width, height);
     }
 
-    // Upsample Cr if needed
     if (samplingFactors.Cr.h < maxH || samplingFactors.Cr.v < maxV) {
         const crWidth = Math.ceil(width / maxH) * samplingFactors.Cr.h;
         const crHeight = Math.ceil(height / maxV) * samplingFactors.Cr.v;

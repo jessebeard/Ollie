@@ -2,7 +2,7 @@
  * Encryption - Handles AES-GCM encryption/decryption
  */
 export class Encryption {
-    // Standard IV length for GCM is 12 bytes (96 bits)
+    
     static IV_LENGTH = 12;
 
     /**

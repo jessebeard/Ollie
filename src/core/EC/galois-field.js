@@ -1,9 +1,4 @@
-/*
- * Galois Field (GF) arithmetic for Reed-Solomon error correction.
- * Original implementation from ZXing, ported to JavaScript by cho45.
- * Copyright 2007 ZXing authors
- * Licensed under the Apache License, Version 2.0
- */
+
 
 export class GenericGF {
     constructor(primitive, size, b) {
@@ -17,7 +12,7 @@ export class GenericGF {
         let x = 1;
         for (let i = 0; i < size; i++) {
             this.expTable[i] = x;
-            x *= 2; // we're assuming the generator alpha is 2
+            x *= 2; 
             if (x >= size) {
                 x ^= primitive;
                 x &= size - 1;
@@ -26,7 +21,6 @@ export class GenericGF {
         for (let i = 0; i < size - 1; i++) {
             this.logTable[this.expTable[i]] = i;
         }
-        // logTable[0] == 0 but this should never be used
 
         this.zero = new GenericGFPoly(this, GenericGFPoly.COEFFICIENTS_ZERO);
         this.one = new GenericGFPoly(this, GenericGFPoly.COEFFICIENTS_ONE);
@@ -102,7 +96,7 @@ export class GenericGFPoly {
         this.field = field;
         const coefficientsLength = coefficients.length;
         if (coefficientsLength > 1 && coefficients[0] === 0) {
-            // Leading term must be non-zero for anything except the constant polynomial "0"
+            
             let firstNonZero = 1;
             while (firstNonZero < coefficientsLength && coefficients[firstNonZero] === 0) {
                 firstNonZero++;
@@ -136,14 +130,14 @@ export class GenericGFPoly {
 
     evaluateAt(a) {
         if (a === 0) {
-            // Just return the x^0 coefficient
+            
             return this.getCoefficient(0);
         }
         const coefficients = this.coefficients;
         const size = coefficients.length;
         let result;
         if (a == 1) {
-            // Just the sum of the coefficients
+            
             result = 0;
             for (let i = 0, len = coefficients.length; i < len; i++) {
                 result = GenericGF.addOrSubtract(result, coefficients[i]);
@@ -181,7 +175,7 @@ export class GenericGFPoly {
         for (let i = lengthDiff; i < largerCoefficients.length; i++) {
             sumDiff[i] = GenericGF.addOrSubtract(smallerCoefficients[i - lengthDiff], largerCoefficients[i]);
         }
-        // Copy high-order terms only found in higher-degree polynomial's coefficients
+        
         sumDiff.set(largerCoefficients.subarray(0, lengthDiff));
 
         return new GenericGFPoly(this.field, sumDiff);
@@ -312,12 +306,11 @@ export class GenericGFPoly {
 GenericGFPoly.COEFFICIENTS_ZERO = new Int32Array([0]);
 GenericGFPoly.COEFFICIENTS_ONE = new Int32Array([1]);
 
-// Predefined GF(256) fields for common use cases
-export const GenericGF_AZTEC_DATA_12 = new GenericGF(0x1069, 4096, 1); // x^12 + x^6 + x^5 + x^3 + 1
-export const GenericGF_AZTEC_DATA_10 = new GenericGF(0x409, 1024, 1); // x^10 + x^3 + 1
-export const GenericGF_AZTEC_DATA_6 = new GenericGF(0x43, 64, 1); // x^6 + x + 1
-export const GenericGF_AZTEC_PARAM = new GenericGF(0x13, 16, 1); // x^4 + x + 1
-export const GenericGF_QR_CODE_FIELD_256 = new GenericGF(0x011D, 256, 0); // x^8 + x^4 + x^3 + x^2 + 1
-export const GenericGF_DATA_MATRIX_FIELD_256 = new GenericGF(0x012D, 256, 1); // x^8 + x^5 + x^3 + x^2 + 1
+export const GenericGF_AZTEC_DATA_12 = new GenericGF(0x1069, 4096, 1); 
+export const GenericGF_AZTEC_DATA_10 = new GenericGF(0x409, 1024, 1); 
+export const GenericGF_AZTEC_DATA_6 = new GenericGF(0x43, 64, 1); 
+export const GenericGF_AZTEC_PARAM = new GenericGF(0x13, 16, 1); 
+export const GenericGF_QR_CODE_FIELD_256 = new GenericGF(0x011D, 256, 0); 
+export const GenericGF_DATA_MATRIX_FIELD_256 = new GenericGF(0x012D, 256, 1); 
 export const GenericGF_AZTEC_DATA_8 = GenericGF_DATA_MATRIX_FIELD_256;
 export const GenericGF_MAXICODE_FIELD_64 = GenericGF_AZTEC_DATA_6;

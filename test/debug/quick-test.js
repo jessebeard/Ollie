@@ -1,15 +1,15 @@
-// Quick test to identify which test files have issues
+
 import { resetStats, getStats } from './test/utils/test-runner.js';
 
 const testFiles = [
-    // Basic encoder tests
+    
     './test/core/encoder/colorspace.test.js',
-    // Steganography tests (likely affected by encryption)
+    
     './test/core/steganography.test.js',
     './test/core/steganography/container.test.js',
     './test/core/steganography/chunk-manager.test.js',
     './test/core/container-format.test.js',
-    // Integration tests (roundtrip tests, affected by encryption)
+    
     './test/integration/steganography-roundtrip.test.js',
 ];
 

@@ -5,22 +5,21 @@
  * This module provides functions to locate markers and extract their payloads.
  */
 
-// Marker constants (from JPEG spec)
 export const MARKERS = {
-    SOI: 0xFFD8,   // Start of Image
-    EOI: 0xFFD9,   // End of Image
-    SOF0: 0xFFC0,  // Baseline DCT
-    SOF1: 0xFFC1,  // Extended Sequential DCT
-    SOF2: 0xFFC2,  // Progressive DCT
-    DHT: 0xFFC4,   // Define Huffman Table
-    DQT: 0xFFDB,   // Define Quantization Table
-    DRI: 0xFFDD,   // Define Restart Interval
-    SOS: 0xFFDA,   // Start of Scan
-    RST0: 0xFFD0,  // Restart markers
+    SOI: 0xFFD8,   
+    EOI: 0xFFD9,   
+    SOF0: 0xFFC0,  
+    SOF1: 0xFFC1,  
+    SOF2: 0xFFC2,  
+    DHT: 0xFFC4,   
+    DQT: 0xFFDB,   
+    DRI: 0xFFDD,   
+    SOS: 0xFFDA,   
+    RST0: 0xFFD0,  
     RST7: 0xFFD7,
-    APP0: 0xFFE0,  // Application segments
+    APP0: 0xFFE0,  
     APP15: 0xFFEF,
-    COM: 0xFFFE    // Comment
+    COM: 0xFFFE    
 };
 
 /**
@@ -52,7 +51,6 @@ export function readMarkerSegment(data, offset) {
 
     const marker = (data[offset] << 8) | data[offset + 1];
 
-    // Markers without length field (standalone markers)
     const standaloneMarkers = [
         MARKERS.SOI, MARKERS.EOI,
         MARKERS.RST0, MARKERS.RST0 + 1, MARKERS.RST0 + 2, MARKERS.RST0 + 3,
@@ -67,7 +65,6 @@ export function readMarkerSegment(data, offset) {
         };
     }
 
-    // Read length (big-endian, 16-bit, includes length bytes themselves)
     if (offset + 3 >= data.length) {
         throw new Error('Incomplete segment length');
     }
@@ -78,7 +75,6 @@ export function readMarkerSegment(data, offset) {
         throw new Error(`Invalid segment length: ${length}`);
     }
 
-    // Extract segment data (excluding marker and length)
     const dataLength = length - 2;
     const segmentData = data.slice(offset + 4, offset + 4 + dataLength);
 
@@ -101,7 +97,6 @@ export function readMarkerSegment(data, offset) {
 export function parseFileStructure(jpegBytes) {
     const segments = new Map();
 
-    // Validate SOI marker
     if (jpegBytes.length < 2 || jpegBytes[0] !== 0xFF || jpegBytes[1] !== 0xD8) {
         throw new Error('Invalid JPEG file: missing SOI marker');
     }
@@ -118,7 +113,6 @@ export function parseFileStructure(jpegBytes) {
 
         const segment = readMarkerSegment(jpegBytes, markerInfo.offset);
 
-        // Store segment by type
         const markerName = getMarkerName(segment.type);
         if (!segments.has(markerName)) {
             segments.set(markerName, []);
@@ -128,31 +122,29 @@ export function parseFileStructure(jpegBytes) {
             data: segment.data
         });
 
-        // Check for EOI
         if (segment.type === MARKERS.EOI) {
             foundEOI = true;
         }
 
-        // Special handling for SOS - scan data follows until next marker
         if (segment.type === MARKERS.SOS) {
-            // Find the end of scan data (next marker that's not a restart marker)
+            
             let scanDataStart = segment.nextOffset;
             let scanDataEnd = scanDataStart;
 
             for (let i = scanDataStart; i < jpegBytes.length - 1; i++) {
                 if (jpegBytes[i] === 0xFF) {
                     const nextByte = jpegBytes[i + 1];
-                    // Skip byte stuffing (0xFF 0x00)
+                    
                     if (nextByte === 0x00) {
-                        i++; // Skip the 0x00
+                        i++; 
                         continue;
                     }
-                    // Skip restart markers
+                    
                     if (nextByte >= 0xD0 && nextByte <= 0xD7) {
-                        i++; // Skip the restart marker
+                        i++; 
                         continue;
                     }
-                    // Found a real marker - end of scan data
+                    
                     if (nextByte !== 0xFF) {
                         scanDataEnd = i;
                         break;
@@ -160,7 +152,6 @@ export function parseFileStructure(jpegBytes) {
                 }
             }
 
-            // Store scan data
             const scanData = jpegBytes.slice(scanDataStart, scanDataEnd);
             segments.get(markerName)[segments.get(markerName).length - 1].scanData = scanData;
 
@@ -185,12 +176,10 @@ export function getMarkerName(marker) {
         }
     }
 
-    // Handle APP markers (0xFFE0 - 0xFFEF)
     if (marker >= 0xFFE0 && marker <= 0xFFEF) {
         return `APP${marker - 0xFFE0}`;
     }
 
-    // Handle RST markers (0xFFD0 - 0xFFD7)
     if (marker >= 0xFFD0 && marker <= 0xFFD7) {
         return `RST${marker - 0xFFD0}`;
     }

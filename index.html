@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS JPEG Encoder & Decoder</title>
+    <title>JS JPEG Encoder &amp; Decoder</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -118,7 +118,7 @@
 
 <body>
     <div class="container">
-        <h1>JPEG Encoder & Decoder</h1>
+        <h1>JPEG Encoder &amp; Decoder</h1>
 
         <div class="tabs">
             <button class="tab-btn active" data-tab="encode">Encoder</button>
@@ -141,6 +141,16 @@
                         <input type="file" id="secret-input">
                         <input type="password" id="encrypt-password" placeholder="Password (optional)"
                             style="padding: 5px; width: 200px; margin-top: 5px;">
+                        <div style="margin-top: 8px;">
+                            <label><input type="checkbox" id="ecc-checkbox" checked> Error Correction (ECC)</label>
+                            <select id="ecc-profile" style="padding: 3px; margin-left: 10px;">
+                                <option value="Low">Low (1.6% overhead)</option>
+                                <option value="Medium" selected>Medium (14% overhead)</option>
+                                <option value="High">High (33% overhead)</option>
+                                <option value="Ultra">Ultra (100% overhead)</option>
+                                <option value="Extreme">Extreme (200% overhead)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <button id="encode-btn">Encode Image</button>
@@ -162,8 +172,6 @@
                     <div>Chroma Subsampling: <span id="encoder-info-chroma">-</span></div>
                 </div>
             </div>
-
-
 
             <div style="margin-bottom: 10px;">
                 <label for="idct-method" style="margin-right: 10px; font-weight: bold;">IDCT Method:</label>
@@ -205,8 +213,7 @@
                 </select>
             </div>
 
-
-            <div class="canvases" style="margin-bottom: 20px;">
+            <div class="canvases" style="margin-top: 20px;">
                 <div class="canvas-wrapper">
                     <h2>Original</h2>
                     <canvas id="original-canvas"></canvas>

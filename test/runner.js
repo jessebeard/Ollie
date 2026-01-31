@@ -5,16 +5,14 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- Minimal DOM Mocks ---
 const htmlContent = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
 global.document = {
     getElementById: (id) => {
-        // Simple regex to find element by ID and extract attributes
-        // Matches: <tag ... id="value" ... > or <tag ... id='value' ... >
+
         const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
         const match = htmlContent.match(regex);
-        // console.log(`Searching for ID: ${id}`, match ? 'Found' : 'Not Found');
+
         if (!match && id === 'progressive-checkbox') {
             const idx = htmlContent.indexOf(id);
             if (idx !== -1) {
@@ -30,7 +28,7 @@ global.document = {
             const element = {
                 tagName: match[1],
                 style: {},
-                // Extract style display:none if present
+
                 get style() {
                     const styleMatch = tag.match(/style=["']([^"']*)["']/);
                     const styleObj = {};
@@ -43,17 +41,16 @@ global.document = {
                     }
                     return styleObj;
                 },
-                // Extract other attributes like href, download
+
                 getAttribute: (attr) => {
                     const attrMatch = tag.match(new RegExp(`${attr}=["']([^"']*)["']`));
                     return attrMatch ? attrMatch[1] : null;
                 }
             };
 
-            // Map common properties
             Object.defineProperty(element, 'href', {
                 get: () => element.getAttribute('href') || '',
-                set: () => { } // No-op for set in this simple parser
+                set: () => { }
             });
             Object.defineProperty(element, 'download', {
                 get: () => element.getAttribute('download') || '',
@@ -87,27 +84,21 @@ global.document = {
 global.window = {
     addEventListener: (event, callback) => {
         if (event === 'DOMContentLoaded') {
-            // Execute immediately for our test runner
+
             callback();
         }
     }
 };
 
-// Mock console.log/error to capture test output if needed, 
-// but for now we'll just let them print to stdout.
-
-// --- Test Runner Logic ---
-
 async function runTests() {
     console.log('\x1b[1mRunning Tests...\x1b[0m\n');
 
     try {
-        // Import the test runner to get stats
+
         const { getStats, resetStats } = await import('./utils/test-runner.js');
 
         resetStats();
 
-        // Import all test files
         await import('./core/encoder/colorspace.test.js');
         await import('./core/encoder/blocks.test.js');
         await import('./core/encoder/headers.test.js');
@@ -118,8 +109,9 @@ async function runTests() {
         await import('./core/encoder/progressive-encoding.test.js');
         await import('./core/encoder/spiff-generation.test.js');
         await import('./core/jpeg-encoder.test.js');
+        await import('./core/jpeg-encoder-quality.test.js');
+        await import('./core/jpeg-encoder-420.test.js');
 
-        // Decoder Tests
         await import('./core/decoder/frame-parser.test.js');
         await import('./core/decoder/scan-parser.test.js');
         await import('./core/decoder/huffman-parser.test.js');
@@ -137,28 +129,29 @@ async function runTests() {
         await import('./core/decoder/progressive-decoding.test.js');
         await import('./core/decoder/spiff-parsing.test.js');
 
-        // Utility Tests
         await import('./utils/bit-reader.test.js');
         await import('./utils/bit-reader-switching.test.js');
         await import('./utils/marker-parser.test.js');
 
-        // Steganography Tests
         await import('./core/steganography.test.js');
         await import('./core/steganography/container.test.js');
         await import('./core/steganography/chunk-manager.test.js');
         await import('./core/container-format.test.js');
 
-        // Error Correction Tests
         await import('./core/EC/reed-solomon-integration.test.js');
         await import('./EC/reedsolomon.test.js');
 
-        // Integration Tests
         await import('./core/jpeg-decoder.test.js');
         await import('./integration/roundtrip.test.js');
         await import('./integration/steganography-roundtrip.test.js');
         await import('./auto_detection_roundtrip.test.js');
         await import('./capacity_validation.test.js');
         await import('./format_detection.test.js');
+
+        await import('./core/jpeg-encoder-coefficients.test.js');
+        await import('./core/jpeg-transcoder.test.js');
+
+        await import('./core/vault/vault-manager.test.js');
 
         await import('./ui.test.js');
 

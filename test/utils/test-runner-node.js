@@ -1,4 +1,4 @@
-// Node.js test runner implementation
+
 
 let currentSuite = null;
 let stats = { total: 0, passed: 0, failed: 0 };

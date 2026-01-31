@@ -53,7 +53,6 @@ describe('Encoder-Decoder Roundtrip', () => {
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
 
-        // Should be close to black
         const avgR = decoded.data[0];
         expect(avgR < 20).toBe(true);
     });
@@ -69,7 +68,6 @@ describe('Encoder-Decoder Roundtrip', () => {
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
 
-        // Should be close to white
         const avgR = decoded.data[0];
         expect(avgR > 235).toBe(true);
     });
@@ -85,7 +83,6 @@ describe('Encoder-Decoder Roundtrip', () => {
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
 
-        // Colors should be approximately correct (within tolerance)
         const r = decoded.data[0];
         const g = decoded.data[1];
         const b = decoded.data[2];
@@ -105,7 +102,6 @@ describe('Encoder-Decoder Roundtrip', () => {
         expect(decoded.width).toBe(16);
         expect(decoded.height).toBe(16);
 
-        // Should have gradient pattern (left darker than right)
         const leftPixel = decoded.data[0];
         const rightPixel = decoded.data[(15 * 4)];
         expect(rightPixel > leftPixel).toBe(true);
@@ -116,7 +112,7 @@ describe('Encoder-Decoder Roundtrip', () => {
             [8, 8],
             [16, 16],
             [24, 24],
-            [10, 10], // Non-multiple of 8
+            [10, 10], 
             [15, 15]
         ];
 
@@ -143,7 +139,6 @@ describe('Encoder-Decoder Roundtrip', () => {
 
         const psnr = calculatePSNR(original, decoded, 16, 16);
 
-        // PSNR > 30dB is generally considered acceptable
         expect(psnr > 30).toBe(true);
     });
 
@@ -173,7 +168,6 @@ describe('Encoder-Decoder Roundtrip', () => {
         const jpegBytes = await encoder.encode(original, 90);
         const decoded = await decoder.decode(jpegBytes);
 
-        // All alpha values should be 255
         for (let i = 3; i < decoded.data.length; i += 4) {
             expect(decoded.data[i]).toBe(255);
         }

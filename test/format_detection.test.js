@@ -6,7 +6,7 @@ describe('Jsteg Format Detection', () => {
         const blocks = [];
         for (let i = 0; i < count; i++) {
             const block = new Int32Array(64).fill(fillValue);
-            block[0] = 100; // DC
+            block[0] = 100; 
             blocks.push(block);
         }
         return blocks;
@@ -44,11 +44,8 @@ describe('Jsteg Format Detection', () => {
 
         await Jsteg.embedContainer(blocks, data, metadata);
 
-        // Try to extract with legacy method
         const extracted = Jsteg.extract(blocks);
 
-        // This will fail because extract() expects [Length][Data] but gets [JSTG][Version]...
-        // The length will be interpreted as 0x4A535447 (JSTG in hex) which is huge
         expect(extracted).toBe(null);
     });
 });

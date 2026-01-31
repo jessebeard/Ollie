@@ -2,7 +2,6 @@ import { createRequire } from 'module';
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { KeyDerivation } from '../../../src/core/crypto/key-derivation.js';
 
-// Helper to get crypto
 function getCrypto() {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
         return crypto;
@@ -53,7 +52,6 @@ describe('KeyDerivation', () => {
         const key1 = await KeyDerivation.deriveKey(password, salt1);
         const key2 = await KeyDerivation.deriveKey(password, salt2);
 
-        // Export keys to compare
         const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
         const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
 

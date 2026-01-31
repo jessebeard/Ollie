@@ -24,20 +24,17 @@ export function parseScanHeader(segmentData) {
 
     let offset = 0;
 
-    // Parse number of components in scan (Ns)
     const numComponents = segmentData[offset++];
 
     if (numComponents < 1 || numComponents > 4) {
         throw new Error(`Invalid number of components in scan: ${numComponents}`);
     }
 
-    // Validate remaining data length
     const expectedMinLength = 1 + (numComponents * 2) + 3;
     if (segmentData.length < expectedMinLength) {
         throw new Error('Incomplete SOS component data');
     }
 
-    // Parse component specifications
     const components = [];
 
     for (let i = 0; i < numComponents; i++) {
@@ -46,7 +43,6 @@ export function parseScanHeader(segmentData) {
         const dcTableId = (tdTaByte >> 4) & 0x0F;
         const acTableId = tdTaByte & 0x0F;
 
-        // Validate table IDs
         if (dcTableId > 3) {
             throw new Error(`Invalid DC table ID: ${dcTableId}`);
         }
@@ -61,17 +57,12 @@ export function parseScanHeader(segmentData) {
         });
     }
 
-    // Parse spectral selection
     const Ss = segmentData[offset++];
     const Se = segmentData[offset++];
 
-    // Parse successive approximation
     const ahAlByte = segmentData[offset++];
     const Ah = (ahAlByte >> 4) & 0x0F;
     const Al = ahAlByte & 0x0F;
-
-    // Validation for progressive mode is removed to support it.
-    // We trust the decoder to handle (or fail gracefully) if it doesn't support specific modes.
 
     return {
         numComponents,

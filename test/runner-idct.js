@@ -5,11 +5,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- Minimal DOM Mocks (Copied from runner.js) ---
 const htmlContent = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
 global.document = {
-    getElementById: (id) => { return { style: {}, getAttribute: () => null }; }, // Simplified
+    getElementById: (id) => { return { style: {}, getAttribute: () => null }; }, 
     createElement: (tag) => { return { style: {}, appendChild: () => { }, textContent: '' }; },
     body: { appendChild: () => { } }
 };

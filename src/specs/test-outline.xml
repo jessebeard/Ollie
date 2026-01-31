@@ -5,7 +5,12 @@
             <file name="runner.js" description="Node.js CLI test runner. Imports all test files and displays summary. Includes DOM mocks for UI tests." />
             <directory name="core" description="Unit tests for core algorithms">
                 <file name="jpeg-encoder.test.js" description="Integration tests for the JpegEncoder class." />
+                <file name="jpeg-encoder-coefficients.test.js" description="Tests for encoding from coefficients (transcoding support)." />
+                <file name="jpeg-encoder-quality.test.js" description="Tests for quality setting and quantization scaling." />
                 <file name="jpeg-decoder.test.js" description="Integration tests for the JpegDecoder class." />
+                <file name="jpeg-transcoder.test.js" description="Tests for JpegTranscoder class (lossless updates)." />
+                <file name="steganography.test.js" description="Core steganography functionality tests." />
+                <file name="container-format.test.js" description="Container format parsing and generation tests." />
                 <directory name="encoder" description="Unit tests for encoder algorithms">
                     <file name="blocks.test.js" description="Tests for block padding and extraction." />
                     <file name="colorspace.test.js" description="Tests for RGB/YCbCr conversion." />
@@ -45,9 +50,10 @@
                     <file name="encryption.test.js" description="Tests for AES-GCM encryption/decryption." />
                     <file name="key-derivation.test.js" description="Tests for PBKDF2 key derivation." />
                 </directory>
+                <directory name="vault" description="Vault logic tests">
+                    <file name="vault-manager.test.js" description="Tests for PasswordVault class (CRUD, Validation, Search, Serialization)." />
+                </directory>
             </directory>
-            <file name="steganography.test.js" description="Core steganography functionality tests." />
-            <file name="container-format.test.js" description="Container format parsing and generation tests." />
             <directory name="utils" description="Test infrastructure and utility classes">
                 <file name="test-runner.js" description="Unified test runner that works in both Node.js and browser environments. Exports describe/it/expect API.">
                     <function name="describe" params="name, fn" description="Defines a test suite." />

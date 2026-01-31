@@ -41,12 +41,12 @@ describe('MarkerParser', () => {
     });
 
     it('should parse segment length correctly (big-endian)', () => {
-        // DQT marker with length 5 (0x00 0x05)
+        
         const data = new Uint8Array([0xFF, 0xDB, 0x00, 0x05, 0x01, 0x02, 0x03]);
         const segment = readMarkerSegment(data, 0);
 
         expect(segment.type).toBe(0xFFDB);
-        expect(segment.data.length).toBe(3); // Length 5 - 2 (length bytes)
+        expect(segment.data.length).toBe(3); 
         expect(segment.data[0]).toBe(0x01);
         expect(segment.data[1]).toBe(0x02);
         expect(segment.data[2]).toBe(0x03);
@@ -100,10 +100,10 @@ describe('MarkerParser', () => {
 
     it('should handle multiple DQT segments', () => {
         const data = new Uint8Array([
-            0xFF, 0xD8, // SOI
-            0xFF, 0xDB, 0x00, 0x03, 0xAA, // DQT 1
-            0xFF, 0xDB, 0x00, 0x03, 0xBB, // DQT 2
-            0xFF, 0xD9  // EOI
+            0xFF, 0xD8, 
+            0xFF, 0xDB, 0x00, 0x03, 0xAA, 
+            0xFF, 0xDB, 0x00, 0x03, 0xBB, 
+            0xFF, 0xD9  
         ]);
 
         const segments = parseFileStructure(data);
@@ -135,8 +135,8 @@ describe('MarkerParser', () => {
 
     it('should parse minimal valid JPEG', () => {
         const data = new Uint8Array([
-            0xFF, 0xD8, // SOI
-            0xFF, 0xD9  // EOI
+            0xFF, 0xD8, 
+            0xFF, 0xD9  
         ]);
 
         const segments = parseFileStructure(data);
@@ -145,7 +145,7 @@ describe('MarkerParser', () => {
     });
 
     it('should throw error on invalid segment length', () => {
-        const data = new Uint8Array([0xFF, 0xDB, 0x00, 0x01]); // Length < 2
+        const data = new Uint8Array([0xFF, 0xDB, 0x00, 0x01]); 
 
         let errorThrown = false;
         try {
@@ -158,7 +158,7 @@ describe('MarkerParser', () => {
     });
 
     it('should throw error on incomplete segment', () => {
-        const data = new Uint8Array([0xFF, 0xDB, 0x00, 0x05, 0xAA]); // Claims 5 bytes but only has 1
+        const data = new Uint8Array([0xFF, 0xDB, 0x00, 0x05, 0xAA]); 
 
         let errorThrown = false;
         try {

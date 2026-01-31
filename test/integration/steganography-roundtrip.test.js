@@ -15,10 +15,7 @@ describe('Steganography Roundtrip', () => {
     }
 
     it('should roundtrip secret data', async () => {
-        // Use a large enough image to hold the data
-        // 64x64 image = 64 blocks.
-        // Each block has ~63 AC coeffs.
-        // Capacity depends on non-zeros. Noise image has high entropy -> many non-zeros.
+
         const width = 64;
         const height = 64;
         const original = createNoiseImage(width, height);
@@ -43,18 +40,15 @@ describe('Steganography Roundtrip', () => {
     });
 
     it('should handle data too large for capacity (graceful failure)', async () => {
-        // Small image, lots of data
+        
         const width = 8;
-        const height = 8; // 1 block
+        const height = 8; 
         const original = createNoiseImage(width, height);
 
-        // 1 block has max 63 bits capacity (minus header bytes)
-        // Try to stuff 100 bytes - should throw error
         const secretData = new Uint8Array(100).fill(65);
 
         const encoder = new JpegEncoder(90, { secretData });
 
-        // Encoder should throw error when data exceeds capacity
         let errorThrown = false;
         try {
             await encoder.encode(original);

@@ -17,9 +17,7 @@ describe('Color Space Conversion', () => {
     });
     it('converts red correctly', () => {
         const { y, cb, cr } = rgbToYcbcr(255, 0, 0);
-        // Y = 0.299*255 = 76.2
-        // Cb = 128 - 0.1687*255 = 84.9
-        // Cr = 128 + 0.5*255 = 255.5
+
         expect(y).toBeCloseTo(76, 0);
         expect(cb).toBeCloseTo(85, 0);
         expect(cr).toBeCloseTo(255, 0);
@@ -27,7 +25,7 @@ describe('Color Space Conversion', () => {
 
     it('converts blue correctly', () => {
         const { y, cb, cr } = rgbToYcbcr(0, 0, 255);
-        // Y = 0.114*255 = 29.1
+        
         expect(y).toBeCloseTo(29, 0);
     });
 
@@ -40,7 +38,7 @@ describe('Color Space Conversion', () => {
     });
 
     it('clamps output values (conceptually)', () => {
-        // Just verifying it runs without error for now
+        
         const { y, cb, cr } = rgbToYcbcr(300, 300, 300);
         expect(y).toBeDefined();
     });
@@ -50,7 +48,6 @@ describe('Color Space Conversion', () => {
         const { y, cb, cr } = rgbToYcbcr(r, g, b);
         const result = ycbcrToRgb(y, cb, cr);
 
-        // Allow off-by-one due to rounding
         expect(Math.abs(result.r - r)).toBeLessThanOrEqual(1);
         expect(Math.abs(result.g - g)).toBeLessThanOrEqual(1);
         expect(Math.abs(result.b - b)).toBeLessThanOrEqual(1);
@@ -65,7 +62,6 @@ describe('Color Space Conversion', () => {
             const { y, cb, cr } = rgbToYcbcr(r, g, b);
             const result = ycbcrToRgb(y, cb, cr);
 
-            // Allow small error due to integer rounding in YCbCr conversion
             expect(Math.abs(result.r - r)).toBeLessThanOrEqual(2);
             expect(Math.abs(result.g - g)).toBeLessThanOrEqual(2);
             expect(Math.abs(result.b - b)).toBeLessThanOrEqual(2);

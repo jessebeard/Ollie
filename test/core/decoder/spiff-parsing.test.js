@@ -4,7 +4,7 @@ import { describe, it, expect } from '../../../test/utils/test-runner.js';
 
 describe('SPIFF Parsing', () => {
     it('should parse a valid SPIFF APP8 marker', async () => {
-        // Use Encoder to generate valid SPIFF JPEG
+        
         const encoder = new JpegEncoder(50, { writeSpiff: true });
         const width = 16;
         const height = 16;
@@ -26,10 +26,10 @@ describe('SPIFF Parsing', () => {
         expect(decoder.spiff.componentCount).toBe(3);
         expect(decoder.spiff.height).toBe(height);
         expect(decoder.spiff.width).toBe(width);
-        expect(decoder.spiff.colorSpace).toBe(4); // YCbCr
+        expect(decoder.spiff.colorSpace).toBe(4); 
         expect(decoder.spiff.bitsPerSample).toBe(8);
-        expect(decoder.spiff.compressionType).toBe(5); // JPEG
-        expect(decoder.spiff.resolutionUnits).toBe(1); // dpi
+        expect(decoder.spiff.compressionType).toBe(5); 
+        expect(decoder.spiff.resolutionUnits).toBe(1); 
         expect(decoder.spiff.verticalResolution).toBe(72);
         expect(decoder.spiff.horizontalResolution).toBe(72);
     });

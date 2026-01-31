@@ -4,7 +4,7 @@ import { dequantize } from '../../../src/core/decoder/dequantization.js';
 describe('Dequantization', () => {
     it('should multiply coefficients by quantization table values', () => {
         const quantized = new Int32Array([10, 5, 3, 0, 0, 0, 0, 0]);
-        // Pad to 64 elements
+        
         const quantizedBlock = new Int32Array(64);
         quantizedBlock.set(quantized);
 
@@ -15,9 +15,9 @@ describe('Dequantization', () => {
 
         const result = dequantize(quantizedBlock, quantTable);
 
-        expect(result[0]).toBe(160);  // 10 * 16
-        expect(result[1]).toBe(55);   // 5 * 11
-        expect(result[2]).toBe(30);   // 3 * 10
+        expect(result[0]).toBe(160);  
+        expect(result[1]).toBe(55);   
+        expect(result[2]).toBe(30);   
         expect(result[3]).toBe(0);
     });
 
@@ -75,8 +75,8 @@ describe('Dequantization', () => {
 
         const result = dequantize(quantized, quantTable);
 
-        expect(result[0]).toBe(168);  // 10.5 * 16
-        expect(result[1]).toBe(55);   // 5.5 * 10
+        expect(result[0]).toBe(168);  
+        expect(result[1]).toBe(55);   
     });
 
     it('should validate block length', () => {
@@ -108,7 +108,7 @@ describe('Dequantization', () => {
     });
 
     it('should handle typical JPEG quantization table', () => {
-        // Typical luminance quantization table (quality 50)
+        
         const quantTable = new Int32Array([
             16, 11, 10, 16, 24, 40, 51, 61,
             12, 12, 14, 19, 26, 58, 60, 55,
@@ -121,15 +121,15 @@ describe('Dequantization', () => {
         ]);
 
         const quantized = new Int32Array(64);
-        quantized[0] = 50;  // DC coefficient
+        quantized[0] = 50;  
         quantized[1] = 10;
         quantized[2] = 5;
 
         const result = dequantize(quantized, quantTable);
 
-        expect(result[0]).toBe(800);   // 50 * 16
-        expect(result[1]).toBe(110);   // 10 * 11
-        expect(result[2]).toBe(50);    // 5 * 10
+        expect(result[0]).toBe(800);   
+        expect(result[1]).toBe(110);   
+        expect(result[2]).toBe(50);    
     });
 
     it('should process all 64 coefficients', () => {

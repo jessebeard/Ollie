@@ -3,7 +3,7 @@ import { Encryption } from '../../../src/core/crypto/encryption.js';
 import { KeyDerivation } from '../../../src/core/crypto/key-derivation.js';
 
 describe('Encryption', () => {
-    // Helper to get a key
+    
     async function getTestKey() {
         const password = 'test-password';
         const salt = KeyDerivation.generateSalt();
@@ -19,8 +19,8 @@ describe('Encryption', () => {
         expect(result).toBeDefined();
         expect(result.ciphertext).toBeDefined();
         expect(result.iv).toBeDefined();
-        expect(result.iv.length).toBe(12); // Standard GCM IV length
-        expect(result.ciphertext.byteLength).toBeGreaterThan(data.length); // Includes tag
+        expect(result.iv.length).toBe(12); 
+        expect(result.ciphertext.byteLength).toBeGreaterThan(data.length); 
     });
 
     it('should decrypt data correctly', async () => {
@@ -38,7 +38,7 @@ describe('Encryption', () => {
 
     it('should fail to decrypt with wrong key', async () => {
         const key1 = await getTestKey();
-        const key2 = await getTestKey(); // Different salt -> different key
+        const key2 = await getTestKey(); 
         const data = new Uint8Array([1, 2, 3]);
 
         const encrypted = await Encryption.encrypt(data, key1);
@@ -59,7 +59,6 @@ describe('Encryption', () => {
 
         const encrypted = await Encryption.encrypt(data, key);
 
-        // Tamper with ciphertext
         const tampered = new Uint8Array(encrypted.ciphertext);
         tampered[0] ^= 1;
 

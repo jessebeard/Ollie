@@ -15,21 +15,18 @@
  * @returns {number} Decoded DC coefficient
  */
 export function decodeDC(bitReader, table, previousDC) {
-    // Decode category (SSSS) using Huffman table
+    
     const category = table.decode(bitReader);
 
     if (category === 0) {
-        // No change from previous DC
+        
         return previousDC;
     }
 
-    // Read additional bits for the actual value
     const bits = bitReader.readBits(category);
 
-    // Decode magnitude (handle negative values)
     const value = decodeValue(bits, category);
 
-    // Add to previous DC (differential coding)
     return previousDC + value;
 }
 
@@ -44,42 +41,34 @@ export function decodeDC(bitReader, table, previousDC) {
 export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
     let k = Ss;
 
-    if (k === 0) k = 1; // AC starts at 1
+    if (k === 0) k = 1; 
 
     while (k <= Se) {
-        // Decode run/size symbol
+        
         const symbol = table.decode(bitReader);
 
         if (symbol === 0x00) {
-            // EOB (End of Block) - all remaining coefficients in this band are zero
-            // Note: In progressive, this means rest of the band (up to Se) is zero.
-            // Since we initialize block to zeros (or it has previous values?), 
-            // if it's the first AC scan, zeros are fine.
-            // If it's a refinement scan, EOB has different meaning (not implemented yet).
-            // For now assuming Spectral Selection only (Ah=0, Al=0).
+
             break;
         }
 
         if (symbol === 0xF0) {
-            // ZRL (Zero Run Length) - 16 zeros
+            
             for (let i = 0; i < 16 && k <= Se; i++, k++) {
-                // block[k] is already 0 if initialized
+                
             }
             continue;
         }
 
-        // Extract run length and size
         const runLength = (symbol >> 4) & 0x0F;
         const size = symbol & 0x0F;
 
-        // Skip zeros
         for (let i = 0; i < runLength && k <= Se; i++, k++) {
-            // block[k] is 0
+            
         }
 
         if (k > Se) break;
 
-        // Read and decode coefficient value
         if (size > 0) {
             const bits = bitReader.readBits(size);
             block[k] = decodeValue(bits, size);
@@ -97,14 +86,13 @@ export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
  * @returns {number} Decoded value
  */
 export function decodeValue(bits, size) {
-    // If the high bit is 1, value is positive
+    
     const highBit = 1 << (size - 1);
 
     if (bits >= highBit) {
         return bits;
     } else {
-        // Negative value: bits represents (value - 1) in magnitude
-        // Formula: value = bits - (2^size - 1)
+
         return bits - ((1 << size) - 1);
     }
 }
@@ -128,16 +116,13 @@ export function decodeBlock(bitReader, dcTable, acTable, previousDC, block = nul
 
     let dc = previousDC;
 
-    // Decode DC coefficient if Ss == 0
     if (Ss === 0) {
         dc = decodeDC(bitReader, dcTable, previousDC);
         block[0] = dc;
     }
 
-    // Decode AC coefficients if Se > 0
-    // Note: If Ss=0, AC starts at 1. If Ss > 0, AC starts at Ss.
     if (Se > 0) {
-        // If Ss is 0, we start AC at 1.
+        
         const acStart = Math.max(1, Ss);
         decodeAC(bitReader, acTable, block, acStart, Se);
     }

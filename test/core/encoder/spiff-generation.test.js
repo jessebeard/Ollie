@@ -14,7 +14,6 @@ describe('SPIFF Generation', () => {
 
         const jpegBytes = await await encoder.encode(imageData);
 
-        // Find APP8 marker (FF E8)
         let app8Index = -1;
         for (let i = 0; i < jpegBytes.length - 1; i++) {
             if (jpegBytes[i] === 0xFF && jpegBytes[i + 1] === 0xE8) {
@@ -25,7 +24,6 @@ describe('SPIFF Generation', () => {
 
         expect(app8Index).toBeGreaterThan(-1);
 
-        // Parse SPIFF header manually to verify contents
         const length = (jpegBytes[app8Index + 2] << 8) | jpegBytes[app8Index + 3];
         expect(length).toBe(32);
 
@@ -39,14 +37,13 @@ describe('SPIFF Generation', () => {
         expect(versionMinor).toBe(2);
 
         const profileId = jpegBytes[app8Index + 12];
-        expect(profileId).toBe(1); // Continuous-tone base
+        expect(profileId).toBe(1); 
 
         const componentCount = jpegBytes[app8Index + 13];
-        expect(componentCount).toBe(3); // YCbCr
+        expect(componentCount).toBe(3); 
 
         const colorSpace = jpegBytes[app8Index + 22];
-        // We expect 4 (YCbCr 3 - ITU-R BT.601-1) because we convert to YCbCr
-        // The current implementation (before fix) likely writes 10 (RGB)
+
         expect(colorSpace).toBe(4);
     });
 

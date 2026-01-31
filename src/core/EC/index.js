@@ -1,4 +1,4 @@
-// Public API for EC (Error Correction) module
+
 export {
     GenericGF,
     GenericGFPoly,

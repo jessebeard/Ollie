@@ -9,7 +9,7 @@ describe('ChunkManager', () => {
 
             const chunks = ChunkManager.split(data, chunkSize);
 
-            expect(chunks.length).toBe(4); // 3 + 3 + 3 + 1
+            expect(chunks.length).toBe(4); 
             expect(chunks[0].data.length).toBe(3);
             expect(chunks[1].data.length).toBe(3);
             expect(chunks[2].data.length).toBe(3);
@@ -24,7 +24,6 @@ describe('ChunkManager', () => {
             expect(chunks[1].chunkId).toBeDefined();
             expect(chunks[2].chunkId).toBeDefined();
 
-            // All chunks should have the same chunkId (they belong to the same dataset)
             expect(chunks[0].chunkId).toBe(chunks[1].chunkId);
             expect(chunks[1].chunkId).toBe(chunks[2].chunkId);
         });
@@ -52,7 +51,6 @@ describe('ChunkManager', () => {
             expect(chunks[0].checksum).toBeDefined();
             expect(chunks[1].checksum).toBeDefined();
 
-            // Different data should produce different checksums
             expect(chunks[0].checksum).not.toBe(chunks[1].checksum);
         });
     });
@@ -72,7 +70,7 @@ describe('ChunkManager', () => {
 
         it('should handle single chunk', () => {
             const original = new Uint8Array([1, 2, 3]);
-            const chunks = ChunkManager.split(original, 10); // Larger than data
+            const chunks = ChunkManager.split(original, 10); 
 
             expect(chunks.length).toBe(1);
 
@@ -85,7 +83,6 @@ describe('ChunkManager', () => {
             const original = new Uint8Array([1, 2, 3, 4, 5, 6]);
             const chunks = ChunkManager.split(original, 2);
 
-            // Shuffle chunks
             const shuffled = [chunks[2], chunks[0], chunks[1]];
 
             const reassembled = ChunkManager.reassemble(shuffled);
@@ -100,7 +97,6 @@ describe('ChunkManager', () => {
             const original = new Uint8Array([1, 2, 3, 4, 5, 6]);
             const chunks = ChunkManager.split(original, 2);
 
-            // Remove middle chunk
             const incomplete = [chunks[0], chunks[2]];
 
             let errorThrown = false;
@@ -120,7 +116,6 @@ describe('ChunkManager', () => {
             const chunks1 = ChunkManager.split(data1, 2);
             const chunks2 = ChunkManager.split(data2, 2);
 
-            // Mix chunks from different datasets
             const mixed = [chunks1[0], chunks2[0]];
 
             let errorThrown = false;

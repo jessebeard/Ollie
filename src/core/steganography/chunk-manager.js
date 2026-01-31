@@ -42,7 +42,6 @@ export class ChunkManager {
             throw new Error('No chunks provided');
         }
 
-        // Validate all chunks have the same chunkId
         const chunkId = chunks[0].chunkId;
         for (const chunk of chunks) {
             if (chunk.chunkId !== chunkId) {
@@ -50,32 +49,26 @@ export class ChunkManager {
             }
         }
 
-        // Sort chunks by index
         const sorted = [...chunks].sort((a, b) => a.index - b.index);
 
-        // Validate we have all chunks
         const expectedTotal = sorted[0].total;
         if (sorted.length !== expectedTotal) {
             throw new Error(`Missing chunks: expected ${expectedTotal}, got ${sorted.length}`);
         }
 
-        // Validate indices are sequential
         for (let i = 0; i < sorted.length; i++) {
             if (sorted[i].index !== i) {
                 throw new Error(`Missing chunk at index ${i}`);
             }
         }
 
-        // Calculate total size
         let totalSize = 0;
         for (const chunk of sorted) {
             totalSize += chunk.data.length;
         }
 
-        // Allocate buffer
         const result = new Uint8Array(totalSize);
 
-        // Copy chunks in order
         let offset = 0;
         for (const chunk of sorted) {
             result.set(chunk.data, offset);
@@ -91,7 +84,7 @@ export class ChunkManager {
      * @returns {string} UUID-like string
      */
     static generateId() {
-        // Simple UUID v4-like generator
+        
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);

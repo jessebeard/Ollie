@@ -30,7 +30,6 @@ export function initDecoderUI() {
 
             const decoder = new JpegDecoder();
 
-            // Configure IDCT method
             const idctSelect = document.getElementById('idct-method');
             if (idctSelect) {
                 switch (idctSelect.value) {
@@ -58,7 +57,6 @@ export function initDecoderUI() {
                 }
             }
 
-            // Configure Dequantization method
             const dequantSelect = document.getElementById('dequant-method');
             if (dequantSelect) {
                 if (dequantSelect.value === 'bypass') {
@@ -70,7 +68,6 @@ export function initDecoderUI() {
                 }
             }
 
-            // Configure Huffman method
             const huffmanSelect = document.getElementById('huffman-method');
             if (huffmanSelect && huffmanSelect.value === 'naive') {
                 HuffmanTable.setDecodeMethod('naive');
@@ -80,7 +77,6 @@ export function initDecoderUI() {
                 console.log('Using Optimized Huffman Decoding');
             }
 
-            // Configure BitReader method
             const bitReaderSelect = document.getElementById('bitreader-method');
             if (bitReaderSelect && bitReaderSelect.value === 'naive') {
                 BitReader.setMode('naive');
@@ -103,7 +99,6 @@ export function initDecoderUI() {
 
             decodeStatus.textContent = `Decoded! ${result.width}x${result.height}`;
 
-            // Update Info Pane
             if (result.metadata) {
                 document.getElementById('decoder-info-size').textContent = `${bytes.length} bytes`;
                 document.getElementById('decoder-info-dims').textContent = `${result.metadata.width}x${result.metadata.height}`;
@@ -112,7 +107,6 @@ export function initDecoderUI() {
                 document.getElementById('decoder-info-chroma').textContent = result.metadata.chromaSubsampling;
             }
 
-            // Handle Secret Data
             const secretSection = document.getElementById('secret-data-section');
             const secretSize = document.getElementById('secret-data-size');
             const downloadSecretBtn = document.getElementById('download-secret-btn');

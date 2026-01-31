@@ -20,14 +20,11 @@ import { decodeOptimized, buildOptimizedLookup } from './huffman-decode-optimize
  */
 export class HuffmanTable {
     constructor(bits, values, tableClass, tableId) {
-        this.bits = bits;           // Array of 16 elements: count of codes for each bit length
-        this.values = values;       // Symbol values
-        this.tableClass = tableClass; // 0=DC, 1=AC
-        this.tableId = tableId;     // 0-3
+        this.bits = bits;           
+        this.values = values;       
+        this.tableClass = tableClass; 
+        this.tableId = tableId;     
 
-        // Build lookup tables
-        // We build both for now to support switching, or we could lazy build.
-        // Since tables are small, building both is fine.
         buildNaiveLookup(this);
         buildOptimizedLookup(this);
     }
@@ -39,7 +36,7 @@ export class HuffmanTable {
      * @returns {number} Decoded symbol
      */
     decode(bitReader) {
-        // Default to optimized if not set
+        
         return decodeOptimized(this, bitReader);
     }
 
@@ -71,22 +68,18 @@ export function parseHuffmanTable(data, offset = 0) {
         throw new Error('Invalid DHT offset');
     }
 
-    // Read Tc_Th byte
     const tcTh = data[offset];
-    const tableClass = (tcTh >> 4) & 0x0F; // High 4 bits: 0=DC, 1=AC
-    const tableId = tcTh & 0x0F; // Low 4 bits: 0-3
+    const tableClass = (tcTh >> 4) & 0x0F; 
+    const tableId = tcTh & 0x0F; 
 
-    // Validate table class
     if (tableClass !== 0 && tableClass !== 1) {
         throw new Error(`Invalid Huffman table class: ${tableClass}`);
     }
 
-    // Validate table ID
     if (tableId > 3) {
         throw new Error(`Invalid Huffman table ID: ${tableId}`);
     }
 
-    // Read BITS array (16 bytes)
     if (offset + 1 + 16 > data.length) {
         throw new Error('Incomplete Huffman BITS array');
     }
@@ -96,18 +89,15 @@ export function parseHuffmanTable(data, offset = 0) {
         bits[i] = data[offset + 1 + i];
     }
 
-    // Calculate total number of symbols
     let totalSymbols = 0;
     for (let i = 0; i < 16; i++) {
         totalSymbols += bits[i];
     }
 
-    // Validate BITS sum
     if (totalSymbols > 256) {
         throw new Error(`Invalid BITS sum: ${totalSymbols} (max 256)`);
     }
 
-    // Read HUFFVAL array
     if (offset + 1 + 16 + totalSymbols > data.length) {
         throw new Error('Incomplete Huffman HUFFVAL array');
     }
@@ -154,7 +144,7 @@ export function parseHuffmanTablesFromSegments(dhtSegments) {
 
     for (const segment of dhtSegments) {
         const tables = parseAllHuffmanTables(segment.data);
-        // Merge tables (later segments can override earlier ones)
+        
         for (const [key, table] of tables) {
             allTables.set(key, table);
         }

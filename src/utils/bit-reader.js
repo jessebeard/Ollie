@@ -27,10 +27,8 @@ export class BitReader {
     isEOF() { return this.impl.isEOF(); }
     getPosition() { return this.impl.getPosition(); }
 
-    // _handleByteStuffing is internal, but if called externally (tests?), proxy it
     _handleByteStuffing() { return this.impl._handleByteStuffing(); }
 
-    // Getters/Setters for properties if accessed directly
     get byteOffset() { return this.impl.byteOffset; }
     set byteOffset(v) { this.impl.byteOffset = v; }
 
@@ -41,5 +39,4 @@ export class BitReader {
     set data(v) { this.impl.data = v; }
 }
 
-// Default mode
 BitReader.mode = 'optimized';

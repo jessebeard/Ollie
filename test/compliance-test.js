@@ -14,7 +14,6 @@ export async function runComplianceTests() {
 async function testMarkerParsing() {
     console.log('  Testing Marker Parsing...');
 
-    // Create a minimal valid JPEG with JFIF
     const encoder = new JpegEncoder(50);
     const width = 16;
     const height = 16;
@@ -39,7 +38,6 @@ async function testMarkerParsing() {
 async function testSpiffGenerationAndParsing() {
     console.log('  Testing SPIFF Generation and Parsing...');
 
-    // Create a JPEG with SPIFF enabled
     const encoder = new JpegEncoder(50, { writeSpiff: true });
     const width = 16;
     const height = 16;

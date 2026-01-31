@@ -1,9 +1,4 @@
-/*
- * Reed-Solomon error correction encoder and decoder.
- * Original implementation from ZXing, ported to JavaScript by cho45.
- * Copyright 2007 ZXing authors
- * Licensed under the Apache License, Version 2.0
- */
+
 
 import { GenericGF, GenericGFPoly } from './galois-field.js';
 
@@ -86,7 +81,7 @@ export class ReedSolomonDecoder {
     }
 
     runEuclideanAlgorithm(a, b, R) {
-        // Assume a's degree is >= b's
+        
         if (a.degree < b.degree) {
             const temp = a;
             a = b;
@@ -98,16 +93,14 @@ export class ReedSolomonDecoder {
         let tLast = this.field.zero;
         let t = this.field.one;
 
-        // Run Euclidean algorithm until r's degree is less than R/2
         while (r.degree >= R / 2) {
             const rLastLast = rLast;
             const tLastLast = tLast;
             rLast = r;
             tLast = t;
 
-            // Divide rLastLast by rLast, with quotient in q and remainder in r
             if (rLast.isZero()) {
-                // Oops, Euclidean algorithm already terminated?
+                
                 throw new Error('ReedSolomonException("r_{i-1} was zero")');
             }
             r = rLastLast;
@@ -140,9 +133,9 @@ export class ReedSolomonDecoder {
     }
 
     findErrorLocations(errorLocator) {
-        // This is a direct application of Chien's search
+        
         const numErrors = errorLocator.degree;
-        if (numErrors == 1) { // shortcut
+        if (numErrors == 1) { 
             return new Int32Array([errorLocator.getCoefficient(1)]);
         }
         const result = new Int32Array(numErrors);
@@ -160,7 +153,7 @@ export class ReedSolomonDecoder {
     }
 
     findErrorMagnitudes(errorEvaluator, errorLocations) {
-        // This is directly applying Forney's Formula
+        
         const s = errorLocations.length;
         const result = new Int32Array(s);
         for (let i = 0; i < s; i++) {

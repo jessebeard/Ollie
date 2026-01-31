@@ -3,7 +3,7 @@ import { BitReader } from '../../src/utils/bit-reader.js';
 
 describe('BitReader', () => {
     it('should read single bits correctly', () => {
-        // 0b10110011 = 0xB3
+        
         const data = new Uint8Array([0xB3]);
         const reader = new BitReader(data);
 
@@ -18,27 +18,26 @@ describe('BitReader', () => {
     });
 
     it('should read multi-bit sequences (1-16 bits)', () => {
-        // 0b10110011 11001010 = 0xB3CA
+        
         const data = new Uint8Array([0xB3, 0xCA]);
         const reader = new BitReader(data);
 
-        expect(reader.readBits(4)).toBe(0b1011); // First 4 bits
-        expect(reader.readBits(8)).toBe(0b00111100); // Next 8 bits
-        expect(reader.readBits(4)).toBe(0b1010); // Last 4 bits
+        expect(reader.readBits(4)).toBe(0b1011); 
+        expect(reader.readBits(8)).toBe(0b00111100); 
+        expect(reader.readBits(4)).toBe(0b1010); 
     });
 
     it('should handle byte boundaries correctly', () => {
         const data = new Uint8Array([0xAB, 0xCD]);
         const reader = new BitReader(data);
 
-        // Read first byte
         expect(reader.readBits(8)).toBe(0xAB);
-        // Read second byte
+        
         expect(reader.readBits(8)).toBe(0xCD);
     });
 
     it('should handle byte stuffing (0xFF 0x00 -> 0xFF)', () => {
-        // 0xFF 0x00 should be interpreted as 0xFF (stuffed byte)
+        
         const data = new Uint8Array([0xFF, 0x00, 0xAA]);
         const reader = new BitReader(data);
 
@@ -51,12 +50,12 @@ describe('BitReader', () => {
         const reader = new BitReader(data);
 
         expect(reader.readBits(8)).toBe(0xAA);
-        // Restart marker should be skipped
+        
         expect(reader.readBits(8)).toBe(0xBB);
     });
 
     it('should throw error on unexpected markers', () => {
-        const data = new Uint8Array([0xAA, 0xFF, 0xD9]); // EOI marker
+        const data = new Uint8Array([0xAA, 0xFF, 0xD9]); 
         const reader = new BitReader(data);
 
         expect(reader.readBits(8)).toBe(0xAA);
@@ -89,16 +88,16 @@ describe('BitReader', () => {
         const reader = new BitReader(data);
 
         expect(reader.peekBits(4)).toBe(0b1011);
-        expect(reader.peekBits(4)).toBe(0b1011); // Should still be the same
-        expect(reader.readBits(4)).toBe(0b1011); // Now consume
-        expect(reader.peekBits(4)).toBe(0b0011); // Next 4 bits
+        expect(reader.peekBits(4)).toBe(0b1011); 
+        expect(reader.readBits(4)).toBe(0b1011); 
+        expect(reader.peekBits(4)).toBe(0b0011); 
     });
 
     it('should align to byte boundary', () => {
         const data = new Uint8Array([0xAA, 0xBB, 0xCC]);
         const reader = new BitReader(data);
 
-        reader.readBits(3); // Read 3 bits
+        reader.readBits(3); 
         expect(reader.getPosition()).toEqual({ byteOffset: 0, bitOffset: 3 });
 
         reader.alignToByte();
@@ -133,12 +132,12 @@ describe('BitReader', () => {
     });
 
     it('should handle reading across multiple bytes', () => {
-        // Test reading bits that span byte boundaries
+        
         const data = new Uint8Array([0b11110000, 0b10101010]);
         const reader = new BitReader(data);
 
         expect(reader.readBits(4)).toBe(0b1111);
-        expect(reader.readBits(8)).toBe(0b00001010); // Spans boundary
+        expect(reader.readBits(8)).toBe(0b00001010); 
         expect(reader.readBits(4)).toBe(0b1010);
     });
 
@@ -148,7 +147,7 @@ describe('BitReader', () => {
 
         let errorThrown = false;
         try {
-            reader.readBits(17); // Too many bits
+            reader.readBits(17); 
         } catch (e) {
             errorThrown = true;
             expect(e.message).toBe('Invalid bit length: 17. Must be 1-16.');

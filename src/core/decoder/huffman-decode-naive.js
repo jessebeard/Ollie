@@ -24,7 +24,6 @@ export function buildNaiveLookup(table) {
         for (let i = 0; i < count; i++) {
             const symbol = table.values[symbolIndex];
 
-            // Store: code -> {symbol, length}
             table.lookup.set((code << (16 - bitLength)), {
                 symbol,
                 length: bitLength
@@ -34,7 +33,7 @@ export function buildNaiveLookup(table) {
             symbolIndex++;
         }
 
-        code <<= 1; // Shift for next bit length
+        code <<= 1; 
     }
 }
 
@@ -54,8 +53,6 @@ export function decodeNaive(table, bitReader) {
     for (let i = 1; i <= table.maxCodeLength; i++) {
         code = (code << 1) | bitReader.readBit();
 
-        // Check if this code exists in lookup
-        // The key in the map is shifted to align to 16 bits
         const key = code << (16 - i);
         if (table.lookup.has(key)) {
             const entry = table.lookup.get(key);

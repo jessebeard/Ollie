@@ -1,13 +1,9 @@
 import { BitWriter } from '../../utils/bit-writer.js';
 
-// Standard JPEG Huffman Tables (Luminance DC)
-// Bits counts (how many codes of length i)
 const STD_DC_LUMINANCE_NRCODES = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
-// Values
+
 const STD_DC_LUMINANCE_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-// We need to generate the code table from these standard definitions.
-// Map: value -> { code, length }
 function generateHuffmanTable(nrCodes, values) {
     const table = {};
     let code = 0;
@@ -27,7 +23,6 @@ function generateHuffmanTable(nrCodes, values) {
 
 export const DC_LUMA_TABLE = generateHuffmanTable(STD_DC_LUMINANCE_NRCODES, STD_DC_LUMINANCE_VALUES);
 
-// Helper to compute SSSS (category)
 export function computeCategory(val) {
     if (val === 0) return 0;
     val = Math.abs(val);
@@ -39,21 +34,13 @@ export function computeCategory(val) {
     return cat;
 }
 
-// Helper to compute the bit representation of the value within the category
 export function getBitRepresentation(val) {
     if (val > 0) return val;
-    // For negative numbers, it's the ones complement of abs value, masked to category length
-    // e.g. -3 (cat 2). abs(3) = 11. ~3 = ...11100. 
-    // JPEG spec: if val < 0, code = val + (2^cat) - 1.
-    // e.g. -3, cat 2. -3 + 4 - 1 = 0. (00 binary)
-    // e.g. -1, cat 1. -1 + 2 - 1 = 0. (0 binary)
-    // e.g. -2, cat 2. -2 + 4 - 1 = 1. (01 binary)
+
     const cat = computeCategory(val);
     return val + (1 << cat) - 1;
 }
 
-// Standard JPEG Huffman Tables (Luminance AC)
-// Added leading 0 for 1-based indexing compatibility with generateHuffmanTable
 const STD_AC_LUMINANCE_NRCODES = [0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d];
 const STD_AC_LUMINANCE_VALUES = [
     0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12,
@@ -82,7 +69,7 @@ const STD_AC_LUMINANCE_VALUES = [
 export const AC_LUMA_TABLE = generateHuffmanTable(STD_AC_LUMINANCE_NRCODES, STD_AC_LUMINANCE_VALUES);
 
 export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, acTable = AC_LUMA_TABLE, Ss = 0, Se = 63) {
-    // 1. Encode DC
+    
     if (Ss === 0) {
         const dcVal = block[0];
         const diff = dcVal - previousDC;
@@ -95,8 +82,6 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
         }
     }
 
-    // 2. Encode AC
-    // Only if the scan includes AC coefficients
     if (Se > 0) {
         let zeroRun = 0;
         const start = Math.max(1, Ss);
@@ -110,7 +95,7 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
                 while (zeroRun >= 16) {
                     safety++;
                     if (safety > 100) { throw new Error('Infinite loop in Huffman zeroRun'); }
-                    // ZRL: F/0 = 0xF0
+                    
                     const zrl = acTable[0xF0];
                     writer.writeBits(zrl.code, zrl.length);
                     zeroRun -= 16;
@@ -127,19 +112,11 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
             }
         }
 
-        // EOB: 0/0 = 0x00
-        // We write EOB if there are trailing zeros in this band, OR if we reached the end of the block (Se=63) and have a run.
-        // Actually, standard EOB means "all remaining coefficients in this block are zero".
-        // So if we are scanning 1..63 and have trailing zeros, we write EOB.
-        // If we are scanning 1..5 and have trailing zeros (val 6..63 are not checked), we write EOB to say "rest of 1..5 are zero"?
-        // No, EOB means "rest of the block (up to 63) is zero" in baseline.
-        // In progressive, EOB means "rest of the band (up to Se) is zero".
-
         if (zeroRun > 0) {
             const eob = acTable[0x00];
             writer.writeBits(eob.code, eob.length);
         }
     }
 
-    return block[0]; // Return new DC value
+    return block[0]; 
 }

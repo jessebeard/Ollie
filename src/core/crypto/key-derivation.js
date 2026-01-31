@@ -3,10 +3,9 @@
  * Uses PBKDF2 with SHA-256
  */
 export class KeyDerivation {
-    // PBKDF2 iterations (100,000 is standard for good security)
+    
     static ITERATIONS = 100000;
 
-    // Salt size in bytes
     static SALT_SIZE = 16;
 
     /**
@@ -33,11 +32,9 @@ export class KeyDerivation {
     static async deriveKey(password, salt) {
         const cryptoObj = this.getCrypto();
 
-        // Convert password to bytes
         const encoder = new TextEncoder();
         const passwordBytes = encoder.encode(password);
 
-        // Import password as a key
         const baseKey = await cryptoObj.subtle.importKey(
             'raw',
             passwordBytes,
@@ -46,7 +43,6 @@ export class KeyDerivation {
             ['deriveBits', 'deriveKey']
         );
 
-        // Derive the actual encryption key
         const key = await cryptoObj.subtle.deriveKey(
             {
                 name: 'PBKDF2',
@@ -57,9 +53,9 @@ export class KeyDerivation {
             baseKey,
             {
                 name: 'AES-GCM',
-                length: 256 // 256-bit key
+                length: 256 
             },
-            true, // extractable (for testing)
+            true, 
             ['encrypt', 'decrypt']
         );
 

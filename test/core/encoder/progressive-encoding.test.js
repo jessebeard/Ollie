@@ -14,7 +14,6 @@ describe('Progressive Encoding', () => {
 
         const jpegBytes = await await encoder.encode(imageData);
 
-        // Count SOS markers (FF DA)
         let sosCount = 0;
         for (let i = 0; i < jpegBytes.length - 1; i++) {
             if (jpegBytes[i] === 0xFF && jpegBytes[i + 1] === 0xDA) {
@@ -22,7 +21,6 @@ describe('Progressive Encoding', () => {
             }
         }
 
-        // A typical progressive scan script has at least 2 scans (often more)
         expect(sosCount).toBeGreaterThan(1);
     });
 
@@ -38,7 +36,6 @@ describe('Progressive Encoding', () => {
 
         const jpegBytes = await await encoder.encode(imageData);
 
-        // Check for SOF2 (FF C2)
         let hasSOF2 = false;
         let hasSOF0 = false;
         for (let i = 0; i < jpegBytes.length - 1; i++) {

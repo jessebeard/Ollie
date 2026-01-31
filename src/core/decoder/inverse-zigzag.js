@@ -5,8 +5,6 @@
  * JPEG spec lines 149-158 define the zigzag order.
  */
 
-// Zigzag order (maps 2D position to zigzag index)
-// This is the same pattern used in the encoder
 export const ZIGZAG_ORDER = new Int32Array([
     0, 1, 8, 16, 9, 2, 3, 10,
     17, 24, 32, 25, 18, 11, 4, 5,
@@ -31,7 +29,6 @@ export function inverseZigZag(zigzagArray, outputBuffer = null) {
 
     const block = outputBuffer || new Float32Array(64);
 
-    // Inverse operation: zigzagArray[i] goes to position ZIGZAG_ORDER[i]
     for (let i = 0; i < 64; i++) {
         block[ZIGZAG_ORDER[i]] = zigzagArray[i];
     }

@@ -7,11 +7,11 @@ import {
 
 describe('QuantizationTableParser', () => {
     it('should parse 8-bit precision table (Pq=0)', () => {
-        // Pq=0, Tq=0, followed by 64 bytes
+        
         const data = new Uint8Array(65);
-        data[0] = 0x00; // Pq=0 (8-bit), Tq=0
+        data[0] = 0x00; 
         for (let i = 0; i < 64; i++) {
-            data[i + 1] = i + 1; // Values 1-64
+            data[i + 1] = i + 1; 
         }
 
         const result = parseQuantizationTable(data, 0);
@@ -25,13 +25,12 @@ describe('QuantizationTableParser', () => {
     });
 
     it('should parse 16-bit precision table (Pq=1)', () => {
-        // Pq=1, Tq=1, followed by 64 × 2 bytes
+        
         const data = new Uint8Array(1 + 64 * 2);
-        data[0] = 0x11; // Pq=1 (16-bit), Tq=1
+        data[0] = 0x11; 
 
-        // Write some 16-bit values (big-endian)
-        data[1] = 0x01; data[2] = 0x00; // 256
-        data[3] = 0x02; data[4] = 0x00; // 512
+        data[1] = 0x01; data[2] = 0x00; 
+        data[3] = 0x02; data[4] = 0x00; 
 
         const result = parseQuantizationTable(data, 0);
 
@@ -59,7 +58,7 @@ describe('QuantizationTableParser', () => {
 
     it('should parse 64 elements', () => {
         const data = new Uint8Array(65);
-        data[0] = 0x00; // Pq=0, Tq=0
+        data[0] = 0x00; 
         for (let i = 0; i < 64; i++) {
             data[i + 1] = (i * 2) % 256;
         }
@@ -73,16 +72,14 @@ describe('QuantizationTableParser', () => {
     });
 
     it('should handle multiple tables in one DQT segment', () => {
-        // Two 8-bit tables
+        
         const data = new Uint8Array(65 * 2);
 
-        // First table: Tq=0
         data[0] = 0x00;
         for (let i = 0; i < 64; i++) {
             data[i + 1] = i;
         }
 
-        // Second table: Tq=1
         data[65] = 0x01;
         for (let i = 0; i < 64; i++) {
             data[65 + i + 1] = 64 + i;
@@ -99,7 +96,7 @@ describe('QuantizationTableParser', () => {
 
     it('should validate table ID range', () => {
         const data = new Uint8Array(65);
-        data[0] = 0x04; // Invalid table ID (4)
+        data[0] = 0x04; 
 
         let errorThrown = false;
         try {
@@ -113,7 +110,7 @@ describe('QuantizationTableParser', () => {
 
     it('should validate precision value', () => {
         const data = new Uint8Array(65);
-        data[0] = 0x20; // Invalid precision (2)
+        data[0] = 0x20; 
 
         let errorThrown = false;
         try {
@@ -126,7 +123,7 @@ describe('QuantizationTableParser', () => {
     });
 
     it('should throw error on incomplete table data', () => {
-        const data = new Uint8Array(10); // Only 10 bytes instead of 65
+        const data = new Uint8Array(10); 
         data[0] = 0x00;
 
         let errorThrown = false;
@@ -140,14 +137,13 @@ describe('QuantizationTableParser', () => {
     });
 
     it('should parse tables from multiple DQT segments', () => {
-        // Segment 1: Table 0
+        
         const segment1Data = new Uint8Array(65);
         segment1Data[0] = 0x00;
         for (let i = 0; i < 64; i++) {
             segment1Data[i + 1] = i;
         }
 
-        // Segment 2: Table 1
         const segment2Data = new Uint8Array(65);
         segment2Data[0] = 0x01;
         for (let i = 0; i < 64; i++) {
@@ -167,14 +163,14 @@ describe('QuantizationTableParser', () => {
     });
 
     it('should handle table override in multiple segments', () => {
-        // Both segments define table 0
+        
         const segment1Data = new Uint8Array(65);
         segment1Data[0] = 0x00;
-        segment1Data[1] = 100; // First value = 100
+        segment1Data[1] = 100; 
 
         const segment2Data = new Uint8Array(65);
         segment2Data[0] = 0x00;
-        segment2Data[1] = 200; // First value = 200 (should override)
+        segment2Data[1] = 200; 
 
         const segments = [
             { data: segment1Data },
@@ -184,16 +180,14 @@ describe('QuantizationTableParser', () => {
         const tables = parseQuantizationTablesFromSegments(segments);
 
         expect(tables.size).toBe(1);
-        expect(tables.get(0)[0]).toBe(200); // Should use second segment's value
+        expect(tables.get(0)[0]).toBe(200); 
     });
 
     it('should parse offset parameter correctly', () => {
         const data = new Uint8Array(130);
 
-        // First table at offset 0
         data[0] = 0x00;
 
-        // Second table at offset 65
         data[65] = 0x01;
         for (let i = 0; i < 64; i++) {
             data[66 + i] = i + 10;

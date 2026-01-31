@@ -3,7 +3,7 @@ import { idctAAN } from './src/core/decoder/idct.js';
 import { forwardDCT } from './src/core/dct.js';
 
 function test() {
-    // Test 1: DC
+    
     console.log('--- DC Test ---');
     const dcInput = new Float32Array(64);
     dcInput.fill(128);
@@ -13,13 +13,11 @@ function test() {
     console.log('DC Output[0]:', dcOutput[0]);
     console.log('Expected:', 128);
 
-    // Test 2: AC (Nyquist x4)
     console.log('\n--- AC Test (x4) ---');
     const acInput = new Float32Array(64);
-    // Create pattern that excites x4 (checkerboard-ish)
-    for (let i = 0; i < 64; i++) acInput[i] = (i % 2 === 0) ? 144 : 112; // Average 128, +/- 16
-    // Actually, x4 is high freq.
-    // Let's just use forwardDCT to get coeffs for a known pattern
+    
+    for (let i = 0; i < 64; i++) acInput[i] = (i % 2 === 0) ? 144 : 112; 
+
     const acCoeffs = forwardDCT(acInput);
     console.log('AC Coeffs (Non-zero):');
     for (let i = 0; i < 64; i++) {
@@ -31,7 +29,6 @@ function test() {
     console.log('Expected[0]:', acInput[0]);
     console.log('Expected[1]:', acInput[1]);
 
-    // Test 3: AC (x1)
     console.log('\n--- AC Test (x1) ---');
     const x1Input = new Float32Array(64);
     for (let x = 0; x < 8; x++) {
@@ -40,7 +37,7 @@ function test() {
     }
     const x1Coeffs = forwardDCT(x1Input);
     console.log('x1 Coeffs[1]:', x1Coeffs[1]);
-    // Test 4: AC (x2)
+    
     console.log('\n--- AC Test (x2) ---');
     const x2Input = new Float32Array(64);
     for (let x = 0; x < 8; x++) {
@@ -53,7 +50,6 @@ function test() {
     console.log('x2 Output[0]:', x2Output[0]);
     console.log('Expected[0]:', x2Input[0]);
 
-    // Test 5: AC (x3)
     console.log('\n--- AC Test (x3) ---');
     const x3Input = new Float32Array(64);
     for (let x = 0; x < 8; x++) {
@@ -65,7 +61,7 @@ function test() {
     const x3Output = idctAAN(x3Coeffs);
     console.log('x3 Output[0]:', x3Output[0]);
     console.log('Expected[0]:', x3Input[0]);
-    // Test 6: AC (x1 again)
+    
     console.log('\n--- AC Test (x1 again) ---');
     const x1InputB = new Float32Array(64);
     for (let x = 0; x < 8; x++) {
@@ -78,7 +74,6 @@ function test() {
     console.log('x1 Output[0]:', x1OutputB[0]);
     console.log('Expected[0]:', x1InputB[0]);
 
-    // Test 7: AC (x7)
     console.log('\n--- AC Test (x7) ---');
     const x7Input = new Float32Array(64);
     for (let x = 0; x < 8; x++) {

@@ -20,9 +20,10 @@
  * Data Format:
  * [Length (32-bit BE)][Data Payload]
  */
-import { ErrorCorrection } from './error-correction.js';
+import { ErrorCorrection, ECC_PROFILES } from './error-correction.js';
 import { Encryption } from '../crypto/encryption.js';
 import { KeyDerivation } from '../crypto/key-derivation.js';
+import { crc32 } from '../../utils/crc32.js';
 
 export class Jsteg {
     /**
@@ -42,6 +43,7 @@ export class Jsteg {
      */
     static getCategory(absVal) {
         if (absVal === 0) return 0;
+        // 1 is now a valid category for embedding (mapped to 2/3)
         if (absVal === 1) return 1;
         if (absVal <= 3) return 2;
         if (absVal <= 7) return 3;
@@ -52,7 +54,7 @@ export class Jsteg {
         if (absVal <= 255) return 8;
         if (absVal <= 511) return 9;
         if (absVal <= 1023) return 10;
-        return 11; // For larger values
+        return 11;
     }
 
     /**
@@ -69,49 +71,46 @@ export class Jsteg {
         let bitIndex = 0;
 
         for (const block of blocks) {
-            // Skip DC (index 0)
+
             for (let i = 1; i < 64; i++) {
                 if (byteIndex >= data.length) {
-                    return true; // Done
+                    return true;
                 }
 
                 const val = block[i];
                 const absVal = Math.abs(val);
 
-                // Skip zeros
                 if (val === 0) continue;
 
-                // Skip |val| = 1: these always cause category changes
-                // 1→0 crosses to zero, 1→2 changes category 1→2
-                if (absVal === 1) continue;
+                // We now support embedding in 1s by mapping them to 2 or 3
+                // This avoids creating 0s (which would be skipped by decoder)
 
-                // Get current bit to embed
                 const bit = (data[byteIndex] >> (7 - bitIndex)) & 1;
 
-                // Category-aware LSB embedding
-                if (absVal === 2) {
-                    // Category 2: [2, 3]
-                    // 2→3 is safe (stays in cat 2)
-                    // 2→1 is unsafe (crosses to cat 1)
-                    // So we can only flip to 3, never to 1
+                if (absVal === 1) {
+                    // Map 1 -> 2 (bit 0) or 3 (bit 1)
+                    // Map -1 -> -2 (bit 0) or -3 (bit 1)
+                    if (val > 0) {
+                        block[i] = bit === 1 ? 3 : 2;
+                    } else {
+                        block[i] = bit === 1 ? -3 : -2;
+                    }
+                } else if (absVal === 2) {
+
                     if (val > 0) {
                         block[i] = bit === 1 ? 3 : 2;
                     } else {
                         block[i] = bit === 1 ? -3 : -2;
                     }
                 } else if (absVal === 3) {
-                    // Category 2: [2, 3]
-                    // 3→2 is safe (stays in cat 2)
-                    // 3→4 crosses to cat 3 - unsafe!
-                    // So standard LSB works: 3→2 or 3→3
+
                     if (val > 0) {
                         block[i] = (val & ~1) | bit;
                     } else {
                         block[i] = -(Math.abs(val & ~1) | bit);
                     }
                 } else {
-                    // |val| >= 4: All LSB flips stay within same category
-                    // This is completely safe for Huffman encoding
+
                     if (val > 0) {
                         block[i] = (val & ~1) | bit;
                     } else {
@@ -127,7 +126,7 @@ export class Jsteg {
             }
         }
 
-        return false; // Ran out of space
+        return false;
     }
 
     /**
@@ -140,10 +139,10 @@ export class Jsteg {
      * @returns {boolean} True if successful, false if data didn't fit
      */
     static embed(blocks, data) {
-        // Prepare data stream with length header
+
         const dataWithHeader = new Uint8Array(data.length + 4);
         const view = new DataView(dataWithHeader.buffer);
-        view.setUint32(0, data.length, false); // Big Endian length
+        view.setUint32(0, data.length, false);
         dataWithHeader.set(data, 4);
 
         return this.embedRaw(blocks, dataWithHeader);
@@ -171,7 +170,6 @@ export class Jsteg {
         const version = 1;
         const flags = 0;
 
-        // 0. Encryption (if password provided)
         let payloadToEmbed = data;
         if (options.password) {
             metadata.encrypted = true;
@@ -179,7 +177,6 @@ export class Jsteg {
             const key = await KeyDerivation.deriveKey(options.password, salt);
             const { ciphertext, iv } = await Encryption.encrypt(data, key);
 
-            // Construct encrypted payload: [Salt(16)][IV(12)][Ciphertext(N)]
             const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
             encryptedPayload.set(salt, 0);
             encryptedPayload.set(iv, salt.length);
@@ -188,59 +185,54 @@ export class Jsteg {
             payloadToEmbed = encryptedPayload;
         }
 
+        let protectedPayload = payloadToEmbed;
+        if (metadata.ecc) {
+
+            const eccProfile = metadata.eccProfile || 'Medium';
+            const eccResult = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            protectedPayload = eccResult.encoded;
+
+            metadata.eccProfile = eccProfile;
+            metadata.originalLength = eccResult.originalLength;
+            metadata.blockCount = eccResult.blockCount;
+        }
+        const payloadLen = protectedPayload.length;
+
         const metaStr = JSON.stringify(metadata);
         const metaBytes = new TextEncoder().encode(metaStr);
         const metaLen = metaBytes.length;
 
-        // Prepare Payload (with ECC if enabled)
-        let protectedPayload = payloadToEmbed;
-        if (metadata.ecc) {
-            protectedPayload = ErrorCorrection.protect(payloadToEmbed);
-        }
-        const payloadLen = protectedPayload.length;
-
-        // Calculate total size
-        // Magic(4) + Ver(1) + Flags(1) + MetaLen(2) + Meta(N) + PayloadLen(4) + Payload(N) + CRC(4)
         const totalSize = 4 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4;
 
         const container = new Uint8Array(totalSize);
         const view = new DataView(container.buffer);
         let offset = 0;
 
-        // Magic
         container.set(magic, offset);
         offset += 4;
 
-        // Version
         view.setUint8(offset, version);
         offset += 1;
 
-        // Flags
         view.setUint8(offset, flags);
         offset += 1;
 
-        // Metadata Length
-        view.setUint16(offset, metaLen, false); // BE
+        view.setUint16(offset, metaLen, false);
         offset += 2;
 
-        // Metadata
         container.set(metaBytes, offset);
         offset += metaLen;
 
-        // Payload Length
-        view.setUint32(offset, payloadLen, false); // BE
+        view.setUint32(offset, payloadLen, false);
         offset += 4;
 
-        // Payload
         container.set(protectedPayload, offset);
         offset += payloadLen;
 
-        // CRC32
-        // Calculate CRC over everything before the CRC field (Magic...Payload)
         const dataToCrc = container.subarray(0, offset);
-        const crc = this.crc32(dataToCrc);
+        const crcVal = crc32(dataToCrc);
 
-        view.setUint32(offset, crc, false);
+        view.setUint32(offset, crcVal, false);
         offset += 4;
 
         return this.embedRaw(blocks, container);
@@ -255,7 +247,6 @@ export class Jsteg {
      * @returns {Promise<Uint8Array|Object|null>}
      */
     static async extractAuto(blocks, options = {}) {
-        // Peek at first 4 bytes to check for magic
         const reader = new JstegReader(blocks);
         const magicBytes = reader.readBytes(4);
 
@@ -264,10 +255,8 @@ export class Jsteg {
         const magic = new TextDecoder().decode(magicBytes);
 
         if (magic === 'JSTG') {
-            // Container format - use extractContainer
             return this.extractContainer(blocks, options);
         } else {
-            // Legacy format - use extract
             return this.extract(blocks);
         }
     }
@@ -282,26 +271,21 @@ export class Jsteg {
     static async extractContainer(blocks, options = {}) {
         const reader = new JstegReader(blocks);
 
-        // 1. Magic (4 bytes)
         const magicBytes = reader.readBytes(4);
         if (!magicBytes) return null;
         const magic = new TextDecoder().decode(magicBytes);
         if (magic !== 'JSTG') return null;
 
-        // 2. Version (1 byte)
         const version = reader.readByte();
         if (version === null || version !== 1) return null;
 
-        // 3. Flags (1 byte)
         const flags = reader.readByte();
         if (flags === null) return null;
 
-        // 4. Metadata Length (2 bytes)
         const metaLenBytes = reader.readBytes(2);
         if (!metaLenBytes) return null;
         const metaLen = (metaLenBytes[0] << 8) | metaLenBytes[1];
 
-        // 5. Metadata (N bytes)
         const metaBytes = reader.readBytes(metaLen);
         if (!metaBytes) return null;
         let metadata;
@@ -311,27 +295,21 @@ export class Jsteg {
             return null;
         }
 
-        // 6. Payload Length (4 bytes)
         const payloadLenBytes = reader.readBytes(4);
         if (!payloadLenBytes) return null;
         const payloadLen = ((payloadLenBytes[0] << 24) | (payloadLenBytes[1] << 16) | (payloadLenBytes[2] << 8) | payloadLenBytes[3]) >>> 0;
 
-        // Sanity check length
-        if (payloadLen > 100 * 1024 * 1024) { // 100MB limit
+        if (payloadLen > 100 * 1024 * 1024) {
             return null;
         }
 
-        // 7. Payload (N bytes)
         let payload = reader.readBytes(payloadLen);
         if (!payload) return null;
 
-        // 8. CRC (4 bytes)
         const crcBytes = reader.readBytes(4);
         if (!crcBytes) return null;
         const expectedCrc = ((crcBytes[0] << 24) | (crcBytes[1] << 16) | (crcBytes[2] << 8) | crcBytes[3]) >>> 0;
 
-        // Verify CRC
-        // Reconstruct the data stream to calculate CRC
         const totalSize = 4 + 1 + 1 + 2 + metaLen + 4 + payloadLen;
         const checkBuffer = new Uint8Array(totalSize);
         const checkView = new DataView(checkBuffer.buffer);
@@ -345,27 +323,35 @@ export class Jsteg {
         checkView.setUint32(checkOffset, payloadLen, false); checkOffset += 4;
         checkBuffer.set(payload, checkOffset); checkOffset += payloadLen;
 
-        const actualCrc = this.crc32(checkBuffer);
+        const actualCrc = crc32(checkBuffer);
 
         if (actualCrc !== expectedCrc) {
-            // CRC failed. If ECC is enabled, try to recover.
             if (!metadata.ecc) {
                 return null;
             }
             console.warn('CRC mismatch, attempting ECC recovery...');
         }
 
-        // If ECC is enabled, recover data (strips parity and fixes errors)
         if (metadata.ecc) {
             try {
-                payload = ErrorCorrection.recover(payload);
+
+                if (metadata.eccProfile && metadata.originalLength !== undefined) {
+                    payload = ErrorCorrection.recover(
+                        payload,
+                        metadata.eccProfile,
+                        metadata.originalLength,
+                        metadata.blockCount
+                    );
+                } else {
+
+                    payload = ErrorCorrection.recover(payload);
+                }
             } catch (e) {
                 console.error('ECC recovery failed:', e);
                 return null;
             }
         }
 
-        // Decryption
         if (metadata.encrypted) {
             if (!options.password) {
                 console.warn('Data is encrypted but no password provided.');
@@ -373,7 +359,7 @@ export class Jsteg {
             }
 
             try {
-                // Parse [Salt(16)][IV(12)][Ciphertext(N)]
+
                 const salt = payload.slice(0, 16);
                 const iv = payload.slice(16, 28);
                 const ciphertext = payload.slice(28);
@@ -399,7 +385,7 @@ export class Jsteg {
      * @returns {Uint8Array|null} Extracted data or null if invalid
      */
     static extract(blocks) {
-        // console.log(`Jsteg.extract: Processing ${blocks.length} blocks`);
+
         let length = 0;
         let lengthBits = 0;
         let data = null;
@@ -407,7 +393,6 @@ export class Jsteg {
         let bitIndex = 0;
         let totalBitsRead = 0;
 
-        // State machine: 0=Reading Length, 1=Reading Data
         let state = 0;
 
         for (const block of blocks) {
@@ -419,16 +404,14 @@ export class Jsteg {
                 totalBitsRead++;
 
                 if (state === 0) {
-                    // Reading Length (32 bits)
+
                     length = (length << 1) | bit;
                     lengthBits++;
                     if (lengthBits === 32) {
-                        // console.log(`Jsteg.extract: Raw length value before unsigned conversion: ${length}`);
-                        length = length >>> 0; // Treat as unsigned 32-bit integer
-                        // console.log(`Jsteg.extract: Length header read: ${length}`);
 
-                        // Sanity check length
-                        if (length > 100 * 1024 * 1024) { // 100MB limit sanity
+                        length = length >>> 0;
+
+                        if (length > 100 * 1024 * 1024) {
                             console.warn('Jsteg: Invalid length detected:', length);
                             return null;
                         }
@@ -437,7 +420,7 @@ export class Jsteg {
                         state = 1;
                     }
                 } else {
-                    // Reading Data
+
                     if (byteIndex < length) {
                         data[byteIndex] = (data[byteIndex] << 1) | bit;
                         bitIndex++;
@@ -445,7 +428,7 @@ export class Jsteg {
                             bitIndex = 0;
                             byteIndex++;
                             if (byteIndex === length) {
-                                // console.log(`Jsteg.extract: Successfully read ${length} bytes`);
+
                                 return data;
                             }
                         }
@@ -454,7 +437,6 @@ export class Jsteg {
             }
         }
 
-        // console.log(`Jsteg.extract: Ran out of blocks. Read ${byteIndex} bytes, ${bitIndex} bits. Total bits read: ${totalBitsRead}`);
         return null;
     }
 
@@ -463,48 +445,65 @@ export class Jsteg {
      * Accounts for category-aware embedding that skips |val|=1 coefficients.
      * 
      * @param {Array<Int32Array|Float32Array>} blocks 
-     * @returns {number} Capacity in bytes
+     * @param {Object} options - { format: 'legacy'|'container', metadata: {}, ecc: bool, encrypted: bool }
+     * @returns {number} Capacity in bytes (available for payload)
      */
-    static calculateCapacity(blocks) {
+    static calculateCapacity(blocks, options = {}) {
         let capacityBits = 0;
         for (const block of blocks) {
             for (let i = 1; i < 64; i++) {
                 const val = block[i];
                 const absVal = Math.abs(val);
 
-                // Skip zeros
                 if (val === 0) continue;
 
-                // Skip |val| = 1 (causes category changes)
-                if (absVal === 1) continue;
+                // Include 1s in capacity now
+                // if (absVal === 1) continue;
 
-                // All other non-zero coefficients can be used
                 capacityBits++;
             }
         }
-        // Subtract 32 bits for header in legacy format
-        // For container format, the actual overhead is higher (magic, version, metadata, CRC)
-        return Math.max(0, Math.floor((capacityBits - 32) / 8));
-    }
-    /**
-     * Calculates CRC32 checksum.
-     * 
-     * @param {Uint8Array} data 
-     * @returns {number} Unsigned 32-bit integer
-     */
-    static crc32(data) {
-        let crc = 0xFFFFFFFF;
-        for (let i = 0; i < data.length; i++) {
-            crc ^= data[i];
-            for (let j = 0; j < 8; j++) {
-                if ((crc & 1) !== 0) {
-                    crc = (crc >>> 1) ^ 0xEDB88320;
-                } else {
-                    crc = crc >>> 1;
+
+        const capacityBytes = Math.floor(capacityBits / 8);
+
+        if (options.format === 'container') {
+
+            let metaStr = JSON.stringify(options.metadata || {});
+
+            const eccMetadataOverhead = options.ecc ? 70 : 0;
+
+            const metaLen = new TextEncoder().encode(metaStr).length + eccMetadataOverhead;
+            let containerOverhead = 4 + 1 + 1 + 2 + metaLen + 4 + 4;
+
+            const encryptionOverhead = options.encrypted ? 28 : 0;
+
+            if (options.ecc) {
+                const eccProfile = options.eccProfile || 'Medium';
+                const profile = ECC_PROFILES[eccProfile];
+
+                const minEncodedSize = 255;
+
+                const availableForECC = capacityBytes - containerOverhead;
+
+                if (availableForECC < minEncodedSize) {
+
+                    return 0;
                 }
+
+                const maxBlocks = Math.floor(availableForECC / 255);
+
+                const maxPayloadWithECC = maxBlocks * profile.dataBytes;
+
+                return Math.max(0, maxPayloadWithECC - encryptionOverhead);
+            } else {
+
+                const availableForPayload = capacityBytes - containerOverhead - encryptionOverhead;
+                return Math.max(0, availableForPayload);
             }
+        } else {
+
+            return Math.max(0, capacityBytes - 4);
         }
-        return (crc ^ 0xFFFFFFFF) >>> 0;
     }
 }
 
@@ -512,8 +511,8 @@ class JstegReader {
     constructor(blocks) {
         this.blocks = blocks;
         this.blockIndex = 0;
-        this.pixelIndex = 1; // Skip DC
-        this.bitCount = 0; // Track total bits read
+        this.pixelIndex = 1;
+        this.bitCount = 0;
     }
 
     readBit() {
@@ -523,11 +522,16 @@ class JstegReader {
                 const val = block[this.pixelIndex];
                 this.pixelIndex++;
 
-                // Skip zeros
                 if (val === 0) continue;
 
-                // Skip |val| = 1 to match embedding logic
-                if (Math.abs(val) === 1) continue;
+                // We now support reading from 1s (which were mapped to 2/3 during embedding)
+                // But wait, if we read a raw file that wasn't embedded, we might see 1s.
+                // If we see a 1, it means it wasn't touched by our new embedder (which maps 1->2/3).
+                // But for extraction, we just read the LSB. 
+                // 1 & 1 = 1. -1 & 1 = 1.
+                // So we can read from 1s too.
+
+                // if (Math.abs(val) === 1) continue;
 
                 this.bitCount++;
                 return val & 1;
@@ -535,7 +539,7 @@ class JstegReader {
             this.pixelIndex = 1;
             this.blockIndex++;
         }
-        return null; // EOF
+        return null;
     }
 
     readByte() {

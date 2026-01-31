@@ -12,12 +12,11 @@ describe('JpegEncoder Integration', () => {
         const height = 8;
         const data = new Uint8Array(width * height * 4);
 
-        // Fill with white (255, 255, 255, 255)
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = 255;     // R
-            data[i + 1] = 255; // G
-            data[i + 2] = 255; // B
-            data[i + 3] = 255; // A
+            data[i] = 255;     
+            data[i + 1] = 255; 
+            data[i + 2] = 255; 
+            data[i + 3] = 255; 
         }
 
         const imageData = { width, height, data };
@@ -27,11 +26,9 @@ describe('JpegEncoder Integration', () => {
         expect(jpegBytes).toBeDefined();
         expect(jpegBytes.length).toBeGreaterThan(0);
 
-        // Check for SOI (FF D8)
         expect(jpegBytes[0]).toBe(0xFF);
         expect(jpegBytes[1]).toBe(0xD8);
 
-        // Check for EOI (FF D9) at the end
         expect(jpegBytes[jpegBytes.length - 2]).toBe(0xFF);
         expect(jpegBytes[jpegBytes.length - 1]).toBe(0xD9);
     });
@@ -41,7 +38,6 @@ describe('JpegEncoder Integration', () => {
         const height = 16;
         const data = new Uint8Array(width * height * 4);
 
-        // Fill with random data
         for (let i = 0; i < data.length; i++) {
             data[i] = i % 255;
         }
@@ -67,7 +63,7 @@ describe('JpegEncoder Integration', () => {
         const jpegBytes = await encoder.encode(imageData);
 
         expect(jpegBytes.length).toBeGreaterThan(0);
-        // Should contain markers
+        
         expect(jpegBytes[0]).toBe(0xFF);
         expect(jpegBytes[1]).toBe(0xD8);
     });
@@ -75,7 +71,7 @@ describe('JpegEncoder Integration', () => {
     it('encodes a 1x1 image', async () => {
         const width = 1;
         const height = 1;
-        const data = new Uint8Array([255, 0, 0, 255]); // Red pixel
+        const data = new Uint8Array([255, 0, 0, 255]); 
 
         const imageData = { width, height, data };
         const encoder = new JpegEncoder();
@@ -103,12 +99,9 @@ describe('JpegEncoder Integration', () => {
         const encoder = new JpegEncoder();
         const jpegBytes = await encoder.encode({ width, height, data });
 
-        // Check for specific markers
-        // SOI: FF D8
         expect(jpegBytes[0]).toBe(0xFF);
         expect(jpegBytes[1]).toBe(0xD8);
 
-        // Find SOF0 (FF C0)
         let foundSOF0 = false;
         for (let i = 0; i < jpegBytes.length - 1; i++) {
             if (jpegBytes[i] === 0xFF && jpegBytes[i + 1] === 0xC0) {
@@ -118,7 +111,6 @@ describe('JpegEncoder Integration', () => {
         }
         expect(foundSOF0).toBe(true);
 
-        // Find SOS (FF DA)
         let foundSOS = false;
         for (let i = 0; i < jpegBytes.length - 1; i++) {
             if (jpegBytes[i] === 0xFF && jpegBytes[i + 1] === 0xDA) {

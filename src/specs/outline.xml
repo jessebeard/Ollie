@@ -27,6 +27,11 @@
                         <method name="setBitReaderMode" params="mode" description="Sets BitReader implementation." />
                     </class>
                 </file>
+                <file name="jpeg-transcoder.js" description="Updates steganography data in JPEG files WITHOUT generation loss.">
+                    <class name="JpegTranscoder">
+                        <method name="updateSecret" params="jpegBytes, newSecretData, options" return="Promise<Uint8Array>" description="Updates steganography data in a JPEG (lossless)." />
+                    </class>
+                </file>
 
                 <directory name="encoder" description="Encoding algorithms">
                     <file name="colorspace.js" description="RGB to YCbCr color space conversion.">
@@ -137,30 +142,20 @@
                     <file name="key-derivation.js" description="PBKDF2-based key derivation from passwords." />
                 </directory>
 
-                <directory name="utils" description="Utility helper classes">
-                    <file name="bit-writer.js" description="Helper class for writing variable-length bit sequences.">
-                        <class name="BitWriter">
-                            <method name="writeBits" params="data, length" description="Writes a sequence of bits." />
-                            <method name="writeBit" params="bit" description="Writes a single bit." />
-                            <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
+                <directory name="vault" description="Password Vault Logic">
+                    <file name="vault-manager.js" description="Core vault management. Handles in-memory storage, CRUD operations, and serialization.">
+                        <class name="PasswordVault">
+                            <method name="constructor" description="Initializes an empty vault with metadata." />
+                            <method name="addEntry" params="entry" return="Object" description="Adds validation-checked entry. Auto-generates ID/timestamps. Fields: title, url, username, password, notes, tags, totp, customFields." />
+                            <method name="updateEntry" params="id, updates" return="Object" description="Updates existing entry. Updates modified timestamp." />
+                            <method name="deleteEntry" params="id" description="Removes entry by ID." />
+                            <method name="search" params="query, tags" return="Array" description="Filters entries by text query (title/url/user/notes) and exact tag match." />
+                            <method name="toJSON" return="Object" description="Serializes entries and metadata for storage." />
+                            <method name="fromJSON" params="data" description="Rehydrates vault from storage. Strict schema check." />
+                            <method name="save" params="imageFiles, password" return="Promise" description="Encrypts/embeds vault into images." />
+                            <method name="load" params="imageFiles, password" return="Promise" description="Extracts/decrypts vault from images." />
+                            <method name="lock" description="Locks vault (clears master password, keeps data in memory)." />
                         </class>
-                    </file>
-                    <file name="bit-reader.js" description="Wrapper class that delegates to naive or optimized BitReader implementations.">
-                        <class name="BitReader">
-                            <method name="constructor" params="data" description="Initializes reader with byte array, uses configured mode." />
-                            <method name="readBit" return="number" description="Reads a single bit, skips stuffed bytes without copying." />
-                            <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
-                            <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits using try-finally." />
-                            <method name="peek16Bits" return="number" description="Fast lookahead for 16 bits with special byte-aligned path." />
-                            <method name="skipBits" params="length" description="Efficiently advances pointer, handles byte stuffing." />
-                        </class>
-                    </file>
-                    <file name="bit-reader-naive.js" description="Simple Map-based BitReader implementation." />
-                    <file name="bit-reader-optimized.js" description="Optimized BitReader with direct byte manipulation." />
-                    <file name="marker-parser.js" description="Parses JPEG file structure and extracts segments.">
-                        <function name="findNextMarker" params="data, offset" return="{marker, offset}" description="Locates next 0xFFxx marker." />
-                        <function name="readMarkerSegment" params="data, offset" return="{type, data, nextOffset}" description="Extracts segment payload." />
-                        <function name="parseFileStructure" params="jpegBytes" return="SegmentMap" description="Builds map of all segments in file." />
                     </file>
                 </directory>
 
@@ -170,6 +165,33 @@
                     <file name="modern-jpeg-spec.xml" description="JPEG specification reference and implementation notes." />
                     <file name="AAN-algo-spec.xml" description="Fast AAN IDCT algorithm specification." />
                 </directory>
+            </directory>
+
+            <directory name="utils" description="Utility helper classes">
+                <file name="bit-writer.js" description="Helper class for writing variable-length bit sequences.">
+                    <class name="BitWriter">
+                        <method name="writeBits" params="data, length" description="Writes a sequence of bits." />
+                        <method name="writeBit" params="bit" description="Writes a single bit." />
+                        <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
+                    </class>
+                </file>
+                <file name="bit-reader.js" description="Wrapper class that delegates to naive or optimized BitReader implementations.">
+                    <class name="BitReader">
+                        <method name="constructor" params="data" description="Initializes reader with byte array, uses configured mode." />
+                        <method name="readBit" return="number" description="Reads a single bit, skips stuffed bytes without copying." />
+                        <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
+                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits using try-finally." />
+                        <method name="peek16Bits" return="number" description="Fast lookahead for 16 bits with special byte-aligned path." />
+                        <method name="skipBits" params="length" description="Efficiently advances pointer, handles byte stuffing." />
+                    </class>
+                </file>
+                <file name="bit-reader-naive.js" description="Simple Map-based BitReader implementation." />
+                <file name="bit-reader-optimized.js" description="Optimized BitReader with direct byte manipulation." />
+                <file name="marker-parser.js" description="Parses JPEG file structure and extracts segments.">
+                    <function name="findNextMarker" params="data, offset" return="{marker, offset}" description="Locates next 0xFFxx marker." />
+                    <function name="readMarkerSegment" params="data, offset" return="{type, data, nextOffset}" description="Extracts segment payload." />
+                    <function name="parseFileStructure" params="jpegBytes" return="SegmentMap" description="Builds map of all segments in file." />
+                </function>
             </directory>
 
         </directory>

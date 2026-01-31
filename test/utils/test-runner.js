@@ -1,16 +1,13 @@
-// Environment-aware test runner
-// Implements describe/it/expect for both Node and browser
+
 
 const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
 
-// Stats tracking (Node only)
 let stats = { total: 0, passed: 0, failed: 0 };
 let currentSuite = null;
 
-// --- describe function ---
 export async function describe(name, fn) {
     if (isNode) {
-        // Node.js implementation
+        
         console.log(`\n\x1b[1m${name}\x1b[0m`);
         currentSuite = name;
         try {
@@ -20,7 +17,7 @@ export async function describe(name, fn) {
         }
         currentSuite = null;
     } else {
-        // Browser implementation
+        
         const runSuite = () => {
             const container = document.createElement('div');
             container.className = 'suite';
@@ -50,10 +47,9 @@ export async function describe(name, fn) {
     }
 }
 
-// --- it function ---
 export async function it(name, fn) {
     if (isNode) {
-        // Node.js implementation
+        
         stats.total++;
         try {
             await fn();
@@ -65,7 +61,7 @@ export async function it(name, fn) {
             console.error(`    \x1b[90m${e.message}\x1b[0m`);
         }
     } else {
-        // Browser implementation
+        
         const suite = window.__currentSuite || document.body;
         const resultDiv = document.createElement('div');
         resultDiv.className = 'test-case';
@@ -85,7 +81,6 @@ export async function it(name, fn) {
     }
 }
 
-// --- expect function ---
 export function expect(actual) {
     return {
         toBe: (expected) => {
@@ -169,7 +164,6 @@ export function expect(actual) {
     };
 }
 
-// --- Stats functions (Node only) ---
 export function getStats() {
     return { ...stats };
 }

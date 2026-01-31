@@ -7,7 +7,6 @@ const decoder = new JpegDecoder();
 const jpegBytes = fs.readFileSync('./test/fixtures/gravel-e.jpg');
 const result = decoder.decode(jpegBytes);
 
-// Check that component dimensions are using block counts (fix #1)
 const yComp = decoder.components[1];
 const expectedYWidth = yComp.blocksH * 8;
 const expectedYHeight = yComp.blocksV * 8;
@@ -15,12 +14,9 @@ const expectedYHeight = yComp.blocksV * 8;
 console.log('✓ Fix #1 - Component Dimensions:');
 console.log(`  Y component: ${expectedYWidth}x${expectedYHeight} (${yComp.blocksH}x${yComp.blocksV} blocks)`);
 
-// Check final image dimensions
 console.log(`  Final image: ${result.width}x${result.height}`);
 console.log(`  ${expectedYWidth !== result.width ? '✓ Cropping applied' : '⚠️ No cropping'}`);
 
-// Verify upsampling is using the new centered sampling (fix #2)
-// We can't directly test this, but we can verify the code exists
 const upsamplingCode = fs.readFileSync('./src/core/decoder/upsampling.js', 'utf8');
 const hasCenteredSampling = upsamplingCode.includes('JPEG uses centered sampling');
 const hasOldFormula = upsamplingCode.includes('srcWidth - 1) / (dstWidth - 1)');

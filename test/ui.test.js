@@ -11,7 +11,7 @@ describe('UI Tests', () => {
         const checkbox = document.getElementById('progressive-checkbox');
         expect(checkbox).toBeDefined();
         expect(checkbox.type).toBe('checkbox');
-        expect(checkbox.checked).toBe(false); // Default should be false
+        expect(checkbox.checked).toBe(false); 
     });
 
     it('Should have a file info pane for decoder', () => {

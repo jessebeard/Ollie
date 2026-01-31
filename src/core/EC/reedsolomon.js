@@ -1,7 +1,4 @@
-/*
- * Backward compatibility re-export for existing code.
- * This file preserves the old import path while delegating to the new modular structure.
- */
+
 
 export {
     GenericGF,

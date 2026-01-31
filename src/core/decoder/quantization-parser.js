@@ -19,39 +19,35 @@ export function parseQuantizationTable(data, offset = 0) {
         throw new Error('Invalid DQT offset');
     }
 
-    // Read Pq_Tq byte
     const pqTq = data[offset];
-    const precision = (pqTq >> 4) & 0x0F; // High 4 bits: 0=8bit, 1=16bit
-    const tableId = pqTq & 0x0F; // Low 4 bits: 0-3
+    const precision = (pqTq >> 4) & 0x0F; 
+    const tableId = pqTq & 0x0F; 
 
-    // Validate precision
     if (precision !== 0 && precision !== 1) {
         throw new Error(`Invalid quantization table precision: ${precision}`);
     }
 
-    // Validate table ID
     if (tableId > 3) {
         throw new Error(`Invalid quantization table ID: ${tableId}`);
     }
 
-    const elementSize = precision === 0 ? 1 : 2; // 8-bit or 16-bit
+    const elementSize = precision === 0 ? 1 : 2; 
     const tableSize = 64 * elementSize;
 
     if (offset + 1 + tableSize > data.length) {
         throw new Error('Incomplete quantization table data');
     }
 
-    // Read 64 quantization values
     const table = new Int32Array(64);
     let dataOffset = offset + 1;
 
     for (let i = 0; i < 64; i++) {
         if (precision === 0) {
-            // 8-bit precision
+            
             table[i] = data[dataOffset];
             dataOffset += 1;
         } else {
-            // 16-bit precision (big-endian)
+            
             table[i] = (data[dataOffset] << 8) | data[dataOffset + 1];
             dataOffset += 2;
         }
@@ -93,7 +89,7 @@ export function parseQuantizationTablesFromSegments(dqtSegments) {
 
     for (const segment of dqtSegments) {
         const tables = parseAllQuantizationTables(segment.data);
-        // Merge tables (later segments can override earlier ones)
+        
         for (const [id, table] of tables) {
             allTables.set(id, table);
         }

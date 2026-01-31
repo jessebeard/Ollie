@@ -5,17 +5,18 @@ describe('Capacity Validation', () => {
     function createTestImage(width, height) {
         const data = new Uint8ClampedArray(width * height * 4);
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = (i / 4) % 256;
-            data[i + 1] = ((i / 4) * 2) % 256;
-            data[i + 2] = ((i / 4) * 3) % 256;
+            // Use random noise for high-frequency content that doesn't compress away
+            data[i] = Math.floor(Math.random() * 256);
+            data[i + 1] = Math.floor(Math.random() * 256);
+            data[i + 2] = Math.floor(Math.random() * 256);
             data[i + 3] = 255;
         }
         return { width, height, data };
     }
 
     it('should throw error when secret data exceeds capacity', async () => {
-        const imageData = createTestImage(8, 8); // Very small image
-        const largeSecret = new Uint8Array(1000); // Way too large
+        const imageData = createTestImage(8, 8);
+        const largeSecret = new Uint8Array(1000);
 
         const encoder = new JpegEncoder(90, { secretData: largeSecret });
 
@@ -35,7 +36,7 @@ describe('Capacity Validation', () => {
     });
 
     it('should succeed when secret data fits', async () => {
-        const imageData = createTestImage(64, 64);
+        const imageData = createTestImage(256, 256);
         const smallSecret = new Uint8Array(10);
 
         const encoder = new JpegEncoder(90, { secretData: smallSecret });

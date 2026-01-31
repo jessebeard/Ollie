@@ -12,7 +12,6 @@ export function describe(name, fn) {
             document.body.appendChild(container);
         }
 
-        // We'll use a global context to attach results to this container
         window.__currentSuite = container;
 
         try {

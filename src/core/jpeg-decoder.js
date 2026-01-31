@@ -20,7 +20,7 @@ import { upsampleChroma } from './decoder/upsampling.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData } from './decoder/block-assembly.js';
 
 import { parseSpiffHeader } from './decoder/spiff-parser.js';
-import { Jsteg } from './steganography/jsteg.js';
+import { F5 } from './steganography/f5.js';
 
 export class JpegDecoder {
     constructor() {
@@ -39,7 +39,7 @@ export class JpegDecoder {
 
     hardreset() {
         this.reset();
-        this.idctMethod = idctPureRef;
+        this.idctMethod = idctOptimizedRef;
         this.dequantizeMethod = dequantize;
     }
 
@@ -87,9 +87,6 @@ export class JpegDecoder {
         }
     }
 
-
-
-
     /**
      * Decode a JPEG byte array into ImageData
      * 
@@ -100,19 +97,16 @@ export class JpegDecoder {
     async decode(jpegBytes, options = {}) {
         this.reset();
 
-        // Phase 1: Parse file structure and headers
         const segments = parseFileStructure(jpegBytes);
 
-        // Validate SOI marker
         if (!segments.has('SOI')) {
             throw new Error('Invalid JPEG: Missing SOI marker');
         }
 
-        // Parse APP0 (JFIF)
         if (segments.has('APP0')) {
             const app0Segments = segments.get('APP0');
             for (const segment of app0Segments) {
-                // Check for JFIF identifier: 0x4A 0x46 0x49 0x46 0x00
+
                 if (segment.data.length >= 5 &&
                     segment.data[0] === 0x4A && segment.data[1] === 0x46 &&
                     segment.data[2] === 0x49 && segment.data[3] === 0x46 &&
@@ -131,7 +125,6 @@ export class JpegDecoder {
             }
         }
 
-        // Parse APP8 (SPIFF)
         if (segments.has('APP8')) {
             const app8Segments = segments.get('APP8');
             for (const segment of app8Segments) {
@@ -143,7 +136,6 @@ export class JpegDecoder {
             }
         }
 
-        // Parse quantization tables (DQT)
         if (segments.has('DQT')) {
             const dqtSegments = segments.get('DQT');
             for (const segment of dqtSegments) {
@@ -154,7 +146,14 @@ export class JpegDecoder {
             }
         }
 
-        // Parse Huffman tables (DHT)
+        if (segments.has('DRI')) {
+            const driSegment = segments.get('DRI')[0];
+            const view = new DataView(driSegment.data.buffer, driSegment.data.byteOffset, driSegment.data.byteLength);
+            this.restartInterval = view.getUint16(0, false);
+        } else {
+            this.restartInterval = 0;
+        }
+
         if (segments.has('DHT')) {
             const dhtSegments = segments.get('DHT');
             for (const segment of dhtSegments) {
@@ -165,7 +164,6 @@ export class JpegDecoder {
             }
         }
 
-        // Parse frame header (SOF0 or SOF2)
         let sofData = null;
         if (segments.has('SOF0')) {
             sofData = segments.get('SOF0')[0].data;
@@ -178,15 +176,6 @@ export class JpegDecoder {
         this.frameHeader = parseFrameHeader(sofData);
         this.frameHeader.sofType = segments.has('SOF2') ? 0xC2 : 0xC0;
         this.initializeComponents();
-
-        // Phase 2: Decode entropy-coded data (Scans)
-        // We need to process SOS segments in order of appearance
-        // The 'segments' map doesn't preserve order of different marker types relative to each other if we iterate keys.
-        // But parseFileStructure returns a Map where values are arrays of segments.
-        // We need to iterate the original file or rely on the fact that we need to process all SOS segments.
-        // Actually, parseFileStructure might not be enough if we need strict ordering of DQT/DHT vs SOS.
-        // But usually DQT/DHT are before SOS.
-        // Multiple SOS segments are in the 'SOS' array in order.
 
         if (!segments.has('SOS')) {
             throw new Error('Invalid JPEG: Missing SOS marker');
@@ -204,43 +193,51 @@ export class JpegDecoder {
             this.decodeScan(scanData, scanHeader);
         }
 
-        // Steganography: Attempt to extract secret data BEFORE assembleImage
-        // We need to extract from the quantized coefficients, not after dequantization/IDCT
         let extractedSecretData = null;
-        try {
-            const allBlocks = [];
-            // Must match encoder order: All blocks of Comp 1, then Comp 2, then Comp 3...
-            // Iterate components in frame header order
-            for (const comp of this.frameHeader.components) {
-                const compData = this.components[comp.id];
-                if (compData && compData.blocks) {
-                    allBlocks.push(...compData.blocks);
-                }
-            }
 
-            extractedSecretData = await Jsteg.extractAuto(allBlocks, options);
-            if (extractedSecretData) {
-                // Handle both legacy (Uint8Array) and container (Object) formats
-                if (extractedSecretData instanceof Uint8Array) {
-                    console.log(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
-                } else if (extractedSecretData.data) {
-                    console.log(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
-                    console.log('Metadata:', extractedSecretData.metadata);
-                    // For backward compatibility, flatten to just the data
-                    extractedSecretData = extractedSecretData.data;
+        if (!options.skipExtraction) {
+            try {
+                const allBlocks = [];
+
+                for (const comp of this.frameHeader.components) {
+                    const compData = this.components[comp.id];
+                    if (compData && compData.blocks) {
+                        // Avoid stack overflow with spread (...) for large block arrays
+                        for (let i = 0; i < compData.blocks.length; i++) {
+                            allBlocks.push(compData.blocks[i]);
+                        }
+                    }
                 }
+
+                extractedSecretData = await F5.extractAuto(allBlocks, options);
+                if (extractedSecretData) {
+
+                    if (extractedSecretData instanceof Uint8Array) {
+                        console.log(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
+                    } else if (extractedSecretData.data) {
+                        console.log(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
+                        console.log('Metadata:', extractedSecretData.metadata);
+
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to extract secret data:', e);
             }
-        } catch (e) {
-            console.warn('Failed to extract secret data:', e);
         }
 
-        // Phase 3: Reconstruct and assemble image
         const result = this.assembleImage();
 
-        // Add extracted data to result
         if (extractedSecretData) {
-            result.secretData = extractedSecretData;
+            if (extractedSecretData.metadata) {
+                result.secretData = extractedSecretData.data;
+                result.secretMetadata = extractedSecretData.metadata;
+            } else {
+                result.secretData = extractedSecretData;
+            }
         }
+
+        result.quantizationTables = this.quantizationTables;
+        result.coefficients = this.components;
 
         return result;
     }
@@ -259,18 +256,15 @@ export class JpegDecoder {
             }
 
             this.components[comp.id] = {
-                blocks: new Array(totalBlocks), // Will be filled with Int32Array(64)
+                blocks: new Array(totalBlocks),
                 blocksH,
                 blocksV,
                 hSampling: comp.hSampling,
                 vSampling: comp.vSampling,
-                dcPredictor: 0 // Maintain DC predictor per component across scans? No, reset per scan usually.
-                // Wait, DC predictor is reset at start of scan (or restart interval).
+                dcPredictor: 0
+
             };
 
-            // Pre-allocate blocks? Or allocate on demand?
-            // On demand is fine, but we need to know if it exists to update it.
-            // Let's pre-allocate to avoid checks.
             for (let i = 0; i < totalBlocks; i++) {
                 this.components[comp.id].blocks[i] = new Int32Array(64);
             }
@@ -286,15 +280,86 @@ export class JpegDecoder {
     decodeScan(scanData, scanHeader) {
         const bitReader = new BitReader(scanData);
         const { mcuCols, mcuRows } = this.frameHeader;
+        const restartInterval = this.restartInterval;
         const totalMCUs = mcuCols * mcuRows;
 
         const { Ss, Se, Ah, Al } = scanHeader;
 
-        // DC predictors are reset at the start of the scan
         const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
 
-        // Decode MCUs
+        let mcusSinceRestart = 0;
+        let expectedRstMarker = 0xD0; // Start with RST0
+
         for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
+
+            // Handle Restart Interval
+            if (restartInterval > 0 && mcusSinceRestart === restartInterval) {
+                // Align to byte boundary
+                bitReader.alignToByte();
+
+                // Read Marker
+                const ff = bitReader.readBits(8);
+                const marker = bitReader.readBits(8);
+
+                if (ff !== 0xFF || marker !== expectedRstMarker) {
+                    console.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
+
+                    // Attempt to resync: Scan forward for the next RST marker
+                    // We need to look for FF D[0-7]
+
+                    let foundMarker = false;
+                    const originalByteOffset = bitReader.byteOffset;
+
+                    // Limit scan to avoid hanging on massive files
+                    const SEARCH_LIMIT = 512;
+
+                    for (let i = 0; i < SEARCH_LIMIT; i++) {
+                        // We are already aligned, so we peek bytes
+                        if (bitReader.byteOffset + i + 1 >= bitReader.data.length) break;
+
+                        const b0 = bitReader.data[bitReader.byteOffset + i];
+                        const b1 = bitReader.data[bitReader.byteOffset + i + 1];
+
+                        if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {
+                            console.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
+
+                            // Advance to AFTER this marker
+                            bitReader.byteOffset += (i + 2);
+                            bitReader.bitOffset = 0;
+
+                            // Update expected marker to match what we found + 1
+                            expectedRstMarker = (b1 + 1);
+                            if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
+
+                            foundMarker = true;
+                            break;
+                        }
+                    }
+
+                    if (!foundMarker) {
+                        console.error('Failed to resync: No RST marker found within search limit.');
+                        // We will likely fail Huffman decoding next, but let's try to proceed
+                        // Maybe we are just 1 byte off? 
+                        // If we didn't find a marker, we consumed 2 bytes (ff, marker) in the initial read.
+                        // We might be in the middle of data.
+                    }
+                } else {
+                    // Correct marker found
+                    // Update expected for next time
+                    expectedRstMarker++;
+                    if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
+                }
+
+                // Always reset predictors after a restart interval (whether we synced or not, it's safer)
+                dcPredictors.fill(0);
+
+                // Reset counter
+                mcusSinceRestart = 0;
+
+                // Continue loop... we either synced, or we failed and will crash soon.
+                continue;
+            }
+
             for (const scanComp of scanHeader.components) {
                 const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
 
@@ -305,8 +370,6 @@ export class JpegDecoder {
                 const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
                 const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
 
-                // Note: dcTable is needed only if Ss=0. acTable only if Se>0.
-                // But we check existence anyway.
                 if (Ss === 0 && !dcTable) {
                     throw new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
                 }
@@ -314,12 +377,10 @@ export class JpegDecoder {
                     throw new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
                 }
 
-                // Decode blocks for this component in this MCU
                 const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
                 for (let i = 0; i < blocksInMCU; i++) {
                     const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
 
-                    // Calculate block index
                     const mcuRow = Math.floor(mcuIndex / mcuCols);
                     const mcuCol = mcuIndex % mcuCols;
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
@@ -338,12 +399,12 @@ export class JpegDecoder {
                         Se
                     );
 
-                    // Update predictor only if we decoded DC (Ss=0)
                     if (Ss === 0) {
                         dcPredictors[compIndex] = dc;
                     }
                 }
             }
+            mcusSinceRestart++;
         }
     }
 
@@ -355,7 +416,6 @@ export class JpegDecoder {
     assembleImage() {
         const { width, height, components } = this.frameHeader;
 
-        // Process each component: dequantize, IDCT, assemble
         const processedComponents = {};
 
         for (const comp of components) {
@@ -366,30 +426,19 @@ export class JpegDecoder {
                 throw new Error(`Missing quantization table ${comp.quantTableId}`);
             }
 
-            // Process each block
-            // Reusable buffers to avoid allocation per block
             const tempDequant = new Float32Array(64);
-            // Note: idctFastAAN modifies its input in-place, so we can't reuse tempZigZag for it
-            // For other IDCT methods, reuse the buffer for performance
+
             const canReuseZigZagBuffer = this.idctMethod !== idctFastAAN;
             const tempZigZag = canReuseZigZagBuffer ? new Float32Array(64) : null;
 
-            // Process each block
             const processedBlocks = compData.blocks.map(block => {
-                // Dequantize (BEFORE inverse zigzag)
-                // The quantization table is in ZigZag order, and the block is in ZigZag order
-                // Use reusable buffer
+
                 const dequantized = this.dequantizeMethod(block, quantTable, tempDequant);
 
-                // Inverse zigzag
-                // If using Fast AAN (which modifies in-place), allocate fresh buffer per block
-                // Otherwise, reuse the buffer
                 const block2D = inverseZigZag(dequantized, tempZigZag);
 
-                // IDCT
                 const spatial = this.idctMethod(block2D);
 
-                // Level shift (+128) and Clamp
                 for (let i = 0; i < 64; i++) {
                     const val = spatial[i] + 128;
                     spatial[i] = Math.max(0, Math.min(255, val));
@@ -398,9 +447,6 @@ export class JpegDecoder {
                 return spatial;
             });
 
-
-            // Assemble blocks into component plane
-            // Use actual block dimensions, not target image dimensions
             const compWidth = compData.blocksH * 8;
             const compHeight = compData.blocksV * 8;
 
@@ -413,13 +459,11 @@ export class JpegDecoder {
             };
         }
 
-        // Handle grayscale vs color
         if (components.length === 1) {
-            // Grayscale
+
             const yComp = processedComponents[components[0].id];
             const fullImageData = grayscaleToImageData(yComp.data, yComp.width, yComp.height);
 
-            // Crop to actual image dimensions if needed
             if (yComp.width !== width || yComp.height !== height) {
                 const cropped = new Uint8ClampedArray(width * height * 4);
                 for (let y = 0; y < height; y++) {
@@ -452,8 +496,8 @@ export class JpegDecoder {
                 width: yComp.width,
                 height: yComp.height,
                 metadata: {
-                    width,  // Original dimensions from SOF
-                    height, // Original dimensions from SOF
+                    width,
+                    height,
                     components: components.length,
                     colorSpace: 'Grayscale',
                     progressive: this.frameHeader.sofType === 0xC2,
@@ -461,11 +505,10 @@ export class JpegDecoder {
                 }
             };
         } else {
-            // Color - upsample chroma if needed
-            // Standard JPEG component IDs: 1=Y, 2=Cb, 3=Cr
-            const yComp = processedComponents[1];
-            const cbComp = processedComponents[2];
-            const crComp = processedComponents[3];
+
+            const yComp = processedComponents[components[0].id];
+            const cbComp = processedComponents[components[1].id];
+            const crComp = processedComponents[components[2].id];
 
             const samplingFactors = {
                 Y: { h: components[0].hSampling, v: components[0].vSampling, width: yComp.width, height: yComp.height },
@@ -473,7 +516,6 @@ export class JpegDecoder {
                 Cr: { h: components[2].hSampling, v: components[2].vSampling, width: crComp.width, height: crComp.height }
             };
 
-            // Upsample chroma to match Y component dimensions (not target image dimensions!)
             const upsampled = upsampleChroma(
                 { Y: yComp.data, Cb: cbComp.data, Cr: crComp.data },
                 samplingFactors,
@@ -481,10 +523,8 @@ export class JpegDecoder {
                 yComp.height
             );
 
-            // Convert to RGBA using Y component dimensions
             const fullImageData = componentsToImageData(upsampled.Y, upsampled.Cb, upsampled.Cr, yComp.width, yComp.height);
 
-            // Crop to actual image dimensions if needed
             if (yComp.width !== width || yComp.height !== height) {
                 const cropped = new Uint8ClampedArray(width * height * 4);
                 for (let y = 0; y < height; y++) {
@@ -502,8 +542,8 @@ export class JpegDecoder {
                     width,
                     height,
                     metadata: {
-                        width,  // Original dimensions from SOF
-                        height, // Original dimensions from SOF
+                        width,
+                        height,
                         components: components.length,
                         colorSpace: 'YCbCr',
                         progressive: this.frameHeader.sofType === 0xC2,
@@ -516,9 +556,10 @@ export class JpegDecoder {
                 data: fullImageData,
                 width: yComp.width,
                 height: yComp.height,
+                coefficients: this.components,
                 metadata: {
-                    width,  // Original dimensions from SOF
-                    height, // Original dimensions from SOF
+                    width,
+                    height,
                     components: components.length,
                     colorSpace: 'YCbCr',
                     progressive: this.frameHeader.sofType === 0xC2,

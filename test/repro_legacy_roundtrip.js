@@ -6,7 +6,7 @@ describe('Jsteg Legacy Roundtrip', () => {
         const blocks = [];
         for (let i = 0; i < count; i++) {
             const block = new Int32Array(64).fill(fillValue);
-            block[0] = 100; // DC
+            block[0] = 100; 
             blocks.push(block);
         }
         return blocks;
@@ -16,11 +16,9 @@ describe('Jsteg Legacy Roundtrip', () => {
         const blocks = createMockBlocks(100);
         const data = new Uint8Array([10, 20, 30, 40, 50]);
 
-        // Embed using legacy method
         const success = Jsteg.embed(blocks, data);
         expect(success).toBe(true);
 
-        // Extract using legacy method
         const extracted = Jsteg.extract(blocks);
 
         expect(extracted).toBeDefined();
@@ -30,15 +28,15 @@ describe('Jsteg Legacy Roundtrip', () => {
     });
 
     it('should handle blocks with 1s and -1s', () => {
-        // Create blocks with 1s
+        
         const blocks = [];
         for (let i = 0; i < 100; i++) {
             const block = new Int32Array(64).fill(1);
-            block[0] = 100; // DC
+            block[0] = 100; 
             blocks.push(block);
         }
 
-        const data = new Uint8Array([0xAA, 0x55]); // 10101010, 01010101
+        const data = new Uint8Array([0xAA, 0x55]); 
 
         Jsteg.embed(blocks, data);
         const extracted = Jsteg.extract(blocks);
@@ -53,7 +51,7 @@ describe('Jsteg Legacy Roundtrip', () => {
         const blocks = [];
         for (let i = 0; i < 100; i++) {
             const block = new Int32Array(64);
-            for (let j = 0; j < 64; j++) block[j] = (j % 5) - 2; // -2, -1, 0, 1, 2
+            for (let j = 0; j < 64; j++) block[j] = (j % 5) - 2; 
             block[0] = 100;
             blocks.push(block);
         }

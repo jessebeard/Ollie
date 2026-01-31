@@ -25,9 +25,8 @@ describe('JpegDecoder Integration', async () => {
 
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
-        expect(result.data.length).toBe(8 * 8 * 4); // RGBA
+        expect(result.data.length).toBe(8 * 8 * 4); 
 
-        // Should be mostly black (allowing for compression artifacts)
         const firstPixelR = result.data[0];
         const firstPixelG = result.data[1];
         const firstPixelB = result.data[2];
@@ -45,7 +44,6 @@ describe('JpegDecoder Integration', async () => {
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
 
-        // Should be mostly white (allowing for compression artifacts)
         const firstPixelR = result.data[0];
         const firstPixelG = result.data[1];
         const firstPixelB = result.data[2];
@@ -63,7 +61,6 @@ describe('JpegDecoder Integration', async () => {
         expect(result.width).toBe(8);
         expect(result.height).toBe(8);
 
-        // Should be mostly red (allowing for compression artifacts)
         const firstPixelR = result.data[0];
         const firstPixelG = result.data[1];
         const firstPixelB = result.data[2];
@@ -82,7 +79,6 @@ describe('JpegDecoder Integration', async () => {
         expect(result.height).toBe(8);
         expect(result.data.length).toBe(8 * 8 * 4);
 
-        // Should have variation (not all same color)
         const pixel0 = result.data[0];
         const pixel1 = result.data[4];
         expect(Math.abs(pixel0 - pixel1) > 50).toBe(true);
@@ -116,7 +112,6 @@ describe('JpegDecoder Integration', async () => {
 
         const result = await await decoder.decode(jpegBytes);
 
-        // Check all alpha values
         for (let i = 3; i < result.data.length; i += 4) {
             expect(result.data[i]).toBe(255);
         }
@@ -138,7 +133,7 @@ describe('JpegDecoder Integration', async () => {
     });
 
     it('should validate SOI marker', async () => {
-        const invalidBytes = new Uint8Array([0xFF, 0xD0]); // Not SOI
+        const invalidBytes = new Uint8Array([0xFF, 0xD0]); 
         const decoder = new JpegDecoder();
 
         let errorThrown = false;
@@ -152,10 +147,10 @@ describe('JpegDecoder Integration', async () => {
     });
 
     it('should require SOF0 marker', async () => {
-        // Create minimal JPEG with SOI but no SOF0
+        
         const bytes = new Uint8Array([
-            0xFF, 0xD8, // SOI
-            0xFF, 0xD9  // EOI
+            0xFF, 0xD8, 
+            0xFF, 0xD9  
         ]);
         const decoder = new JpegDecoder();
 

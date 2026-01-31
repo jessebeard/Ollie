@@ -6,7 +6,6 @@
  * JPEG spec Annex A describes the DCT/IDCT mathematics.
  */
 
-// Precompute cosine table (same as encoder)
 const COS_TABLE = new Float32Array(8 * 8);
 for (let u = 0; u < 8; u++) {
     for (let x = 0; x < 8; x++) {
@@ -14,7 +13,6 @@ for (let u = 0; u < 8; u++) {
     }
 }
 
-// C coefficients (same as encoder)
 const C = new Float32Array(8);
 C[0] = 1 / Math.sqrt(2);
 for (let i = 1; i < 8; i++) C[i] = 1;
@@ -33,7 +31,6 @@ export function idct(coefficients) {
     const colOutput = new Float32Array(64);
     const result = new Float32Array(64);
 
-    // 1. IDCT on columns
     for (let x = 0; x < 8; x++) {
         for (let y = 0; y < 8; y++) {
             let sum = 0;
@@ -47,7 +44,6 @@ export function idct(coefficients) {
         }
     }
 
-    // 2. IDCT on rows
     for (let y = 0; y < 8; y++) {
         for (let x = 0; x < 8; x++) {
             let sum = 0;
@@ -78,13 +74,10 @@ export const idctNaive = idct;
  * @returns {Float32Array} 64-element block of spatial domain values
  */
 export function idctAAN(coefficients) {
-    // TODO: Fix AAN implementation scaling factors. Currently falling back to Naive IDCT for correctness.
+    
     return idct(coefficients);
 }
 
-// --- AAN Constants and Tables ---
-
-// Cosine constants
 const C1 = Math.cos(Math.PI / 16);
 const C2 = Math.cos(2 * Math.PI / 16);
 const C3 = Math.cos(3 * Math.PI / 16);
@@ -92,18 +85,6 @@ const C4 = Math.cos(4 * Math.PI / 16);
 const C5 = Math.cos(5 * Math.PI / 16);
 const C6 = Math.cos(6 * Math.PI / 16);
 const C7 = Math.cos(7 * Math.PI / 16);
-// Inverse Scale Factors
-// Standard AAN scaling factors S[i], scaled by 1/4 to normalize the IDCT gain.
-// FDCT Gain = 8. IDCT Core Gain = 16. S[0]^2 = 1/8.
-// FDCT Out = Input * 8.
-// IDCT Out (with S) = FDCT Out * 16 * (1/8) = Input * 16.
-// We want IDCT Out = Input. So we need 1/16 factor.
-// Apply 1/4 to each 1D pass (or 1/4 to IS).
-// IS[i] = S[i] / 4.
-
-// Inverse Scale Factors
-// Standard AAN scaling factors S[i], scaled by 1/4 to normalize the IDCT gain.
-// IS[i] = S[i] / 4.
 
 const S = [
     1 / (2 * Math.sqrt(2)),
@@ -116,9 +97,8 @@ const S = [
     1 / (4 * C7)
 ];
 
-const IS = S; // S.map(s => s * 1.414213562);
+const IS = S; 
 
-// Precomputed 2D Scale Table
 const AAN_SCALE_TABLE = new Float32Array(64);
 for (let v = 0; v < 8; v++) {
     for (let u = 0; u < 8; u++) {
@@ -135,7 +115,7 @@ for (let v = 0; v < 8; v++) {
  * @param {number} stride - Step between elements (1 for row, 8 for col)
  */
 function aan1d(data, offset, stride) {
-    // Read input
+    
     const x0 = data[offset];
     const x1 = data[offset + stride];
     const x2 = data[offset + stride * 2];
@@ -145,11 +125,6 @@ function aan1d(data, offset, stride) {
     const x6 = data[offset + stride * 6];
     const x7 = data[offset + stride * 7];
 
-    // Stage 1 (Even/Odd split and initial butterflies)
-    // Based on standard AAN IDCT flow
-
-    // Even part
-    // Even Part
     const tmp0 = x0;
     const tmp1 = x4;
     const tmp2 = x2;
@@ -166,7 +141,6 @@ function aan1d(data, offset, stride) {
     const tmp1_ = tmp11 + tmp12;
     const tmp2_ = tmp11 - tmp12;
 
-    // Odd Part
     const tmp4 = x1;
     const tmp5 = x3;
     const tmp6 = x5;
@@ -180,18 +154,7 @@ function aan1d(data, offset, stride) {
     const tmp7_ = z11 + z13;
     const tmp11_ = (z11 - z13) * 1.414213562;
 
-    const z5 = (z10 + z12) * 1.847759065; // 1/cos(3pi/16)? No.
-    // IJG constants:
-    // 1.847759065 = 2 * cos(2pi/16) / cos(6pi/16)? No.
-    // It is 2.613125930?
-    // Let's just use the values:
-    // c2 = 2.613125930
-    // c4 = 1.082392200
-
-    // Actually, I should stick to the spec constants if I can map them.
-    // But I can't map them easily without the flow graph.
-    // I will use the explicit values from a known working AAN implementation.
-    // This is safer than guessing the flow graph from the spec's forward equations.
+    const z5 = (z10 + z12) * 1.847759065; 
 
     const z5_ = (z10 + z12) * 1.847759065;
     const tmp10_ = z5_ - z12 * 1.082392200;
@@ -201,7 +164,6 @@ function aan1d(data, offset, stride) {
     const tmp5_ = tmp11_ - tmp6_;
     const tmp4_ = tmp10_ + tmp5_;
 
-    // Final Output
     data[offset] = tmp0_ + tmp7_;
     data[offset + stride * 7] = tmp0_ - tmp7_;
     data[offset + stride * 1] = tmp1_ + tmp6_;

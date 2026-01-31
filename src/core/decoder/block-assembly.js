@@ -28,7 +28,6 @@ export function assembleBlocks(blocks, width, height, blocksPerRow) {
         const startY = blockRow * 8;
         const startX = blockCol * 8;
 
-        // Copy block data to result, handling edge cases
         for (let y = 0; y < 8 && startY + y < height; y++) {
             for (let x = 0; x < 8 && startX + x < width; x++) {
                 const blockOffset = y * 8 + x;
@@ -59,17 +58,15 @@ export function componentsToImageData(yData, cbData, crData, width, height) {
         const cb = cbData[i];
         const cr = crData[i];
 
-        // YCbCr to RGB conversion (JFIF standard)
         const r = y + 1.402 * (cr - 128);
         const g = y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128);
         const b = y + 1.772 * (cb - 128);
 
-        // Clamp and store RGBA
         const offset = i * 4;
         imageData[offset + 0] = Math.max(0, Math.min(255, Math.round(r)));
         imageData[offset + 1] = Math.max(0, Math.min(255, Math.round(g)));
         imageData[offset + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        imageData[offset + 3] = 255; // Alpha
+        imageData[offset + 3] = 255; 
     }
 
     return imageData;
@@ -92,7 +89,7 @@ export function grayscaleToImageData(yData, width, height) {
         imageData[offset + 0] = gray;
         imageData[offset + 1] = gray;
         imageData[offset + 2] = gray;
-        imageData[offset + 3] = 255; // Alpha
+        imageData[offset + 3] = 255; 
     }
 
     return imageData;
