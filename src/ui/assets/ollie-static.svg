@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/AspectRatio" viewBox="0 0 200 200" width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Maine Coon Fur Texture Base -->
+    <radialGradient id="furGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4a3b32" />
+      <stop offset="60%" stop-color="#3d2f26" />
+      <stop offset="100%" stop-color="#2a1e16" />
+    </radialGradient>
+    <linearGradient id="bibGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Big Fluffy Ears -->
+  <path d="M40 70 L20 20 L80 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M160 70 L180 20 L120 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Inner Ear Fur -->
+  <path d="M45 60 L30 35 L65 45 Z" fill="#ebcfc4" />
+  <path d="M155 60 L170 35 L135 45 Z" fill="#ebcfc4" />
+
+  <!-- Main Head shape - Maine Coon rugged jaw -->
+  <path d="M50 70 
+           Q20 100, 30 140 
+           Q70 170, 100 170 
+           Q130 170, 170 140 
+           Q180 100, 150 70 
+           Q100 40, 50 70" 
+        fill="url(#furGradient)" stroke="#1a120b" stroke-width="3" />
+
+  <!-- White Bib (Chest fluff) -->
+  <path d="M60 150 
+           Q100 200, 140 150 
+           Q170 180, 150 210
+           Q100 230, 50 210
+           Q30 180, 60 150" 
+        fill="url(#bibGradient)" />
+
+  <!-- Heterochromia Eyes: Left Yellow, Right Green -->
+  <!-- Left Eye (Yellow) -->
+  <path d="M60 100 Q75 85, 90 100 Q75 110, 60 100" fill="#facc15" stroke="#000" stroke-width="2" />
+  <circle cx="75" cy="98" r="4" fill="#000" />
+  <circle cx="72" cy="95" r="2" fill="#fff" /> <!-- catchlight -->
+
+  <!-- Right Eye (Green) -->
+  <path d="M110 100 Q125 85, 140 100 Q125 110, 110 100" fill="#4ade80" stroke="#000" stroke-width="2" />
+  <circle cx="125" cy="98" r="4" fill="#000" />
+  <circle cx="122" cy="95" r="2" fill="#fff" /> <!-- catchlight -->
+
+  <!-- Nose & Muzzle -->
+  <path d="M90 120 Q100 130, 110 120 Z" fill="#fca5a5" />
+  <!-- Mouth -->
+  <path d="M100 130 Q100 140, 85 135" fill="none" stroke="#1a120b" stroke-width="2" stroke-linecap="round" />
+  <path d="M100 130 Q100 140, 115 135" fill="none" stroke="#1a120b" stroke-width="2" stroke-linecap="round" />
+
+  <!-- Whiskers -->
+  <path d="M30 115 L10 110 M30 125 L5 125 M30 135 L10 140" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+  <path d="M170 115 L190 110 M170 125 L195 125 M170 135 L190 140" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+
+</svg>

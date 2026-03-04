@@ -138,9 +138,30 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('should search entries correctly with queries and tags', () => {
+        let vault = new PasswordVault();
+        [vault] = vault.addEntry({ title: 'Apple ID', url: 'apple.com', tags: ['personal', 'apple'] });
+        [vault] = vault.addEntry({ title: 'Work Email', url: 'gmail.com', tags: ['work', 'email'] });
+        [vault] = vault.addEntry({ title: 'Personal Email', username: 'jesse', tags: ['personal', 'email'] });
+        [vault] = vault.addEntry({ title: 'Banking', tags: ['finance'] });
 
+        // Empty search returns all
+        expect(vault.search('', []).length).toBe(4);
 
-    it('should preserve full entry data through toJSON/fromJSON round-trip', () => {
+        // Text query only (matches title/url/username)
+        expect(vault.search('email', []).length).toBe(2);
+        expect(vault.search('Apple', []).length).toBe(1); // case insensitive
+
+        // Tag matching (AND logic for tags)
+        expect(vault.search('', ['personal']).length).toBe(2);
+        expect(vault.search('', ['email']).length).toBe(2);
+        expect(vault.search('', ['personal', 'email']).length).toBe(1); // Must have both
+        expect(vault.search('', ['finance', 'work']).length).toBe(0); // Must have both
+
+        // Query + Tag combination
+        expect(vault.search('Apple', ['personal']).length).toBe(1);
+        expect(vault.search('Apple', ['work']).length).toBe(0);
+    }); it('should preserve full entry data through toJSON/fromJSON round-trip', () => {
         let vault = new PasswordVault();
         [vault] = vault.addEntry({
             title: 'Full Entry',

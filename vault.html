@@ -6,8 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ollie Vault</title>
     <link rel="stylesheet" href="src/ui/vault/vault.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-</head>
 
 <body>
     <div class="vault-app">
@@ -16,14 +14,15 @@
             <h2>🔐 Ollie Vault</h2>
 
             <div class="nav-group">
-                <button class="btn btn-secondary w-full" id="createBtn" style="width:100%; margin-bottom: 0.5rem">✨ New
-                    Vault</button>
-                <button class="btn btn-secondary w-full" id="saveBtn" style="width:100%">💾 Save Vault</button>
+                <button class="btn btn-secondary w-full" id="createBtn" style="width:100%; margin-bottom: 0.5rem"
+                    aria-label="Create a new Vault">✨ New Base Vault</button>
+                <button class="btn btn-secondary w-full" id="saveBtn" style="width:100%"
+                    aria-label="Save current vault to JPEGs">💾 Save To JPEGs</button>
             </div>
 
-            <div style="margin-top: 2rem">
+            <div style="margin-top: 2rem" aria-label="Filter by tags">
                 <h4 style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Tags</h4>
-                <div id="tagList" style="margin-top: 1rem">
+                <div id="tagList" style="margin-top: 1rem" role="group" aria-label="Available Tags">
                     <!-- Tags populated here -->
                 </div>
             </div>
@@ -32,26 +31,40 @@
         <!-- Main Content (Drop Zone) -->
         <main class="drop-zone" id="dropZone">
             <header class="app-header">
-                <div class="status-badge">
-                    <span class="status-dot"></span>
-                    <span id="statusText">Locked</span>
+                <div class="header-controls">
+                    <div class="status-badge" aria-live="polite">
+                        <span class="status-dot"></span>
+                        <span id="statusText">Locked</span>
+                    </div>
                 </div>
 
-                <div class="actions">
-                    <button class="btn btn-primary" id="addBtn">➕ Add Entry</button>
+                <div class="header-controls">
+                    <input type="search" id="searchInput" class="search-input" placeholder="Search..."
+                        aria-label="Search items by title, username, or URL">
+                    <select id="sortSelect" class="sort-select" aria-label="Sort Entries">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z Name</option>
+                        <option value="za">Z-A Name</option>
+                    </select>
+                    <button class="btn btn-primary" id="addBtn" aria-label="Add a new entry">➕ Add Entry</button>
                 </div>
             </header>
 
             <div id="vaultList">
                 <div class="empty-state">
-                    <div class="empty-icon">📂</div>
+                    <div class="empty-icon">
+                        <img src="src/ui/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120"
+                            height="120" />
+                    </div>
                     <h3>Drop Vault Here</h3>
                     <p>Drag and drop a folder of images to load your vault.</p>
                 </div>
             </div>
 
             <div class="status-bar"
-                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);"
+                role="status" aria-live="polite">
                 <span id="itemCount">0 Items</span>
                 <span>Ollie v2.0 (Secure)</span>
             </div>

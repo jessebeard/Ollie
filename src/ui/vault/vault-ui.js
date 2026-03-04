@@ -17,6 +17,9 @@ export class VaultUI {
         this.events = new EventBus();
         this.modals = new ModalManager();
         this.view = null;
+        this.activeTags = new Set();
+        this.currentQuery = '';
+        this.currentSort = 'newest';
 
         this.initialize();
     }
@@ -38,6 +41,18 @@ export class VaultUI {
         document.getElementById('createBtn').addEventListener('click', () => this.createVault());
         document.getElementById('saveBtn').addEventListener('click', () => this.saveVault());
         document.getElementById('addBtn').addEventListener('click', () => this.addEntry());
+
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', (e) => {
+            this.currentQuery = e.target.value.trim();
+            this.updateUI();
+        });
+
+        const sortSelect = document.getElementById('sortSelect');
+        sortSelect.addEventListener('change', (e) => {
+            this.currentSort = e.target.value;
+            this.updateUI();
+        });
 
         // Initial State
         this.updateState();
@@ -277,8 +292,7 @@ export class VaultUI {
 
     copyPassword(pass) {
         navigator.clipboard.writeText(pass);
-        // Toast?
-        console.log('Copied');
+        this.modals.showAlert('Copied', 'Password copied to clipboard!');
     }
 
     updateUI() {
@@ -286,12 +300,60 @@ export class VaultUI {
         document.body.classList.toggle('vault-unlocked', unlocked);
 
         if (unlocked) {
-            this.view.render(this.vault.entries);
-            document.getElementById('itemCount').textContent = `${this.vault.entries.length} Items`;
+            this.renderSidebarTags();
+
+            let filteredResults = this.vault.search(this.currentQuery, Array.from(this.activeTags));
+            filteredResults = this.sortEntries(filteredResults, this.currentSort);
+
+            this.view.render(filteredResults);
+            document.getElementById('itemCount').textContent = `${filteredResults.length} Items`;
             document.getElementById('statusText').textContent = 'Unlocked';
         } else {
             document.getElementById('statusText').textContent = 'Locked';
         }
+    }
+
+    sortEntries(entries, sortMethod) {
+        return entries.slice().sort((a, b) => { // Shallow copy to avoid mutating cache
+            const titleA = (a.title || '').toLowerCase();
+            const titleB = (b.title || '').toLowerCase();
+            switch (sortMethod) {
+                case 'az': return titleA.localeCompare(titleB);
+                case 'za': return titleB.localeCompare(titleA);
+                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date. 
+                case 'newest':
+                default:
+                    return b.id.localeCompare(a.id);
+            }
+        });
+    }
+
+    renderSidebarTags() {
+        const tagListEl = document.getElementById('tagList');
+        tagListEl.innerHTML = '';
+
+        // Extract all unique tags
+        const allTags = new Set();
+        this.vault.entries.forEach(e => {
+            if (e.tags) e.tags.forEach(t => allTags.add(t));
+        });
+
+        if (allTags.size === 0) {
+            tagListEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem;">No tags</div>';
+            return;
+        }
+
+        Array.from(allTags).sort().forEach(tag => {
+            const span = document.createElement('span');
+            span.className = `tag tag-interactive ${this.activeTags.has(tag) ? 'tag-active' : ''}`;
+            span.textContent = tag;
+            span.addEventListener('click', () => {
+                if (this.activeTags.has(tag)) this.activeTags.delete(tag);
+                else this.activeTags.add(tag);
+                this.updateUI();
+            });
+            tagListEl.appendChild(span);
+        });
     }
 
     updateState() {

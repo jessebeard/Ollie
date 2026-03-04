@@ -2,6 +2,7 @@ import { describe, it, expect } from '../utils/test-runner.js';
 import { JpegEncoder } from '../../src/core/jpeg-encoder.js';
 import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
 import { JpegTranscoder } from '../../src/core/jpeg-transcoder.js';
+import { Arbitrary, assertProperty } from '../utils/pbt.js';
 
 describe('JPEG Transcoder (Lossless)', () => {
 
@@ -166,6 +167,49 @@ describe('JPEG Transcoder (Lossless)', () => {
         }
 
         expect(maxDiff).toBeLessThan(100);
+    });
+
+    it('Property: Transcoder Fuzzing Payload Integrity', async () => {
+        // Assert that arbitrary payload dimensions and capacities decode perfectly back out
+        await assertProperty(
+            [Arbitrary.string(1, 100), Arbitrary.string(4, 20)],
+            async (secretStr, password) => {
+                const width = 64;
+                const height = 64;
+                const data = new Uint8ClampedArray(width * height * 4);
+                // Give some entropy so coefficients exist
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        data[idx] = Math.floor(Math.random() * 255);
+                        data[idx + 1] = Math.floor(Math.random() * 255);
+                        data[idx + 2] = Math.floor(Math.random() * 255);
+                        data[idx + 3] = 255;
+                    }
+                }
+
+                const encoder = new JpegEncoder(90);
+                const originalJpeg = await encoder.encode({ width, height, data });
+
+                const payload = new TextEncoder().encode(secretStr);
+                const transcoder = new JpegTranscoder();
+
+                const [stegoJpeg, transErr] = await transcoder.updateSecret(originalJpeg, payload, { password });
+
+                // If it couldn't fit the payload, just ignore this fuzz cycle
+                if (transErr) return true;
+
+                const decoder = new JpegDecoder();
+                const [decoded, decErr] = await decoder.decode(stegoJpeg, { password });
+
+                expect(decErr).toBeNull();
+                const extractedText = new TextDecoder().decode(decoded.secretData);
+                expect(extractedText).toBe(secretStr);
+
+                return true;
+            },
+            10
+        );
     });
 
     it('coefficientsOnly mode should return coefficients without image data', async () => {

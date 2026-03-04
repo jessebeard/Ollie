@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Fur & Bib Gradients -->
+    <radialGradient id="furGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4a3b32" />
+      <stop offset="60%" stop-color="#3d2f26" />
+      <stop offset="100%" stop-color="#2a1e16" />
+    </radialGradient>
+    <linearGradient id="bibGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+
+  <g id="ollie-body">
+    <!-- Ears -->
+    <g id="left-ear">
+      <path d="M40 70 L20 20 L80 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M45 60 L30 35 L65 45 Z" fill="#ebcfc4" />
+      <animateTransform attributeName="transform" type="rotate" values="0 40 70; -5 40 70; 0 40 70" dur="4s" repeatCount="indefinite" additive="sum"/>
+    </g>
+    <g id="right-ear">
+      <path d="M160 70 L180 20 L120 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M155 60 L170 35 L135 45 Z" fill="#ebcfc4" />
+      <animateTransform attributeName="transform" type="rotate" values="0 160 70; 5 160 70; 0 160 70" dur="5s" repeatCount="indefinite" additive="sum"/>
+    </g>
+
+    <!-- Head -->
+    <path d="M50 70 Q20 100, 30 140 Q70 170, 100 170 Q130 170, 170 140 Q180 100, 150 70 Q100 40, 50 70" fill="url(#furGradient)" stroke="#1a120b" stroke-width="3" />
+
+    <!-- White Bib -->
+    <path d="M60 150 Q100 200, 140 150 Q170 180, 150 210 Q100 230, 50 210 Q30 180, 60 150" fill="url(#bibGradient)" />
+
+    <!-- Left Eye (Yellow) -->
+    <g id="left-eye">
+      <!-- Blinking Path Animation using SMIL -->
+      <path fill="#facc15" stroke="#000" stroke-width="2">
+        <animate attributeName="d" 
+                 values="M60 100 Q75 85, 90 100 Q75 110, 60 100;
+                         M60 100 Q75 98, 90 100 Q75 102, 60 100;
+                         M60 100 Q75 85, 90 100 Q75 110, 60 100" 
+                 keyTimes="0; 0.05; 0.1" 
+                 dur="4s" repeatCount="indefinite" />
+      </path>
+      <!-- Pupil & Catchlight (Hidden during blink) -->
+      <g>
+        <circle cx="75" cy="98" r="4" fill="#000" />
+        <circle cx="72" cy="95" r="2" fill="#fff" />
+        <animate attributeName="opacity" values="1; 0; 1" keyTimes="0; 0.05; 0.1" dur="4s" repeatCount="indefinite" />
+      </g>
+    </g>
+
+    <!-- Right Eye (Green) -->
+    <g id="right-eye">
+      <!-- Blinking Path Animation using SMIL -->
+      <path fill="#4ade80" stroke="#000" stroke-width="2">
+        <animate attributeName="d" 
+                 values="M110 100 Q125 85, 140 100 Q125 110, 110 100;
+                         M110 100 Q125 98, 140 100 Q125 102, 110 100;
+                         M110 100 Q125 85, 140 100 Q125 110, 110 100" 
+                 keyTimes="0; 0.05; 0.1" 
+                 dur="4s" repeatCount="indefinite" />
+      </path>
+      <g>
+        <circle cx="125" cy="98" r="4" fill="#000" />
+        <circle cx="122" cy="95" r="2" fill="#fff" />
+        <animate attributeName="opacity" values="1; 0; 1" keyTimes="0; 0.05; 0.1" dur="4s" repeatCount="indefinite" />
+      </g>
+    </g>
+
+    <!-- Nose & Mouth -->
+    <path d="M90 120 Q100 130, 110 120 Z" fill="#fca5a5" />
+    <path d="M100 130 Q100 140, 85 135" fill="none" stroke="#1a120b" stroke-width="2" stroke-linecap="round" />
+    <path d="M100 130 Q100 140, 115 135" fill="none" stroke="#1a120b" stroke-width="2" stroke-linecap="round" />
+
+    <!-- Whiskers with subtle SMIL waving -->
+    <g opacity="0.6" stroke="#fff" stroke-width="1.5" stroke-linecap="round">
+      <path d="M30 115 L10 110"><animate attributeName="d" values="M30 115 L10 110; M30 115 L10 115; M30 115 L10 110" dur="3.5s" repeatCount="indefinite"/></path>
+      <path d="M30 125 L5 125"><animate attributeName="d" values="M30 125 L5 125; M30 125 L5 120; M30 125 L5 125" dur="3.5s" repeatCount="indefinite"/></path>
+      <path d="M30 135 L10 140"><animate attributeName="d" values="M30 135 L10 140; M30 135 L10 135; M30 135 L10 140" dur="3.5s" repeatCount="indefinite"/></path>
+      <path d="M170 115 L190 110"><animate attributeName="d" values="M170 115 L190 110; M170 115 L190 115; M170 115 L190 110" dur="3.8s" repeatCount="indefinite"/></path>
+      <path d="M170 125 L195 125"><animate attributeName="d" values="M170 125 L195 125; M170 125 L195 120; M170 125 L195 125" dur="3.8s" repeatCount="indefinite"/></path>
+      <path d="M170 135 L190 140"><animate attributeName="d" values="M170 135 L190 140; M170 135 L190 135; M170 135 L190 140" dur="3.8s" repeatCount="indefinite"/></path>
+    </g>
+  </g>
+</svg>

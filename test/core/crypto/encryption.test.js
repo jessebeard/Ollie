@@ -83,4 +83,46 @@ describe('Encryption (Property-Based Tests)', () => {
             50
         );
     });
+    it('Property: Unique IV & Identical Decryption per pass', async () => {
+        await assertProperty(
+            [Arbitrary.string(8, 32), Arbitrary.byteArray(16, 16), Arbitrary.byteArray(10, 1000)],
+            async (password, salt, plaintextBytes) => {
+                const key = await getTestKey(password, salt);
+
+                const [enc1, err1] = await Encryption.encrypt(plaintextBytes, key);
+                const [enc2, err2] = await Encryption.encrypt(plaintextBytes, key);
+
+                expect(err1).toEqual(null);
+                expect(err2).toEqual(null);
+
+                // IVs must be unique even with identical plaintexts and keys
+                let ivMatch = true;
+                for (let i = 0; i < enc1.iv.length; i++) {
+                    if (enc1.iv[i] !== enc2.iv[i]) {
+                        ivMatch = false;
+                        break;
+                    }
+                }
+                expect(ivMatch).toBe(false);
+
+                // But both must decrypt identically back to the source plaintext
+                const [dec1, errDec1] = await Encryption.decrypt(enc1.ciphertext, key, enc1.iv);
+                const [dec2, errDec2] = await Encryption.decrypt(enc2.ciphertext, key, enc2.iv);
+
+                expect(errDec1).toBeNull();
+                expect(errDec2).toBeNull();
+
+                expect(dec1.byteLength).toBe(plaintextBytes.length);
+                expect(dec2.byteLength).toBe(plaintextBytes.length);
+
+                for (let i = 0; i < plaintextBytes.length; i++) {
+                    if (dec1[i] !== plaintextBytes[i]) return false;
+                    if (dec2[i] !== plaintextBytes[i]) return false;
+                }
+
+                return true;
+            },
+            20
+        );
+    });
 });

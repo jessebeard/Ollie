@@ -5,6 +5,35 @@ import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
 
 describe('Orchestrator & Transcoding Equivalency (PBT)', () => {
 
+    it('Fuzzing Odd JPEG Dimensions (Boundary Rejection/Padding Idempotency)', async () => {
+        // Assert that generating inputs with odd bounds respects boundary rejection/padding.
+        await assertProperty(
+            [Arbitrary.integer(9, 63), Arbitrary.integer(9, 63)],
+            async (width, height) => {
+                // DO NOT ensure cleanly divisible by 8! We want the encoder/decoder to handle padding.
+                const data = new Uint8ClampedArray(width * height * 4);
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = 100;
+                    data[i + 1] = 120;
+                    data[i + 2] = 140;
+                    data[i + 3] = 255;
+                }
+
+                const encoder = new JpegEncoder(90);
+                const jpegData = await encoder.encode({ width, height, data });
+                const decoder = new JpegDecoder();
+                const [decoded, err] = await decoder.decode(jpegData);
+
+                expect(err).toBeNull();
+                // The decoder should pad the canvas to the nearest MCU, 
+                // but the image width/height parsed from SOF should match the original.
+                expect(decoded.width === width).toBe(true);
+                expect(decoded.height === height).toBe(true);
+            },
+            10
+        );
+    });
+
     it('Progressive vs. Baseline Equivalency', async () => {
         // The sum of all multi-scan progressive DCT coefficients must perfectly match
         // the single-scan baseline DCT coefficients for the same image.
