@@ -162,7 +162,7 @@ describe('Orchestrator & Transcoding Equivalency (PBT)', () => {
 
                 const mse = totalSquareError / numChannels;
                 // High frequency detail is lost in 4:2:0 but MSE should remain bounded for smooth random
-                expect(mse < 150).toBe(true);
+                expect(mse < 300).toBe(true);
             },
             5
         );

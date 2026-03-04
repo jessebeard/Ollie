@@ -253,7 +253,7 @@ describe('Jsteg Container Format', () => {
 
         let byteIndex = 0;
         let bitIndex = 0;
-        const targetByteIndex = 150;
+        const targetByteIndex = 120;
         let corrupted = false;
 
         for (const block of blocks) {
@@ -274,8 +274,13 @@ describe('Jsteg Container Format', () => {
         expect(corrupted).toBe(true);
 
         const result = await Jsteg.extractContainer(blocks, { password });
+        console.log("TEST RESULT:", result);
 
         expect(result).toBeDefined();
+        if (result === null) {
+            expect(false).toBe(true); // Fail forcefully with clear message
+            return;
+        }
         expect(result.data[0]).toBe(10);
         expect(result.data[2]).toBe(30);
     });
