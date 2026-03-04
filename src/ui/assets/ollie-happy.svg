@@ -12,9 +12,11 @@
   </defs>
 
   <g id="ollie-body" transform="translate(0, -10)">
-    <!-- Ears -->
+    <!-- Ears & Tufts -->
     <path d="M40 80 L20 30 L80 50 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M20 30 Q15 15, 27 25 Z" fill="#2a1e16" /> <!-- Left Tuft -->
     <path d="M160 80 L180 30 L120 50 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M180 30 Q185 15, 173 25 Z" fill="#2a1e16" /> <!-- Right Tuft -->
     <path d="M45 70 L30 45 L65 55 Z" fill="#ebcfc4" />
     <path d="M155 70 L170 45 L135 55 Z" fill="#ebcfc4" />
 
@@ -24,11 +26,11 @@
     <!-- White Bib -->
     <path d="M60 160 Q100 210, 140 160 Q170 190, 150 220 Q100 240, 50 220 Q30 190, 60 160" fill="url(#bibGradient)" />
 
-    <!-- Happy Eyes (^ ^) -->
+    <!-- Happy Eyes (^ ^) Crescent shaped -->
     <!-- Left Eye (Yellow accents) -->
-    <path d="M55 110 Q75 85, 95 110 Z" fill="#facc15" stroke="#1a120b" stroke-width="2" />
+    <path d="M55 110 Q75 80, 95 110 Q75 95, 55 110 Z" fill="#facc15" stroke="#1a120b" stroke-width="2" />
     <!-- Right Eye (Green accents) -->
-    <path d="M105 110 Q125 85, 145 110 Z" fill="#4ade80" stroke="#1a120b" stroke-width="2" />
+    <path d="M105 110 Q125 80, 145 110 Q125 95, 105 110 Z" fill="#4ade80" stroke="#1a120b" stroke-width="2" />
 
     <!-- Nose & Muzzle -->
     <path d="M90 120 Q100 130, 110 120 Z" fill="#fca5a5" />

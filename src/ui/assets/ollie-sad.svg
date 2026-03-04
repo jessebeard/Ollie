@@ -12,9 +12,11 @@
   </defs>
 
   <g id="ollie-body" transform="translate(0, 10)">
-    <!-- Drooped Ears -->
+    <!-- Drooped Ears & Tufts -->
     <path d="M35 70 L5 35 L75 55 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M5 35 Q0 25, 15 35 Z" fill="#2a1e16" /> <!-- Left Tuft -->
     <path d="M165 70 L195 35 L125 55 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M195 35 Q200 25, 185 35 Z" fill="#2a1e16" /> <!-- Right Tuft -->
     <path d="M40 60 L20 40 L60 55 Z" fill="#ebcfc4" />
     <path d="M160 60 L180 40 L140 55 Z" fill="#ebcfc4" />
 
@@ -26,14 +28,16 @@
 
     <!-- Sad Eyes (Tilted up in the middle) -->
     <!-- Left Eye (Yellow) -->
-    <path d="M55 95 Q75 80, 95 105 Q75 115, 55 95" fill="#facc15" stroke="#000" stroke-width="2" />
-    <circle cx="75" cy="98" r="4" fill="#000" />
-    <circle cx="72" cy="95" r="2" fill="#fff" />
+    <path d="M55 95 Q75 70, 95 105 Q75 125, 55 95" fill="#facc15" stroke="#000" stroke-width="2" />
+    <ellipse cx="75" cy="100" rx="3" ry="10" fill="#000" />
+    <circle cx="72" cy="94" r="2.5" fill="#fff" />
+    <circle cx="77" cy="104" r="1.5" fill="#fff" />
     
     <!-- Right Eye (Green) -->
-    <path d="M105 105 Q125 80, 145 95 Q125 115, 105 105" fill="#4ade80" stroke="#000" stroke-width="2" />
-    <circle cx="125" cy="98" r="4" fill="#000" />
-    <circle cx="122" cy="95" r="2" fill="#fff" />
+    <path d="M105 105 Q125 70, 145 95 Q125 125, 105 105" fill="#4ade80" stroke="#000" stroke-width="2" />
+    <ellipse cx="125" cy="100" rx="3" ry="10" fill="#000" />
+    <circle cx="122" cy="94" r="2.5" fill="#fff" />
+    <circle cx="127" cy="104" r="1.5" fill="#fff" />
 
     <!-- Nose & Muzzle -->
     <path d="M90 120 Q100 130, 110 120 Z" fill="#fca5a5" />

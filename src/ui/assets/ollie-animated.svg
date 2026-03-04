@@ -13,14 +13,16 @@
   </defs>
 
   <g id="ollie-body">
-    <!-- Ears -->
+    <!-- Ears & Tufts -->
     <g id="left-ear">
       <path d="M40 70 L20 20 L80 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M20 20 Q15 5, 27 15 Z" fill="#2a1e16" /> <!-- Left Tuft -->
       <path d="M45 60 L30 35 L65 45 Z" fill="#ebcfc4" />
       <animateTransform attributeName="transform" type="rotate" values="0 40 70; -5 40 70; 0 40 70" dur="4s" repeatCount="indefinite" additive="sum"/>
     </g>
     <g id="right-ear">
       <path d="M160 70 L180 20 L120 40 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M180 20 Q185 5, 173 15 Z" fill="#2a1e16" /> <!-- Right Tuft -->
       <path d="M155 60 L170 35 L135 45 Z" fill="#ebcfc4" />
       <animateTransform attributeName="transform" type="rotate" values="0 160 70; 5 160 70; 0 160 70" dur="5s" repeatCount="indefinite" additive="sum"/>
     </g>
@@ -36,16 +38,17 @@
       <!-- Blinking Path Animation using SMIL -->
       <path fill="#facc15" stroke="#000" stroke-width="2">
         <animate attributeName="d" 
-                 values="M60 100 Q75 85, 90 100 Q75 110, 60 100;
-                         M60 100 Q75 98, 90 100 Q75 102, 60 100;
-                         M60 100 Q75 85, 90 100 Q75 110, 60 100" 
+                 values="M55 100 Q75 75, 95 100 Q75 125, 55 100;
+                         M55 100 Q75 98, 95 100 Q75 102, 55 100;
+                         M55 100 Q75 75, 95 100 Q75 125, 55 100" 
                  keyTimes="0; 0.05; 0.1" 
                  dur="4s" repeatCount="indefinite" />
       </path>
       <!-- Pupil & Catchlight (Hidden during blink) -->
       <g>
-        <circle cx="75" cy="98" r="4" fill="#000" />
-        <circle cx="72" cy="95" r="2" fill="#fff" />
+        <ellipse cx="75" cy="100" rx="3" ry="10" fill="#000" />
+        <circle cx="72" cy="94" r="2.5" fill="#fff" />
+        <circle cx="77" cy="104" r="1.5" fill="#fff" />
         <animate attributeName="opacity" values="1; 0; 1" keyTimes="0; 0.05; 0.1" dur="4s" repeatCount="indefinite" />
       </g>
     </g>
@@ -55,15 +58,16 @@
       <!-- Blinking Path Animation using SMIL -->
       <path fill="#4ade80" stroke="#000" stroke-width="2">
         <animate attributeName="d" 
-                 values="M110 100 Q125 85, 140 100 Q125 110, 110 100;
-                         M110 100 Q125 98, 140 100 Q125 102, 110 100;
-                         M110 100 Q125 85, 140 100 Q125 110, 110 100" 
+                 values="M105 100 Q125 75, 145 100 Q125 125, 105 100;
+                         M105 100 Q125 98, 145 100 Q125 102, 105 100;
+                         M105 100 Q125 75, 145 100 Q125 125, 105 100" 
                  keyTimes="0; 0.05; 0.1" 
                  dur="4s" repeatCount="indefinite" />
       </path>
       <g>
-        <circle cx="125" cy="98" r="4" fill="#000" />
-        <circle cx="122" cy="95" r="2" fill="#fff" />
+        <ellipse cx="125" cy="100" rx="3" ry="10" fill="#000" />
+        <circle cx="122" cy="94" r="2.5" fill="#fff" />
+        <circle cx="127" cy="104" r="1.5" fill="#fff" />
         <animate attributeName="opacity" values="1; 0; 1" keyTimes="0; 0.05; 0.1" dur="4s" repeatCount="indefinite" />
       </g>
     </g>
