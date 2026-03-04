@@ -176,12 +176,20 @@ export class ModalManager {
     }
 
     showAlert(title, message, type = 'info') {
+        let iconSrc = 'src/ui/assets/ollie-happy.svg';
+        if (type === 'error') {
+            iconSrc = 'src/ui/assets/ollie-sad.svg';
+        }
+
         const modal = document.createElement('div');
         modal.className = `modal-dialog alert-${type}`;
         modal.innerHTML = `
-            <h3>${title}</h3>
-            <p>${message}</p>
-            <div class="modal-actions">
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${type}">
+            </div>
+            <h3 style="text-align: center;">${title}</h3>
+            <p style="text-align: center; color: var(--text-muted);">${message}</p>
+            <div class="modal-actions" style="justify-content: center; margin-top: 1.5rem;">
                 <button class="btn btn-primary confirm-btn">OK</button>
             </div>
         `;

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <radialGradient id="furGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4a3b32" />
+      <stop offset="60%" stop-color="#3d2f26" />
+      <stop offset="100%" stop-color="#2a1e16" />
+    </radialGradient>
+    <linearGradient id="bibGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+  </defs>
+
+  <g id="ollie-body" transform="translate(0, 10)">
+    <!-- Drooped Ears -->
+    <path d="M35 70 L5 35 L75 55 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M165 70 L195 35 L125 55 Z" fill="url(#furGradient)" stroke="#1a120b" stroke-width="2" />
+    <path d="M40 60 L20 40 L60 55 Z" fill="#ebcfc4" />
+    <path d="M160 60 L180 40 L140 55 Z" fill="#ebcfc4" />
+
+    <!-- Head -->
+    <path d="M50 70 Q20 100, 30 140 Q70 170, 100 170 Q130 170, 170 140 Q180 100, 150 70 Q100 40, 50 70" fill="url(#furGradient)" stroke="#1a120b" stroke-width="3" />
+
+    <!-- White Bib -->
+    <path d="M60 150 Q100 200, 140 150 Q170 180, 150 210 Q100 230, 50 210 Q30 180, 60 150" fill="url(#bibGradient)" />
+
+    <!-- Sad Eyes (Tilted up in the middle) -->
+    <!-- Left Eye (Yellow) -->
+    <path d="M55 95 Q75 80, 95 105 Q75 115, 55 95" fill="#facc15" stroke="#000" stroke-width="2" />
+    <circle cx="75" cy="98" r="4" fill="#000" />
+    <circle cx="72" cy="95" r="2" fill="#fff" />
+    
+    <!-- Right Eye (Green) -->
+    <path d="M105 105 Q125 80, 145 95 Q125 115, 105 105" fill="#4ade80" stroke="#000" stroke-width="2" />
+    <circle cx="125" cy="98" r="4" fill="#000" />
+    <circle cx="122" cy="95" r="2" fill="#fff" />
+
+    <!-- Nose & Muzzle -->
+    <path d="M90 120 Q100 130, 110 120 Z" fill="#fca5a5" />
+    
+    <!-- Sad Mouth -->
+    <path d="M90 140 Q100 130, 110 140" fill="none" stroke="#1a120b" stroke-width="2" stroke-linecap="round" />
+
+    <!-- Drooping Whiskers -->
+    <g opacity="0.6" stroke="#fff" stroke-width="1.5" stroke-linecap="round">
+      <path d="M30 120 L10 130" />
+      <path d="M30 130 L5 145" />
+      <path d="M30 140 L10 160" />
+      <path d="M170 120 L190 130" />
+      <path d="M170 130 L195 145" />
+      <path d="M170 140 L190 160" />
+    </g>
+  </g>
+</svg>
