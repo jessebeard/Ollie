@@ -1,131 +1,119 @@
 import { describe, it, expect } from '../../../test/utils/test-runner.js';
 import { ChunkManager } from '../../../src/core/steganography/chunk-manager.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
-describe('ChunkManager', () => {
-    describe('split', () => {
-        it('should split data into chunks of specified size', () => {
-            const data = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-            const chunkSize = 3;
+describe('ChunkManager (Property-Based Tests)', () => {
 
-            const chunks = ChunkManager.split(data, chunkSize);
+    it('Property: Reassembly Symmetry (split then reassemble yields original data)', async () => {
+        // Fuzz byte arrays of varying lengths and random chunk sizes
+        await assertProperty(
+            // Use 1 to 1000 bytes to not blow up mocked image bounds limits
+            [Arbitrary.byteArray(1, 1000), Arbitrary.positiveInteger(1024)],
+            async (dataBytes, chunkSize) => {
+                const chunks = ChunkManager.split(dataBytes, chunkSize);
 
-            expect(chunks.length).toBe(4); 
-            expect(chunks[0].data.length).toBe(3);
-            expect(chunks[1].data.length).toBe(3);
-            expect(chunks[2].data.length).toBe(3);
-            expect(chunks[3].data.length).toBe(1);
-        });
+                // Properties of the split
+                let totalExpected = Math.ceil(dataBytes.length / chunkSize);
+                expect(chunks.length).toBe(totalExpected);
 
-        it('should assign unique chunk IDs', () => {
-            const data = new Uint8Array([1, 2, 3, 4, 5, 6]);
-            const chunks = ChunkManager.split(data, 2);
+                if (chunks.length > 0) {
+                    const expectedId = chunks[0].chunkId;
+                    for (let i = 0; i < chunks.length; i++) {
+                        expect(chunks[i].chunkId).toBe(expectedId);
+                        expect(chunks[i].index).toBe(i);
+                        expect(chunks[i].total).toBe(totalExpected);
+                    }
+                }
 
-            expect(chunks[0].chunkId).toBeDefined();
-            expect(chunks[1].chunkId).toBeDefined();
-            expect(chunks[2].chunkId).toBeDefined();
+                // Reassembly invariant
+                const [reassembled, err] = ChunkManager.reassemble(chunks);
+                expect(err).toEqual(null);
+                expect(reassembled.length).toBe(dataBytes.length);
 
-            expect(chunks[0].chunkId).toBe(chunks[1].chunkId);
-            expect(chunks[1].chunkId).toBe(chunks[2].chunkId);
-        });
+                for (let i = 0; i < dataBytes.length; i++) {
+                    if (reassembled[i] !== dataBytes[i]) return false;
+                }
 
-        it('should assign correct indices and total count', () => {
-            const data = new Uint8Array([1, 2, 3, 4, 5]);
-            const chunks = ChunkManager.split(data, 2);
-
-            expect(chunks.length).toBe(3);
-
-            expect(chunks[0].index).toBe(0);
-            expect(chunks[0].total).toBe(3);
-
-            expect(chunks[1].index).toBe(1);
-            expect(chunks[1].total).toBe(3);
-
-            expect(chunks[2].index).toBe(2);
-            expect(chunks[2].total).toBe(3);
-        });
-
-        it('should include checksum for each chunk', () => {
-            const data = new Uint8Array([1, 2, 3, 4]);
-            const chunks = ChunkManager.split(data, 2);
-
-            expect(chunks[0].checksum).toBeDefined();
-            expect(chunks[1].checksum).toBeDefined();
-
-            expect(chunks[0].checksum).not.toBe(chunks[1].checksum);
-        });
+                return true;
+            },
+            50
+        );
     });
 
-    describe('reassemble', () => {
-        it('should reassemble chunks into original data', () => {
-            const original = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
-            const chunks = ChunkManager.split(original, 3);
+    it('Property: Shuffle Recovery (reassemble out-of-order chunks yields original data)', async () => {
+        await assertProperty(
+            [Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(500)],
+            async (dataBytes, randomChunkSize) => {
+                const chunkSize = Math.max(1, randomChunkSize);
+                const chunks = ChunkManager.split(dataBytes, chunkSize);
 
-            const reassembled = ChunkManager.reassemble(chunks);
+                // Shuffle the chunks randomly
+                const shuffled = [...chunks];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
 
-            expect(reassembled.length).toBe(original.length);
-            for (let i = 0; i < original.length; i++) {
-                expect(reassembled[i]).toBe(original[i]);
-            }
-        });
+                const [reassembled, err] = ChunkManager.reassemble(shuffled);
+                expect(err).toEqual(null);
+                expect(reassembled.length).toBe(dataBytes.length);
 
-        it('should handle single chunk', () => {
-            const original = new Uint8Array([1, 2, 3]);
-            const chunks = ChunkManager.split(original, 10); 
+                for (let i = 0; i < dataBytes.length; i++) {
+                    if (reassembled[i] !== dataBytes[i]) return false;
+                }
 
-            expect(chunks.length).toBe(1);
+                return true;
+            },
+            50
+        );
+    });
 
-            const reassembled = ChunkManager.reassemble(chunks);
-            expect(reassembled.length).toBe(3);
-            expect(reassembled[0]).toBe(1);
-        });
+    it('Property: Incomplete Payload Rejection', async () => {
+        await assertProperty(
+            [Arbitrary.byteArray(50, 1000), Arbitrary.positiveInteger(500)],
+            async (dataBytes, randomChunkSize) => {
+                const chunkSize = Math.max(1, randomChunkSize);
+                const chunks = ChunkManager.split(dataBytes, chunkSize);
 
-        it('should reassemble chunks in correct order even if shuffled', () => {
-            const original = new Uint8Array([1, 2, 3, 4, 5, 6]);
-            const chunks = ChunkManager.split(original, 2);
+                if (chunks.length < 2) return true; // Can't remove a chunk if there's only 1
 
-            const shuffled = [chunks[2], chunks[0], chunks[1]];
+                // Remove a random chunk
+                const removeIndex = Math.floor(Math.random() * chunks.length);
+                const incomplete = chunks.filter((_, i) => i !== removeIndex);
 
-            const reassembled = ChunkManager.reassemble(shuffled);
+                const [data, err] = ChunkManager.reassemble(incomplete);
+                expect(data).toEqual(null);
+                expect(err !== null).toBe(true);
+                expect(err.message.includes('Missing chunks')).toBe(true);
 
-            expect(reassembled.length).toBe(6);
-            for (let i = 0; i < original.length; i++) {
-                expect(reassembled[i]).toBe(original[i]);
-            }
-        });
+                return true;
+            },
+            50
+        );
+    });
 
-        it('should throw error if chunks are missing', () => {
-            const original = new Uint8Array([1, 2, 3, 4, 5, 6]);
-            const chunks = ChunkManager.split(original, 2);
+    it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
+        await assertProperty(
+            [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],
+            async (data1, data2, randomChunkSize) => {
+                const chunkSize = Math.max(1, randomChunkSize);
+                const chunks1 = ChunkManager.split(data1, chunkSize);
+                const chunks2 = ChunkManager.split(data2, chunkSize);
 
-            const incomplete = [chunks[0], chunks[2]];
+                if (chunks1.length === 0 || chunks2.length === 0) return true;
 
-            let errorThrown = false;
-            try {
-                ChunkManager.reassemble(incomplete);
-            } catch (e) {
-                errorThrown = true;
-            }
+                // Take first chunk of dataset 1, and rest from dataset 2.
+                // It is statistically impossible for two separate unseeded generations to yield the same 16-char string ID
+                const mixed = [chunks1[0], ...chunks2];
 
-            expect(errorThrown).toBe(true);
-        });
+                const [data, err] = ChunkManager.reassemble(mixed);
+                expect(data).toEqual(null);
+                expect(err !== null).toBe(true);
+                expect(err.message.includes('Chunk IDs do not match')).toBe(true);
 
-        it('should throw error if chunk IDs do not match', () => {
-            const data1 = new Uint8Array([1, 2, 3]);
-            const data2 = new Uint8Array([4, 5, 6]);
-
-            const chunks1 = ChunkManager.split(data1, 2);
-            const chunks2 = ChunkManager.split(data2, 2);
-
-            const mixed = [chunks1[0], chunks2[0]];
-
-            let errorThrown = false;
-            try {
-                ChunkManager.reassemble(mixed);
-            } catch (e) {
-                errorThrown = true;
-            }
-
-            expect(errorThrown).toBe(true);
-        });
+                return true;
+            },
+            50
+        );
     });
 });

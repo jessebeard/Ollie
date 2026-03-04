@@ -8,24 +8,24 @@
 export function parseSpiffHeader(data) {
 
     if (data.length < 30) {
-        throw new Error('SPIFF header too short');
+        return [null, new Error('SPIFF header too short')];
     }
 
     if (data[0] !== 0x53 || data[1] !== 0x50 || data[2] !== 0x49 ||
         data[3] !== 0x46 || data[4] !== 0x46 || data[5] !== 0x00) {
-        throw new Error('Invalid SPIFF identifier');
+        return [null, new Error('Invalid SPIFF identifier')];
     }
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
 
-    return {
+    return [{
         version: {
             major: data[6],
             minor: data[7]
         },
         profileId: data[8],
         componentCount: data[9],
-        height: view.getUint32(10, false), 
+        height: view.getUint32(10, false),
         width: view.getUint32(14, false),
         colorSpace: data[18],
         bitsPerSample: data[19],
@@ -33,7 +33,7 @@ export function parseSpiffHeader(data) {
         resolutionUnits: data[21],
         verticalResolution: view.getUint32(22, false),
         horizontalResolution: view.getUint32(26, false)
-    };
+    }, null];
 }
 
 export const SPIFF_COLOR_SPACES = {

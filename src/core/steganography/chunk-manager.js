@@ -7,11 +7,12 @@ export class ChunkManager {
      * 
      * @param {Uint8Array} data - Data to split
      * @param {number} chunkSize - Maximum size of each chunk in bytes
+     * @param {string} [chunkId] - Injected ID for deterministic testing
      * @returns {Array<Object>} Array of chunk objects
      */
-    static split(data, chunkSize) {
+    static split(data, chunkSize, chunkId = null) {
         const chunks = [];
-        const chunkId = this.generateId();
+        const id = chunkId || ChunkManager.generateId();
         const totalChunks = Math.ceil(data.length / chunkSize);
 
         for (let i = 0; i < totalChunks; i++) {
@@ -20,11 +21,11 @@ export class ChunkManager {
             const chunkData = data.slice(start, end);
 
             chunks.push({
-                chunkId: chunkId,
+                chunkId: id,
                 index: i,
                 total: totalChunks,
                 data: chunkData,
-                checksum: this.calculateChecksum(chunkData)
+                checksum: ChunkManager.calculateChecksum(chunkData)
             });
         }
 
@@ -35,17 +36,17 @@ export class ChunkManager {
      * Reassembles chunks back into original data
      * 
      * @param {Array<Object>} chunks - Array of chunk objects
-     * @returns {Uint8Array} Reassembled data
+     * @returns {[Uint8Array|null, Error|null]} Tuple of [reassembledData, error]
      */
     static reassemble(chunks) {
         if (!chunks || chunks.length === 0) {
-            throw new Error('No chunks provided');
+            return [null, new Error('No chunks provided')];
         }
 
         const chunkId = chunks[0].chunkId;
         for (const chunk of chunks) {
             if (chunk.chunkId !== chunkId) {
-                throw new Error('Chunk IDs do not match - chunks from different datasets');
+                return [null, new Error('Chunk IDs do not match - chunks from different datasets')];
             }
         }
 
@@ -53,12 +54,12 @@ export class ChunkManager {
 
         const expectedTotal = sorted[0].total;
         if (sorted.length !== expectedTotal) {
-            throw new Error(`Missing chunks: expected ${expectedTotal}, got ${sorted.length}`);
+            return [null, new Error(`Missing chunks: expected ${expectedTotal}, got ${sorted.length}`)];
         }
 
         for (let i = 0; i < sorted.length; i++) {
             if (sorted[i].index !== i) {
-                throw new Error(`Missing chunk at index ${i}`);
+                return [null, new Error(`Missing chunk at index ${i}`)];
             }
         }
 
@@ -75,7 +76,7 @@ export class ChunkManager {
             offset += chunk.data.length;
         }
 
-        return result;
+        return [result, null];
     }
 
     /**
@@ -84,7 +85,7 @@ export class ChunkManager {
      * @returns {string} UUID-like string
      */
     static generateId() {
-        
+
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);

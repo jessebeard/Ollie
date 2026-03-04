@@ -105,7 +105,8 @@ describe('JPEG Encoder - 4:2:0 Subsampling', () => {
 
         // Decode
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(jpeg, { skipExtraction: true });
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(width);
         expect(decoded.height).toBe(height);
@@ -135,7 +136,8 @@ describe('JPEG Encoder - 4:2:0 Subsampling', () => {
 
         // Decode
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg1, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(jpeg1, { skipExtraction: true });
+        expect(err).toBeNull();
 
         expect(decoded.metadata.chromaSubsampling).toBe('4:2:0');
 
@@ -149,7 +151,8 @@ describe('JPEG Encoder - 4:2:0 Subsampling', () => {
 
         // Decode transcoded image
         const decoder2 = new JpegDecoder();
-        const decoded2 = await decoder2.decode(jpeg2, { skipExtraction: true });
+        const [decoded2, err2] = await decoder2.decode(jpeg2, { skipExtraction: true });
+        expect(err2).toBeNull();
 
         // Should preserve 4:2:0 subsampling
         expect(decoded2.metadata.chromaSubsampling).toBe('4:2:0');
@@ -167,7 +170,8 @@ describe('JPEG Encoder - 4:2:0 Subsampling', () => {
         const jpeg = await encoder.encode({ width, height, data });
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(jpeg, { skipExtraction: true });
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(width);
         expect(decoded.height).toBe(height);

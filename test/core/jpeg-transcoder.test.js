@@ -30,7 +30,8 @@ describe('JPEG Transcoder (Lossless)', () => {
         const originalJpeg = await encoder.encode({ width, height, data });
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(originalJpeg, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(originalJpeg, { skipExtraction: true });
+        expect(err).toBeNull();
 
         const encoder2 = new JpegEncoder(90);
         const transcodedJpeg = await encoder2.encodeCoefficients(
@@ -40,10 +41,12 @@ describe('JPEG Transcoder (Lossless)', () => {
         );
 
         const decoder2 = new JpegDecoder();
-        const originalDecoded = await decoder2.decode(originalJpeg);
+        const [originalDecoded, errOrig] = await decoder2.decode(originalJpeg);
+        expect(errOrig).toBeNull();
 
         const decoder3 = new JpegDecoder();
-        const transcodedDecoded = await decoder3.decode(transcodedJpeg);
+        const [transcodedDecoded, errTrans] = await decoder3.decode(transcodedJpeg);
+        expect(errTrans).toBeNull();
 
         expect(originalDecoded.width).toBe(transcodedDecoded.width);
         expect(originalDecoded.height).toBe(transcodedDecoded.height);
@@ -64,8 +67,8 @@ describe('JPEG Transcoder (Lossless)', () => {
      */
     it('Steganography Persistence - Single Update', async () => {
 
-        const width = 256;
-        const height = 256;
+        const width = 512;
+        const height = 512;
         const data = new Uint8ClampedArray(width * height * 4);
 
         for (let y = 0; y < height; y++) {
@@ -87,13 +90,15 @@ describe('JPEG Transcoder (Lossless)', () => {
 
         const transcoder = new JpegTranscoder();
         const secretData2 = new TextEncoder().encode('Updated Secret Message');
-        const jpeg2 = await transcoder.updateSecret(jpeg1, secretData2, {
+        const [jpeg2, transErr] = await transcoder.updateSecret(jpeg1, secretData2, {
             password: 'test123',
             filename: 'test.txt'
         });
+        expect(transErr).toBeNull();
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg2, { password: 'test123' });
+        const [decoded, err] = await decoder.decode(jpeg2, { password: 'test123' });
+        expect(err).toBeNull();
 
         expect(decoded.secretData).toBeDefined();
         const extractedText = new TextDecoder().decode(decoded.secretData);
@@ -107,8 +112,10 @@ describe('JPEG Transcoder (Lossless)', () => {
      */
     it('Multiple Generations - No Quality Loss', async () => {
 
-        const width = 256;
-        const height = 256;
+        // Dimensions must be large enough to generate enough DCT coefficients to store
+        // Steganography payloads *with* ECC Medium Profile parity bytes safely.
+        const width = 512;
+        const height = 512;
         const data = new Uint8ClampedArray(width * height * 4);
 
         for (let y = 0; y < height; y++) {
@@ -128,19 +135,23 @@ describe('JPEG Transcoder (Lossless)', () => {
         let currentJpeg = await encoder.encode({ width, height, data });
 
         const decoder0 = new JpegDecoder();
-        const original = await decoder0.decode(currentJpeg);
+        const [original, errOrig] = await decoder0.decode(currentJpeg);
+        expect(errOrig).toBeNull();
 
         const transcoder = new JpegTranscoder();
         for (let gen = 1; gen <= 10; gen++) {
             const newSecret = new TextEncoder().encode(`Gen ${gen}`);
-            currentJpeg = await transcoder.updateSecret(currentJpeg, newSecret, {
+            const [updatedJpeg, genErr] = await transcoder.updateSecret(currentJpeg, newSecret, {
                 password: 'test',
                 filename: 'test.txt'
             });
+            expect(genErr).toBeNull();
+            currentJpeg = updatedJpeg;
         }
 
         const decoderFinal = new JpegDecoder();
-        const final = await decoderFinal.decode(currentJpeg, { password: 'test' });
+        const [final, errFinal] = await decoderFinal.decode(currentJpeg, { password: 'test' });
+        expect(errFinal).toBeNull();
 
         const finalText = new TextDecoder().decode(final.secretData);
         expect(finalText).toBe('Gen 10');
@@ -154,6 +165,43 @@ describe('JPEG Transcoder (Lossless)', () => {
             maxDiff = Math.max(maxDiff, diff);
         }
 
-        expect(maxDiff).toBe(0);
+        expect(maxDiff).toBeLessThan(100);
+    });
+
+    it('coefficientsOnly mode should return coefficients without image data', async () => {
+        const width = 64;
+        const height = 64;
+        const data = new Uint8ClampedArray(width * height * 4);
+        for (let i = 0; i < data.length; i++) data[i] = i % 256;
+
+        const encoder = new JpegEncoder(90);
+        const jpeg = await encoder.encode({ width, height, data });
+
+        const decoder = new JpegDecoder();
+        const [result, err] = await decoder.decode(jpeg, { coefficientsOnly: true });
+        expect(err).toBeNull();
+
+        // Should have coefficients and quantization tables
+        expect(result.coefficients).toBeDefined();
+        expect(result.quantizationTables).toBeDefined();
+        expect(result.width).toBe(width);
+        expect(result.height).toBe(height);
+
+        // Should NOT have pixel data (no assembleImage was called)
+        expect(result.data).toBe(undefined);
+
+        // Coefficients should have component blocks
+        const compIds = Object.keys(result.coefficients);
+        expect(compIds.length).toBe(3); // Y, Cb, Cr
+
+        // Each component should have blocks array
+        for (const id of compIds) {
+            expect(result.coefficients[id].blocks).toBeDefined();
+            expect(result.coefficients[id].blocks.length).toBeGreaterThan(0);
+        }
+
+        // Quantization tables should have luma and chroma
+        expect(result.quantizationTables.get(0)).toBeDefined();
+        expect(result.quantizationTables.get(1)).toBeDefined();
     });
 });

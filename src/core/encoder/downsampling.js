@@ -11,13 +11,13 @@
  * Each 2x2 region in the source is averaged to produce one output pixel.
  * This is the standard box filter approach for 4:2:0 downsampling.
  * 
- * @param {Float32Array} source - 16x16 chroma values (256 elements) already level-shifted (-128)
+ * @param {Float32Array} source - Chroma channel data
  * @param {number} srcWidth - Width of source image
  * @param {number} srcX - X offset in source (must be multiple of 16)
  * @param {number} srcY - Y offset in source (must be multiple of 16)
  * @param {number} imgWidth - Original image width (for edge clamping)
  * @param {number} imgHeight - Original image height (for edge clamping)
- * @returns {Float32Array} 8x8 downsampled block (64 elements)
+ * @returns {[Float32Array, null] | [null, Error]} 8x8 downsampled block as tuple
  */
 export function downsampleBlock420(source, srcWidth, srcX, srcY, imgWidth, imgHeight) {
     const block = new Float32Array(64);
@@ -44,7 +44,7 @@ export function downsampleBlock420(source, srcWidth, srcX, srcY, imgWidth, imgHe
         }
     }
 
-    return block;
+    return [block, null];
 }
 
 /**
@@ -60,7 +60,7 @@ export function downsampleBlock420(source, srcWidth, srcX, srcY, imgWidth, imgHe
  * @param {number} srcY - Y offset (must be multiple of 16)
  * @param {number} imgWidth - Original image width
  * @param {number} imgHeight - Original image height
- * @returns {Float32Array[]} Array of 4 blocks [Y0, Y1, Y2, Y3]
+ * @returns {[Float32Array[], null] | [null, Error]} Array of 4 blocks [Y0, Y1, Y2, Y3] as tuple
  */
 export function extractLumaBlocks420(yChannel, srcWidth, srcX, srcY, imgWidth, imgHeight) {
     const blocks = [];
@@ -89,5 +89,5 @@ export function extractLumaBlocks420(yChannel, srcWidth, srcX, srcY, imgWidth, i
         blocks.push(block);
     }
 
-    return blocks;
+    return [blocks, null];
 }

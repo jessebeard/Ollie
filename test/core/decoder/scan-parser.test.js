@@ -9,7 +9,7 @@ describe('ScanHeaderParser', () => {
             1, 0x00,     
             0, 63, 0     
         ]);
-        expect(parseScanHeader(data1).numComponents).toBe(1);
+        expect((() => { const [r] = parseScanHeader(data1); return r.numComponents; })()).toBe(1);
 
         const data3 = new Uint8Array([
             3,           
@@ -18,7 +18,7 @@ describe('ScanHeaderParser', () => {
             3, 0x11,     
             0, 63, 0
         ]);
-        expect(parseScanHeader(data3).numComponents).toBe(3);
+        expect((() => { const [r] = parseScanHeader(data3); return r.numComponents; })()).toBe(3);
     });
 
     it('should parse component selectors (Cs)', () => {
@@ -30,7 +30,7 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.components[0].selector).toBe(1);
         expect(scan.components[1].selector).toBe(2);
         expect(scan.components[2].selector).toBe(3);
@@ -44,7 +44,7 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.components[0].dcTableId).toBe(0);
         expect(scan.components[1].dcTableId).toBe(1);
     });
@@ -57,7 +57,7 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.components[0].acTableId).toBe(1);
         expect(scan.components[1].acTableId).toBe(2);
     });
@@ -69,7 +69,7 @@ describe('ScanHeaderParser', () => {
             0
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.Ss).toBe(0);
         expect(scan.Se).toBe(63);
     });
@@ -81,7 +81,7 @@ describe('ScanHeaderParser', () => {
             0x00         
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.Ah).toBe(0);
         expect(scan.Al).toBe(0);
     });
@@ -93,7 +93,7 @@ describe('ScanHeaderParser', () => {
             0x10         
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
         expect(scan.Ss).toBe(0);
         expect(scan.Se).toBe(5);
         expect(scan.Ah).toBe(1);
@@ -107,14 +107,9 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid DC table ID: 4');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseScanHeaderErrResult] = parseScanHeader(data);
+        expect(parseScanHeaderErrResult).toBeDefined();
+        expect(parseScanHeaderErrResult.message).toBe('Invalid DC table ID: 4');
     });
 
     it('should validate AC table ID range', () => {
@@ -124,14 +119,9 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid AC table ID: 4');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseScanHeaderErrResult] = parseScanHeader(data);
+        expect(parseScanHeaderErrResult).toBeDefined();
+        expect(parseScanHeaderErrResult.message).toBe('Invalid AC table ID: 4');
     });
 
     it('should validate number of components range', () => {
@@ -141,14 +131,9 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid number of components in scan: 5');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseScanHeaderErrResult] = parseScanHeader(data);
+        expect(parseScanHeaderErrResult).toBeDefined();
+        expect(parseScanHeaderErrResult.message).toBe('Invalid number of components in scan: 5');
     });
 
     it('should throw error on incomplete data', () => {
@@ -158,14 +143,9 @@ describe('ScanHeaderParser', () => {
             0, 0         
         ]);
 
-        let errorThrown = false;
-        try {
-            parseScanHeader(data);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Incomplete SOS component data');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseScanHeaderErrResult] = parseScanHeader(data);
+        expect(parseScanHeaderErrResult).toBeDefined();
+        expect(parseScanHeaderErrResult.message).toBe('Incomplete SOS component data');
     });
 
     it('should map components to Huffman tables correctly', () => {
@@ -177,7 +157,7 @@ describe('ScanHeaderParser', () => {
             0, 63, 0
         ]);
 
-        const scan = parseScanHeader(data);
+        const [scan, scanErr] = parseScanHeader(data);
 
         expect(scan.components[0].dcTableId).toBe(0);
         expect(scan.components[0].acTableId).toBe(0);

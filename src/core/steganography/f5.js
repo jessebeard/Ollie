@@ -19,6 +19,10 @@ export class F5 {
     static MAGIC = 'F5SG';
     static VERSION = 1;
 
+    static crc32(data) {
+        return crc32(data);
+    }
+
     /**
      * Create a seeded PRNG for permutation.
      * Uses a simple LCG for reproducibility.
@@ -434,9 +438,15 @@ export class F5 {
         let payloadToEmbed = data;
         if (options.password) {
             metadata.encrypted = true;
-            const salt = KeyDerivation.generateSalt();
-            const key = await KeyDerivation.deriveKey(options.password, salt);
-            const { ciphertext, iv } = await Encryption.encrypt(data, key);
+            const [salt, saltErr] = KeyDerivation.generateSalt();
+            if (saltErr) return { success: false, error: saltErr };
+
+            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+            if (keyErr) return { success: false, error: keyErr };
+
+            const [encResult, encErr] = await Encryption.encrypt(data, key);
+            if (encErr) return { success: false, error: encErr };
+            const { ciphertext, iv } = encResult;
 
             const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
             encryptedPayload.set(salt, 0);
@@ -449,7 +459,11 @@ export class F5 {
         let protectedPayload = payloadToEmbed;
         if (metadata.ecc) {
             const eccProfile = metadata.eccProfile || 'Medium';
-            const eccResult = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            const [eccResult, eccErr] = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            if (eccErr) {
+                console.error('F5: ECC protection failed:', eccErr);
+                return null;
+            }
             protectedPayload = eccResult.encoded;
 
             metadata.eccProfile = eccProfile;
@@ -695,20 +709,20 @@ export class F5 {
         }
 
         if (metadata.ecc) {
-            try {
-                if (metadata.eccProfile && metadata.originalLength !== undefined) {
-                    payload = ErrorCorrection.recover(
-                        payload,
-                        metadata.eccProfile,
-                        metadata.originalLength,
-                        metadata.blockCount
-                    );
-                } else {
-                    payload = ErrorCorrection.recover(payload);
+            if (metadata.eccProfile && metadata.originalLength !== undefined) {
+                const [recovered, recoverErr] = ErrorCorrection.recover(
+                    payload,
+                    metadata.eccProfile,
+                    metadata.originalLength,
+                    metadata.blockCount
+                );
+                if (recoverErr) {
+                    console.error('F5: ECC recovery failed:', recoverErr);
+                    return null;
                 }
-            } catch (e) {
-                console.error('F5: ECC recovery failed:', e);
-                return null;
+                payload = recovered;
+            } else {
+                payload = ErrorCorrection.recover(payload);
             }
         }
 
@@ -718,17 +732,22 @@ export class F5 {
                 return null;
             }
 
-            try {
-                const salt = payload.slice(0, 16);
-                const iv = payload.slice(16, 28);
-                const ciphertext = payload.slice(28);
+            const salt = payload.slice(0, 16);
+            const iv = payload.slice(16, 28);
+            const ciphertext = payload.slice(28);
 
-                const key = await KeyDerivation.deriveKey(options.password, salt);
-                payload = await Encryption.decrypt(ciphertext, key, iv);
-            } catch (e) {
-                console.error('F5: Decryption failed:', e);
+            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+            if (keyErr) {
+                console.error('F5: Key derivation failed:', keyErr);
                 return null;
             }
+
+            const [decryptedPayload, decErr] = await Encryption.decrypt(ciphertext, key, iv);
+            if (decErr) {
+                console.error('F5: Decryption failed:', decErr);
+                return null;
+            }
+            payload = decryptedPayload;
         }
 
         return {

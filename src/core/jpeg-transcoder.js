@@ -21,16 +21,17 @@ export class JpegTranscoder {
      * @returns {Promise<Uint8Array>} Updated JPEG with new secret data
      */
     async updateSecret(jpegBytes, newSecretData, options = {}) {
-        
+
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpegBytes, { skipExtraction: true });
+        const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
+        if (decodeErr) return [null, decodeErr];
 
         if (!decoded.coefficients) {
-            throw new Error('Decoder did not return coefficients. Lossless transcoding requires coefficient access.');
+            return [null, new Error('Decoder did not return coefficients. Lossless transcoding requires coefficient access.')];
         }
 
         if (!decoded.quantizationTables) {
-            throw new Error('Decoder did not return quantization tables. Lossless transcoding requires table preservation.');
+            return [null, new Error('Decoder did not return quantization tables. Lossless transcoding requires table preservation.')];
         }
 
         const encoder = new JpegEncoder(90, {
@@ -40,15 +41,18 @@ export class JpegTranscoder {
             progressive: decoded.metadata?.progressive || false
         });
 
-        const outputBytes = await encoder.encodeCoefficients(
-            decoded.coefficients,
-            decoded.quantizationTables,
-            {
-                width: decoded.width,
-                height: decoded.height
-            }
-        );
-
-        return outputBytes;
+        try {
+            const outputBytes = await encoder.encodeCoefficients(
+                decoded.coefficients,
+                decoded.quantizationTables,
+                {
+                    width: decoded.width,
+                    height: decoded.height
+                }
+            );
+            return [outputBytes, null];
+        } catch (e) {
+            return [null, e instanceof Error ? e : new Error(String(e))];
+        }
     }
 }

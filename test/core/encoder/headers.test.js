@@ -2,7 +2,7 @@ import { describe, it, expect } from '../../utils/test-runner.js';
 import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
 import { getScaledQuantizationTables } from '../../../src/core/encoder/quantization.js';
 
-const defaultQTables = getScaledQuantizationTables(50);
+const [defaultQTables] = getScaledQuantizationTables(50);
 describe('JPEG Headers', () => {
     it('should write correct SOI marker', () => {
         const encoder = new JpegEncoder();
@@ -18,18 +18,18 @@ describe('JPEG Headers', () => {
         encoder.writeHeaders(null, 100, 100, defaultQTables);
         const headers = encoder.headers;
 
-        let idx = 2; 
+        let idx = 2;
         expect(headers[idx]).toBe(0xFF);
         expect(headers[idx + 1]).toBe(0xE0);
 
         expect(headers[idx + 2]).toBe(0x00);
         expect(headers[idx + 3]).toBe(0x10);
 
-        expect(headers[idx + 4]).toBe(0x4A); 
-        expect(headers[idx + 5]).toBe(0x46); 
-        expect(headers[idx + 6]).toBe(0x49); 
-        expect(headers[idx + 7]).toBe(0x46); 
-        expect(headers[idx + 8]).toBe(0x00); 
+        expect(headers[idx + 4]).toBe(0x4A);
+        expect(headers[idx + 5]).toBe(0x46);
+        expect(headers[idx + 6]).toBe(0x49);
+        expect(headers[idx + 7]).toBe(0x46);
+        expect(headers[idx + 8]).toBe(0x00);
     });
 
     it('should write DQT markers', () => {
@@ -46,7 +46,7 @@ describe('JPEG Headers', () => {
                 expect(len).toBe(67);
             }
         }
-        
+
         expect(dqtCount).toBeGreaterThanOrEqual(2);
     });
 

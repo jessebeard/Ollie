@@ -12,7 +12,7 @@ class MockFile {
         this.name = name;
     }
     async arrayBuffer() {
-        
+
         return this.buffer.buffer.slice(this.buffer.byteOffset, this.buffer.byteOffset + this.buffer.byteLength);
     }
 }
@@ -44,7 +44,8 @@ async function runTest() {
     };
 
     console.log('Embedding...');
-    const embeddedFiles = await embedder.embed(secretData, files, options, (c, t, s) => console.log(s));
+    const [embeddedFiles, embedErr] = await embedder.embed(secretData, files, options, (c, t, s) => console.log(s));
+    if (embedErr) throw embedErr;
 
     console.log(`Embedded into ${embeddedFiles.length} files.`);
 
@@ -52,7 +53,8 @@ async function runTest() {
 
     const extractor = new BatchExtractor();
     console.log('Extracting...');
-    const result = await extractor.extract(extractFiles, null, (c, t, s) => console.log(s));
+    const [result, extractErr] = await extractor.extract(extractFiles, null, (c, t, s) => console.log(s));
+    if (extractErr) throw extractErr;
 
     console.log('Extraction complete.');
     console.log('Filename:', result.filename);

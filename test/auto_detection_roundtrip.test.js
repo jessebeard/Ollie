@@ -24,7 +24,8 @@ describe('Steganography Auto-Detection Roundtrip', () => {
         const jpegBytes = await encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.secretData).toBeDefined();
         expect(decoded.secretData.length).toBe(secretData.length);
@@ -40,7 +41,8 @@ describe('Steganography Auto-Detection Roundtrip', () => {
         const jpegBytes = await encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.secretData === null || decoded.secretData === undefined).toBe(true);
     });

@@ -10,15 +10,15 @@
  * 
  * @param {Int32Array|Float32Array} quantizedBlock - 64-element block of quantized coefficients
  * @param {Int32Array} quantTable - 64-element quantization table
- * @returns {Float32Array} Dequantized coefficients
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: dequantized coefficients, or error
  */
 export function dequantize(quantizedBlock, quantTable, outputBuffer = null) {
     if (quantizedBlock.length !== 64) {
-        throw new Error(`Invalid block length: ${quantizedBlock.length} (expected 64)`);
+        return [null, new Error(`Invalid block length: ${quantizedBlock.length} (expected 64)`)];
     }
 
     if (quantTable.length !== 64) {
-        throw new Error(`Invalid quantization table length: ${quantTable.length} (expected 64)`);
+        return [null, new Error(`Invalid quantization table length: ${quantTable.length} (expected 64)`)];
     }
 
     const dequantized = outputBuffer || new Float32Array(64);
@@ -27,7 +27,7 @@ export function dequantize(quantizedBlock, quantTable, outputBuffer = null) {
         dequantized[i] = quantizedBlock[i] * quantTable[i];
     }
 
-    return dequantized;
+    return [dequantized, null];
 }
 
 /**
@@ -39,5 +39,5 @@ export function dequantizeBypass(quantizedBlock, quantTable, outputBuffer = null
     for (let i = 0; i < 64; i++) {
         dequantized[i] = quantizedBlock[i];
     }
-    return dequantized;
+    return [dequantized, null];
 }

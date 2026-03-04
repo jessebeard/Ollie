@@ -55,14 +55,20 @@ export class VaultUI {
                 // It's a Handle
                 try {
                     const file = await item.getFile();
-                    filesToLoad.push(file);
-                    this.droppedHandles.set(file.name, item);
+                    if (FileScanner.matchesPattern(file.name, '*.jpg') || FileScanner.matchesPattern(file.name, '*.jpeg')) {
+                        filesToLoad.push(file);
+                        this.droppedHandles.set(file.name, item);
+                    }
                 } catch (e) {
                     console.warn('Failed to get file from handle:', e);
                 }
             } else {
                 // It's a standard File object
-                filesToLoad.push(item);
+                if (item.name && (FileScanner.matchesPattern(item.name, '*.jpg') || FileScanner.matchesPattern(item.name, '*.jpeg'))) {
+                    filesToLoad.push(item);
+                } else if (!item.name && (item.type === 'image/jpeg' || item.type === 'image/jpg')) {
+                    filesToLoad.push(item);
+                }
             }
         }
 
@@ -73,15 +79,21 @@ export class VaultUI {
             if (!password) return;
 
             this.showLoading(true, 'Decrypting...');
-            await this.vault.load(filesToLoad, password);
+            const [newVault, loadErr] = await PasswordVault.load(filesToLoad, password);
             this.showLoading(false);
 
+            if (loadErr) {
+                this.modals.showAlert('Error', 'Failed to load vault: ' + loadErr.message, 'error');
+                return;
+            }
+
+            this.vault = newVault;
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
             this.updateUI();
 
         } catch (e) {
             this.showLoading(false);
-            this.modals.showAlert('Error', 'Failed to load vault: ' + e.message, 'error');
+            this.modals.showAlert('Error', 'Unexpected error: ' + e.message, 'error');
         }
     }
 
@@ -95,9 +107,7 @@ export class VaultUI {
             return;
         }
 
-        this.vault = new PasswordVault();
-        this.vault.masterPassword = pass1;
-        this.vault.isUnlocked = true; // Use this flag to enable UI
+        this.vault = new PasswordVault([], null, true, pass1);
 
         this.updateUI();
         this.modals.showAlert('Created', 'New vault created. Add entries and save.');
@@ -116,7 +126,13 @@ export class VaultUI {
         const data = await this.modals.showForm('Add New Entry', fields);
         if (!data) return;
 
-        this.vault.addEntry(data);
+        const [newVault, err] = this.vault.addEntry(data);
+        if (err) {
+            this.modals.showAlert('Error', 'Failed to add entry: ' + err.message, 'error');
+            return;
+        }
+
+        this.vault = newVault;
         this.updateUI();
         this.modals.showAlert('Success', 'Entry added.');
     }
@@ -140,7 +156,13 @@ export class VaultUI {
         const data = await this.modals.showForm('Edit Entry', fields, initial);
         if (!data) return;
 
-        this.vault.updateEntry(entry.id, data);
+        const [newVault, err] = this.vault.updateEntry(entry.id, data);
+        if (err) {
+            this.modals.showAlert('Error', 'Failed to edit entry: ' + err.message, 'error');
+            return;
+        }
+
+        this.vault = newVault;
         this.updateUI();
     }
 

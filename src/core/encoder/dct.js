@@ -24,6 +24,10 @@ C[0] = 1 / Math.sqrt(2);
 for (let i = 1; i < 8; i++) C[i] = 1;
 
 export function forwardDCTNaive(block) {
+    if (block.length !== 64) {
+        return [null, new Error(`Invalid block length: ${block.length} (expected 64)`)];
+    }
+
     const rowOutput = new Float32Array(64);
     const result = new Float32Array(64);
 
@@ -32,7 +36,7 @@ export function forwardDCTNaive(block) {
             let sum = 0;
             for (let x = 0; x < 8; x++) {
                 const pixel = block[y * 8 + x];
-                const cosVal = COS_TABLE[u * 8 + x]; 
+                const cosVal = COS_TABLE[u * 8 + x];
                 sum += pixel * cosVal;
             }
             const cu = C[u];
@@ -45,7 +49,7 @@ export function forwardDCTNaive(block) {
             let sum = 0;
             for (let y = 0; y < 8; y++) {
                 const val = rowOutput[y * 8 + u];
-                const cosVal = COS_TABLE[v * 8 + y]; 
+                const cosVal = COS_TABLE[v * 8 + y];
                 sum += val * cosVal;
             }
             const cv = C[v];
@@ -53,7 +57,7 @@ export function forwardDCTNaive(block) {
         }
     }
 
-    return result;
+    return [result, null];
 }
 
 const C1 = 0.98078528;
@@ -114,12 +118,12 @@ function aan_fdct_1d(data, offset, stride) {
     const tmp12 = t1 - t2;
     const tmp13 = t0 - t3;
 
-    data[offset] = tmp10 + tmp11; 
-    data[offset + stride * 4] = tmp10 - tmp11; 
+    data[offset] = tmp10 + tmp11;
+    data[offset + stride * 4] = tmp10 - tmp11;
 
     const z1 = (tmp12 + tmp13) * 0.707106781;
-    data[offset + stride * 2] = tmp13 + z1; 
-    data[offset + stride * 6] = tmp13 - z1; 
+    data[offset + stride * 2] = tmp13 + z1;
+    data[offset + stride * 6] = tmp13 - z1;
 
     const tmp10_o = t4 + t5;
     const tmp11_o = t5 + t6;
@@ -140,14 +144,18 @@ function aan_fdct_1d(data, offset, stride) {
 }
 
 export function forwardDCTAAN(block) {
+    if (block.length !== 64) {
+        return [null, new Error(`Invalid block length: ${block.length} (expected 64)`)];
+    }
+
     const output = new Float32Array(64);
     const temp = new Float32Array(64);
 
     for (let y = 0; y < 8; y++) {
-        
+
         for (let x = 0; x < 8; x++) temp[x] = block[y * 8 + x];
         aan_fdct_1d(temp, 0, 1);
-        
+
         for (let x = 0; x < 8; x++) output[y * 8 + x] = temp[x];
     }
 
@@ -159,7 +167,7 @@ export function forwardDCTAAN(block) {
         output[i] *= AAN_FDCT_SCALE[i];
     }
 
-    return output;
+    return [output, null];
 }
 
 export const forwardDCT = forwardDCTNaive;

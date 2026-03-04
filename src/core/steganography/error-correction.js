@@ -30,7 +30,7 @@ const BLOCK_SIZE = 255;
  * ErrorCorrection - Robust Reed-Solomon wrapper with chunking and interleaving
  */
 export class ErrorCorrection {
-    
+
     static FIELD = GenericGF_QR_CODE_FIELD_256;
 
     static DEFAULT_PARITY_BYTES = 4;
@@ -47,7 +47,7 @@ export class ErrorCorrection {
      *                              Legacy mode: Uint8Array
      */
     static protect(data, profileOrParity = null) {
-        
+
         if (profileOrParity === null) {
             return this._protectLegacy(data, this.DEFAULT_PARITY_BYTES);
         }
@@ -58,7 +58,7 @@ export class ErrorCorrection {
         const profileName = profileOrParity;
         const profile = ECC_PROFILES[profileName];
         if (!profile) {
-            throw new Error(`Unknown ECC profile: ${profileName}`);
+            return [null, new Error(`Unknown ECC profile: ${profileName}`)];
         }
 
         const { dataBytes, parityBytes } = profile;
@@ -84,12 +84,12 @@ export class ErrorCorrection {
 
         const interleaved = this._interleave(blocks, blockCount, BLOCK_SIZE);
 
-        return {
+        return [{
             encoded: interleaved,
             originalLength,
             profile: profileName,
             blockCount
-        };
+        }, null];
     }
 
     /**
@@ -105,7 +105,7 @@ export class ErrorCorrection {
      * @throws {Error} If too many errors to correct
      */
     static recover(encoded, profileOrParity = null, originalLength = null, blockCount = null) {
-        
+
         if (profileOrParity === null) {
             return this._recoverLegacy(encoded, this.DEFAULT_PARITY_BYTES);
         }
@@ -116,7 +116,7 @@ export class ErrorCorrection {
         const profileName = profileOrParity;
         const profile = ECC_PROFILES[profileName];
         if (!profile) {
-            throw new Error(`Unknown ECC profile: ${profileName}`);
+            return [null, new Error(`Unknown ECC profile: ${profileName}`)];
         }
 
         const { dataBytes, parityBytes } = profile;
@@ -134,7 +134,7 @@ export class ErrorCorrection {
             try {
                 decoder.decode(block, parityBytes);
             } catch (e) {
-                throw new Error(`ECC recovery failed on block ${i}: ${e.message}`);
+                return [null, new Error(`ECC recovery failed on block ${i}: ${e.message}`)];
             }
 
             const chunk = new Uint8Array(dataBytes);
@@ -154,7 +154,7 @@ export class ErrorCorrection {
             if (offset >= result.length) break;
         }
 
-        return result;
+        return [result, null];
     }
 
     /**

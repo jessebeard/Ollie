@@ -18,7 +18,7 @@ export class BitWriter {
         this.bitCount++;
         if (this.bitCount === 8) {
             this.bytes.push(this.byte);
-            
+
             if (this.byte === 0xFF) {
                 this.bytes.push(0x00);
             }
@@ -29,7 +29,7 @@ export class BitWriter {
 
     alignByte() {
         if (this.bitCount > 0) {
-            
+
             const shift = 8 - this.bitCount;
             this.byte = (this.byte << shift) | ((1 << shift) - 1);
             this.bytes.push(this.byte);

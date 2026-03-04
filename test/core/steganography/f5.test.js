@@ -5,6 +5,7 @@
  * and container format.
  */
 import { F5 } from '../../../src/core/steganography/f5.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
 
 describe('F5 Steganography', () => {
     describe('PRNG', () => {
@@ -98,7 +99,7 @@ describe('F5 Steganography', () => {
             expect(result.success).toBe(true);
 
             const extracted = F5.extractRaw(blocks, data.length * 8, { seed: 'test', k: result.k });
-            expect(extracted).not.toBeNull();
+            expect(extracted).not.toBe(null);
             expect(Array.from(extracted.slice(0, data.length))).toEqual(Array.from(data));
         });
 
@@ -119,7 +120,7 @@ describe('F5 Steganography', () => {
             expect(result.success).toBe(true);
 
             const extracted = F5.extractRaw(blocks, data.length * 8, { seed: 'shrinktest', k: result.k });
-            expect(extracted).not.toBeNull();
+            expect(extracted).not.toBe(null);
             expect(Array.from(extracted.slice(0, data.length))).toEqual(Array.from(data));
         });
     });
@@ -140,7 +141,7 @@ describe('F5 Steganography', () => {
             expect(result).toBe(true);
 
             const extracted = F5.extract(blocks, { seed: 'legacy' });
-            expect(extracted).not.toBeNull();
+            expect(extracted).not.toBe(null);
             expect(extracted.length).toBe(data.length);
             expect(Array.from(extracted)).toEqual(Array.from(data));
         });
@@ -164,7 +165,7 @@ describe('F5 Steganography', () => {
             expect(result).toBe(true);
 
             const extracted = await F5.extractContainer(blocks, { seed: 'containertest' });
-            expect(extracted).not.toBeNull();
+            expect(extracted).not.toBe(null);
             expect(extracted.metadata.filename).toBe('test.txt');
             expect(Array.from(extracted.data)).toEqual(Array.from(data));
         });

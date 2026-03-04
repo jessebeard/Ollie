@@ -27,7 +27,8 @@ describe('Steganography Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(width);
         expect(decoded.height).toBe(height);
@@ -40,9 +41,9 @@ describe('Steganography Roundtrip', () => {
     });
 
     it('should handle data too large for capacity (graceful failure)', async () => {
-        
+
         const width = 8;
-        const height = 8; 
+        const height = 8;
         const original = createNoiseImage(width, height);
 
         const secretData = new Uint8Array(100).fill(65);

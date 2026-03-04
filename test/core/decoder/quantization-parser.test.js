@@ -14,7 +14,7 @@ describe('QuantizationTableParser', () => {
             data[i + 1] = i + 1; 
         }
 
-        const result = parseQuantizationTable(data, 0);
+        const [result, resultErr] = parseQuantizationTable(data, 0);
 
         expect(result.id).toBe(0);
         expect(result.precision).toBe(0);
@@ -32,7 +32,7 @@ describe('QuantizationTableParser', () => {
         data[1] = 0x01; data[2] = 0x00; 
         data[3] = 0x02; data[4] = 0x00; 
 
-        const result = parseQuantizationTable(data, 0);
+        const [result, resultErr] = parseQuantizationTable(data, 0);
 
         expect(result.id).toBe(1);
         expect(result.precision).toBe(1);
@@ -51,7 +51,7 @@ describe('QuantizationTableParser', () => {
         for (const { pqTq, expectedId } of testCases) {
             const data = new Uint8Array(65);
             data[0] = pqTq;
-            const result = parseQuantizationTable(data, 0);
+            const [result, resultErr] = parseQuantizationTable(data, 0);
             expect(result.id).toBe(expectedId);
         }
     });
@@ -63,7 +63,7 @@ describe('QuantizationTableParser', () => {
             data[i + 1] = (i * 2) % 256;
         }
 
-        const result = parseQuantizationTable(data, 0);
+        const [result, resultErr] = parseQuantizationTable(data, 0);
         expect(result.table.length).toBe(64);
 
         for (let i = 0; i < 64; i++) {
@@ -85,7 +85,7 @@ describe('QuantizationTableParser', () => {
             data[65 + i + 1] = 64 + i;
         }
 
-        const tables = parseAllQuantizationTables(data);
+        const [tables, tablesErr] = parseAllQuantizationTables(data);
 
         expect(tables.size).toBe(2);
         expect(tables.has(0)).toBe(true);
@@ -98,42 +98,27 @@ describe('QuantizationTableParser', () => {
         const data = new Uint8Array(65);
         data[0] = 0x04; 
 
-        let errorThrown = false;
-        try {
-            parseQuantizationTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid quantization table ID: 4');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseQuantizationTableErrResult] = parseQuantizationTable(data, 0);
+        expect(parseQuantizationTableErrResult).toBeDefined();
+        expect(parseQuantizationTableErrResult.message).toBe('Invalid quantization table ID: 4');
     });
 
     it('should validate precision value', () => {
         const data = new Uint8Array(65);
         data[0] = 0x20; 
 
-        let errorThrown = false;
-        try {
-            parseQuantizationTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid quantization table precision: 2');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseQuantizationTableErrResult] = parseQuantizationTable(data, 0);
+        expect(parseQuantizationTableErrResult).toBeDefined();
+        expect(parseQuantizationTableErrResult.message).toBe('Invalid quantization table precision: 2');
     });
 
     it('should throw error on incomplete table data', () => {
         const data = new Uint8Array(10); 
         data[0] = 0x00;
 
-        let errorThrown = false;
-        try {
-            parseQuantizationTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Incomplete quantization table data');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseQuantizationTableErrResult] = parseQuantizationTable(data, 0);
+        expect(parseQuantizationTableErrResult).toBeDefined();
+        expect(parseQuantizationTableErrResult.message).toBe('Incomplete quantization table data');
     });
 
     it('should parse tables from multiple DQT segments', () => {
@@ -155,7 +140,7 @@ describe('QuantizationTableParser', () => {
             { data: segment2Data }
         ];
 
-        const tables = parseQuantizationTablesFromSegments(segments);
+        const [tables, tablesErr] = parseQuantizationTablesFromSegments(segments);
 
         expect(tables.size).toBe(2);
         expect(tables.get(0)[0]).toBe(0);
@@ -177,7 +162,7 @@ describe('QuantizationTableParser', () => {
             { data: segment2Data }
         ];
 
-        const tables = parseQuantizationTablesFromSegments(segments);
+        const [tables, tablesErr] = parseQuantizationTablesFromSegments(segments);
 
         expect(tables.size).toBe(1);
         expect(tables.get(0)[0]).toBe(200); 
@@ -193,7 +178,7 @@ describe('QuantizationTableParser', () => {
             data[66 + i] = i + 10;
         }
 
-        const result = parseQuantizationTable(data, 65);
+        const [result, resultErr] = parseQuantizationTable(data, 65);
         expect(result.id).toBe(1);
         expect(result.table[0]).toBe(10);
     });

@@ -1,21 +1,12 @@
-import { BitReaderNaive } from './bit-reader-naive.js';
 import { BitReaderOptimized } from './bit-reader-optimized.js';
 
 /**
  * BitReader Wrapper
- * Delegates to either Naive or Optimized implementation
+ * Delegates to the Optimized implementation
  */
 export class BitReader {
     constructor(data) {
-        if (BitReader.mode === 'naive') {
-            this.impl = new BitReaderNaive(data);
-        } else {
-            this.impl = new BitReaderOptimized(data);
-        }
-    }
-
-    static setMode(mode) {
-        BitReader.mode = mode;
+        this.impl = new BitReaderOptimized(data);
     }
 
     readBit() { return this.impl.readBit(); }
@@ -38,5 +29,3 @@ export class BitReader {
     get data() { return this.impl.data; }
     set data(v) { this.impl.data = v; }
 }
-
-BitReader.mode = 'optimized';

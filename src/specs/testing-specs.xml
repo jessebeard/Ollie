@@ -11,6 +11,9 @@
                 <Features>Visual report, hierarchical suite rendering, immediate feedback.</Features>
             </Environment>
         </Environments>
+        <Constraints>
+            <Constraint>Both Node.js and Browser environments must contain identically matching test import lists to ensure code coverage parity across javascript engines.</Constraint>
+        </Constraints>
     </Overview>
 
     <Architecture>

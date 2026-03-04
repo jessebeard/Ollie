@@ -15,11 +15,11 @@
 /**
  * Parse SOS scan header
  * @param {Uint8Array} segmentData - SOS segment data (without marker and length)
- * @returns {Object} Scan information
+ * @returns {[Object, null] | [null, Error]} Tuple: scan information, or error
  */
 export function parseScanHeader(segmentData) {
     if (segmentData.length < 4) {
-        throw new Error('Invalid SOS segment: too short');
+        return [null, new Error('Invalid SOS segment: too short')];
     }
 
     let offset = 0;
@@ -27,12 +27,12 @@ export function parseScanHeader(segmentData) {
     const numComponents = segmentData[offset++];
 
     if (numComponents < 1 || numComponents > 4) {
-        throw new Error(`Invalid number of components in scan: ${numComponents}`);
+        return [null, new Error(`Invalid number of components in scan: ${numComponents}`)];
     }
 
     const expectedMinLength = 1 + (numComponents * 2) + 3;
     if (segmentData.length < expectedMinLength) {
-        throw new Error('Incomplete SOS component data');
+        return [null, new Error('Incomplete SOS component data')];
     }
 
     const components = [];
@@ -44,10 +44,10 @@ export function parseScanHeader(segmentData) {
         const acTableId = tdTaByte & 0x0F;
 
         if (dcTableId > 3) {
-            throw new Error(`Invalid DC table ID: ${dcTableId}`);
+            return [null, new Error(`Invalid DC table ID: ${dcTableId}`)];
         }
         if (acTableId > 3) {
-            throw new Error(`Invalid AC table ID: ${acTableId}`);
+            return [null, new Error(`Invalid AC table ID: ${acTableId}`)];
         }
 
         components.push({
@@ -64,12 +64,12 @@ export function parseScanHeader(segmentData) {
     const Ah = (ahAlByte >> 4) & 0x0F;
     const Al = ahAlByte & 0x0F;
 
-    return {
+    return [{
         numComponents,
         components,
         Ss,
         Se,
         Ah,
         Al
-    };
+    }, null];
 }

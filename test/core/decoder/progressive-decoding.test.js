@@ -4,7 +4,7 @@ import { describe, it, expect } from '../../../test/utils/test-runner.js';
 
 describe('Progressive Decoding', () => {
     it('should decode a progressive JPEG correctly', async () => {
-        
+
         const encoder = new JpegEncoder(50, { progressive: true });
         const width = 16;
         const height = 16;
@@ -15,16 +15,17 @@ describe('Progressive Decoding', () => {
         };
 
         for (let i = 0; i < width * height; i++) {
-            imageData.data[i * 4] = 255;     
-            imageData.data[i * 4 + 1] = 0;   
-            imageData.data[i * 4 + 2] = 0;   
-            imageData.data[i * 4 + 3] = 255; 
+            imageData.data[i * 4] = 255;
+            imageData.data[i * 4 + 1] = 0;
+            imageData.data[i * 4 + 2] = 0;
+            imageData.data[i * 4 + 3] = 255;
         }
 
         const jpegBytes = await await encoder.encode(imageData);
 
         const decoder = new JpegDecoder();
-        const decoded = await await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(width);
         expect(decoded.height).toBe(height);

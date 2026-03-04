@@ -32,11 +32,11 @@ for (let i = 1; i < 8; i++) {
  * - C[v] = 1/√2 if v=0, else 1
  * 
  * @param {Float32Array} coefficients - 64 DCT coefficients in row-major order
- * @returns {Float32Array} 64 spatial domain values in row-major order
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: spatial domain values, or error
  */
 export function idctPureRef(coefficients) {
     if (coefficients.length !== 64) {
-        throw new Error(`Invalid coefficient block length: ${coefficients.length}`);
+        return [null, new Error(`Invalid coefficient block length: ${coefficients.length}`)];
     }
 
     const output = new Float32Array(64);
@@ -47,11 +47,11 @@ export function idctPureRef(coefficients) {
 
             for (let v = 0; v < 8; v++) {
                 for (let u = 0; u < 8; u++) {
-                    
+
                     const S_vu = coefficients[v * 8 + u];
 
-                    const cos_x_u = COS_TABLE[u * 8 + x];  
-                    const cos_y_v = COS_TABLE[v * 8 + y];  
+                    const cos_x_u = COS_TABLE[u * 8 + x];
+                    const cos_y_v = COS_TABLE[v * 8 + y];
 
                     sum += C[u] * C[v] * S_vu * cos_x_u * cos_y_v;
                 }
@@ -61,7 +61,7 @@ export function idctPureRef(coefficients) {
         }
     }
 
-    return output;
+    return [output, null];
 }
 
 /**
@@ -71,11 +71,11 @@ export function idctPureRef(coefficients) {
  * 1D IDCT formula: x[n] = (1/2) * Sum(k=0..7) C[k] * X[k] * cos((2n+1)k*π/16)
  * 
  * @param {Float32Array} coefficients - 64 DCT coefficients in row-major order
- * @returns {Float32Array} 64 spatial domain values in row-major order
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: spatial domain values, or error
  */
 export function idctOptimizedRef(coefficients) {
     if (coefficients.length !== 64) {
-        throw new Error(`Invalid coefficient block length: ${coefficients.length}`);
+        return [null, new Error(`Invalid coefficient block length: ${coefficients.length}`)];
     }
 
     const intermediate = new Float32Array(64);
@@ -85,8 +85,8 @@ export function idctOptimizedRef(coefficients) {
         for (let y = 0; y < 8; y++) {
             let sum = 0;
             for (let v = 0; v < 8; v++) {
-                const coeff = coefficients[v * 8 + x];  
-                const cosVal = COS_TABLE[v * 8 + y];    
+                const coeff = coefficients[v * 8 + x];
+                const cosVal = COS_TABLE[v * 8 + y];
                 sum += C[v] * coeff * cosVal;
             }
             intermediate[y * 8 + x] = sum * 0.5;
@@ -97,15 +97,15 @@ export function idctOptimizedRef(coefficients) {
         for (let x = 0; x < 8; x++) {
             let sum = 0;
             for (let u = 0; u < 8; u++) {
-                const val = intermediate[y * 8 + u];    
-                const cosVal = COS_TABLE[u * 8 + x];    
+                const val = intermediate[y * 8 + u];
+                const cosVal = COS_TABLE[u * 8 + x];
                 sum += C[u] * val * cosVal;
             }
             output[y * 8 + x] = sum * 0.5;
         }
     }
 
-    return output;
+    return [output, null];
 }
 
 /**
@@ -126,7 +126,7 @@ export function idctFastAAN(coefficients) {
         idct1D(coefficients, i, 1);
     }
 
-    return coefficients;
+    return [coefficients, null];
 }
 
 const S0 = 0.35355339059;

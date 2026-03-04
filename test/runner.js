@@ -106,6 +106,7 @@ async function runTests() {
         await import('./core/encoder/quantization.test.js');
         await import('./core/encoder/zigzag.test.js');
         await import('./core/encoder/huffman.test.js');
+        await import('./core/encoder/downsampling.test.js');
         await import('./core/encoder/progressive-encoding.test.js');
         await import('./core/encoder/spiff-generation.test.js');
         await import('./core/jpeg-encoder.test.js');
@@ -117,7 +118,6 @@ async function runTests() {
         await import('./core/decoder/huffman-parser.test.js');
         await import('./core/decoder/quantization-parser.test.js');
         await import('./core/decoder/huffman-decoder.test.js');
-        await import('./core/decoder/huffman-naive.test.js');
         await import('./core/decoder/inverse-zigzag.test.js');
         await import('./core/decoder/dequantization.test.js');
         await import('./core/decoder/idct.test.js');
@@ -127,21 +127,28 @@ async function runTests() {
         await import('./core/decoder/upsampling.test.js');
         await import('./core/decoder/block-assembly.test.js');
         await import('./core/decoder/progressive-decoding.test.js');
-        await import('./core/decoder/spiff-parsing.test.js');
-
+        await import('./core/decoder/rst-markers.test.js');
         await import('./utils/bit-reader.test.js');
-        await import('./utils/bit-reader-switching.test.js');
         await import('./utils/marker-parser.test.js');
 
         await import('./core/steganography.test.js');
         await import('./core/steganography/container.test.js');
         await import('./core/steganography/chunk-manager.test.js');
+        await import('./core/steganography/f5.test.js');
+        await import('./core/steganography/batch-process.test.js');
+        await import('./core/steganography/error-correction.test.js');
         await import('./core/container-format.test.js');
 
+        await import('./core/crypto/encryption.test.js');
+        await import('./core/crypto/key-derivation.test.js');
+
         await import('./core/EC/reed-solomon-integration.test.js');
+        await import('./core/EC/galois-field.test.js');
+        await import('./core/EC/reed-solomon.test.js');
         await import('./EC/reedsolomon.test.js');
 
         await import('./core/jpeg-decoder.test.js');
+        await import('./core/jpeg-decoder-defensive.test.js');
         await import('./integration/roundtrip.test.js');
         await import('./integration/steganography-roundtrip.test.js');
         await import('./auto_detection_roundtrip.test.js');
@@ -150,10 +157,9 @@ async function runTests() {
 
         await import('./core/jpeg-encoder-coefficients.test.js');
         await import('./core/jpeg-transcoder.test.js');
+        await import('./core/orchestrator.test.js');
 
         await import('./core/vault/vault-manager.test.js');
-
-        await import('./ui.test.js');
 
         const stats = getStats();
 

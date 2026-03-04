@@ -21,6 +21,7 @@ export class JpegEncoder {
             progressive: options.progressive || false,
             secretData: options.secretData || null,
             subsampling: options.subsampling || '4:4:4', // '4:4:4' or '4:2:0'
+            restartInterval: options.restartInterval || 0,
             ...options
         };
         // Store subsampling for methods that need it
@@ -81,13 +82,14 @@ export class JpegEncoder {
         console.log(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes (ECC: ${useEcc})`);
 
         if (this.options.secretData.length > capacity) {
-            throw new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`);
+            return [null, new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`)];
         }
 
         const result = await F5.embedContainer(allBlocks, this.options.secretData, metadata, { password: this.options.password });
         if (!result) {
-            throw new Error('Failed to embed secret data into image.');
+            return [null, new Error('Failed to embed secret data into image.')];
         }
+        return [true, null];
     }
 
     /**
@@ -155,6 +157,12 @@ export class JpegEncoder {
             writeWord(0); writeWord(72);
             writeWord(0); writeWord(72);
         }
+
+        if (this.options.restartInterval > 0) {
+            writeWord(0xFFDD);
+            writeWord(4);
+            writeWord(this.options.restartInterval);
+        }
     }
 
     /**
@@ -198,7 +206,7 @@ export class JpegEncoder {
         this.headers = [];
         const writer = new BitWriter();
 
-        const qTables = getScaledQuantizationTables(this.quality);
+        const [qTables] = getScaledQuantizationTables(this.quality);
 
         this.writeHeaders(writer, width, height, qTables);
 
@@ -210,7 +218,7 @@ export class JpegEncoder {
 
         if (this.subsampling === '4:2:0') {
             // 4:2:0 mode: 16x16 MCUs, 4 Y blocks + 1 Cb + 1 Cr per MCU
-            const padded = padDimensions420(width, height);
+            const [padded] = padDimensions420(width, height);
             let mcuCount = 0;
 
             for (let mcuY = 0; mcuY < padded.height; mcuY += 16) {
@@ -232,7 +240,7 @@ export class JpegEncoder {
                                 const r = data[idx];
                                 const g = data[idx + 1];
                                 const b = data[idx + 2];
-                                const ycbcr = rgbToYcbcr(r, g, b);
+                                const [ycbcr] = rgbToYcbcr(r, g, b);
                                 Y[row * 8 + col] = ycbcr.y - 128;
                             }
                         }
@@ -254,7 +262,7 @@ export class JpegEncoder {
                                     const r = data[idx];
                                     const g = data[idx + 1];
                                     const b = data[idx + 2];
-                                    const ycbcr = rgbToYcbcr(r, g, b);
+                                    const [ycbcr] = rgbToYcbcr(r, g, b);
                                     sumCb += ycbcr.cb;
                                     sumCr += ycbcr.cr;
                                 }
@@ -269,7 +277,7 @@ export class JpegEncoder {
             }
         } else {
             // 4:4:4 mode: 8x8 MCUs, 1 Y + 1 Cb + 1 Cr per MCU
-            const padded = padDimensions(width, height);
+            const [padded] = padDimensions(width, height);
             let blockCount = 0;
 
             for (let y = 0; y < padded.height; y += 8) {
@@ -291,7 +299,7 @@ export class JpegEncoder {
                             const g = data[idx + 1];
                             const b = data[idx + 2];
 
-                            const ycbcr = rgbToYcbcr(r, g, b);
+                            const [ycbcr] = rgbToYcbcr(r, g, b);
                             Y[row * 8 + col] = ycbcr.y - 128;
                             Cb[row * 8 + col] = ycbcr.cb - 128;
                             Cr[row * 8 + col] = ycbcr.cr - 128;
@@ -319,7 +327,7 @@ export class JpegEncoder {
                 // We can use 'mcuCount' derived from blocks.Cb.length or recalculate.
 
                 // Recalculate padded dimensions to be safe
-                const padded = padDimensions420(width, height);
+                const [padded] = padDimensions420(width, height);
                 const mcuCols = padded.width / 16;
                 const blocksH = padded.width / 8;
                 const blocksV = padded.height / 8;
@@ -341,7 +349,8 @@ export class JpegEncoder {
                 blocksForEmbedding = { Y: rowMajorY, Cb: blocks.Cb, Cr: blocks.Cr };
             }
 
-            await this.embedSecretData(this.flattenBlocks(blocksForEmbedding));
+            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocksForEmbedding));
+            if (embedErr) throw embedErr;
         }
 
         console.log('Finished preparing blocks. Writing scans...');
@@ -463,7 +472,8 @@ export class JpegEncoder {
 
         if (this.options.secretData) {
             console.log('Embedding secret data into coefficients...');
-            await this.embedSecretData(this.flattenBlocks(blocks));
+            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocks));
+            if (embedErr) throw embedErr;
         }
 
         console.log('Writing scans from coefficients...');
@@ -476,11 +486,12 @@ export class JpegEncoder {
 
     prepareBlock(blockData, qTable) {
 
-        const dct = forwardDCT(blockData);
+        const [dct] = forwardDCT(blockData);
 
-        const quantized = quantize(dct, qTable);
+        const [quantized] = quantize(dct, qTable);
 
-        return zigZag(quantized);
+        const [zigzagged] = zigZag(quantized);
+        return zigzagged;
     }
 
     writeScan(writer, blocks, Ss, Se) {
@@ -491,6 +502,20 @@ export class JpegEncoder {
         let prevDC_Y = 0;
         let prevDC_Cb = 0;
         let prevDC_Cr = 0;
+
+        let mcusSinceRestart = 0;
+        let expectedRstMarker = 0;
+
+        const handleRestart = () => {
+            if (this.options.restartInterval > 0 && mcusSinceRestart === this.options.restartInterval) {
+                writer.writeMarker(0xFFD0 + expectedRstMarker);
+                expectedRstMarker = (expectedRstMarker + 1) % 8;
+                mcusSinceRestart = 0;
+                prevDC_Y = 0;
+                prevDC_Cb = 0;
+                prevDC_Cr = 0;
+            }
+        };
 
         if (this.subsampling === '4:2:0') {
             // 4:2:0: Each MCU has 4 Y blocks + 1 Cb + 1 Cr
@@ -506,6 +531,7 @@ export class JpegEncoder {
                 console.log(`4:2:0 encoding (row-major): numMCUs=${numMCUs}, blocksH=${blocksH}, mcuCols=${mcuCols}`);
 
                 for (let mcu = 0; mcu < numMCUs; mcu++) {
+                    handleRestart();
                     const mcuRow = Math.floor(mcu / mcuCols);
                     const mcuCol = mcu % mcuCols;
 
@@ -514,30 +540,37 @@ export class JpegEncoder {
                         const blockRow = mcuRow * 2 + Math.floor(j / 2);
                         const blockCol = mcuCol * 2 + (j % 2);
                         const yIndex = blockRow * blocksH + blockCol;
-                        prevDC_Y = encodeBlock(blocks.Y[yIndex], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                        [prevDC_Y] = encodeBlock(blocks.Y[yIndex], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
                     }
-                    prevDC_Cb = encodeBlock(blocks.Cb[mcu], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
-                    prevDC_Cr = encodeBlock(blocks.Cr[mcu], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                    [prevDC_Cb] = encodeBlock(blocks.Cb[mcu], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                    [prevDC_Cr] = encodeBlock(blocks.Cr[mcu], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+
+                    mcusSinceRestart++;
                 }
             } else {
                 // MCU-linear storage (from encode()): blocks already in correct order
                 console.log(`4:2:0 encoding (MCU-linear): numMCUs=${numMCUs}`);
 
                 for (let mcu = 0; mcu < numMCUs; mcu++) {
+                    handleRestart();
                     for (let j = 0; j < 4; j++) {
-                        prevDC_Y = encodeBlock(blocks.Y[mcu * 4 + j], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                        [prevDC_Y] = encodeBlock(blocks.Y[mcu * 4 + j], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
                     }
-                    prevDC_Cb = encodeBlock(blocks.Cb[mcu], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
-                    prevDC_Cr = encodeBlock(blocks.Cr[mcu], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                    [prevDC_Cb] = encodeBlock(blocks.Cb[mcu], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                    [prevDC_Cr] = encodeBlock(blocks.Cr[mcu], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+
+                    mcusSinceRestart++;
                 }
             }
         } else {
             // 4:4:4: Each MCU has 1 Y + 1 Cb + 1 Cr
             const numBlocks = blocks.Y.length;
             for (let i = 0; i < numBlocks; i++) {
-                prevDC_Y = encodeBlock(blocks.Y[i], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
-                prevDC_Cb = encodeBlock(blocks.Cb[i], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
-                prevDC_Cr = encodeBlock(blocks.Cr[i], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                handleRestart();
+                [prevDC_Y] = encodeBlock(blocks.Y[i], prevDC_Y, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                [prevDC_Cb] = encodeBlock(blocks.Cb[i], prevDC_Cb, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                [prevDC_Cr] = encodeBlock(blocks.Cr[i], prevDC_Cr, writer, DC_LUMA_TABLE, AC_LUMA_TABLE, Ss, Se);
+                mcusSinceRestart++;
             }
         }
     }
@@ -551,13 +584,13 @@ export class JpegEncoder {
         writeWord(0xFFDB);
         writeWord(2 + 1 + 64);
         writeByte(0);
-        const lumaZigZag = zigZag(qTables.luma);
+        const [lumaZigZag] = zigZag(qTables.luma);
         for (let i = 0; i < 64; i++) writeByte(lumaZigZag[i]);
 
         writeWord(0xFFDB);
         writeWord(2 + 1 + 64);
         writeByte(1);
-        const chromaZigZag = zigZag(qTables.chroma);
+        const [chromaZigZag] = zigZag(qTables.chroma);
         for (let i = 0; i < 64; i++) writeByte(chromaZigZag[i]);
 
         this.writeSOF(writeByte, writeWord, width, height, this.subsampling);

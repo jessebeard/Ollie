@@ -48,7 +48,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
@@ -63,7 +64,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
@@ -78,7 +80,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);
@@ -97,7 +100,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(16);
         expect(decoded.height).toBe(16);
@@ -112,7 +116,7 @@ describe('Encoder-Decoder Roundtrip', () => {
             [8, 8],
             [16, 16],
             [24, 24],
-            [10, 10], 
+            [10, 10],
             [15, 15]
         ];
 
@@ -122,7 +126,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         for (const [width, height] of sizes) {
             const original = createSolidImage(width, height, 128, 128, 128);
             const jpegBytes = await encoder.encode(original, 90);
-            const decoded = await decoder.decode(jpegBytes);
+            const [decoded, err] = await decoder.decode(jpegBytes);
+            expect(err).toBeNull();
 
             expect(decoded.width).toBe(width);
             expect(decoded.height).toBe(height);
@@ -135,7 +140,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         const psnr = calculatePSNR(original, decoded, 16, 16);
 
@@ -151,9 +157,12 @@ describe('Encoder-Decoder Roundtrip', () => {
         const q50 = await encoder.encode(original, 50);
         const q90 = await encoder.encode(original, 90);
 
-        const decoded10 = await decoder.decode(q10);
-        const decoded50 = await decoder.decode(q50);
-        const decoded90 = await decoder.decode(q90);
+        const [decoded10, err10] = await decoder.decode(q10);
+        expect(err10).toBeNull();
+        const [decoded50, err50] = await decoder.decode(q50);
+        expect(err50).toBeNull();
+        const [decoded90, err90] = await decoder.decode(q90);
+        expect(err90).toBeNull();
 
         expect(decoded10.width).toBe(8);
         expect(decoded50.width).toBe(8);
@@ -166,7 +175,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         for (let i = 3; i < decoded.data.length; i += 4) {
             expect(decoded.data[i]).toBe(255);
@@ -179,7 +189,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(1);
         expect(decoded.height).toBe(1);
@@ -192,7 +203,8 @@ describe('Encoder-Decoder Roundtrip', () => {
         const decoder = new JpegDecoder();
 
         const jpegBytes = await encoder.encode(original, 90);
-        const decoded = await decoder.decode(jpegBytes);
+        const [decoded, err] = await decoder.decode(jpegBytes);
+        expect(err).toBeNull();
 
         expect(decoded.width).toBe(8);
         expect(decoded.height).toBe(8);

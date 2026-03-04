@@ -1,11 +1,13 @@
-import { createRequire } from 'module';
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { KeyDerivation } from '../../../src/core/crypto/key-derivation.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
-function getCrypto() {
+async function getCrypto() {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
         return crypto;
     }
+    // Node.js fallback: dynamic import to avoid breaking browser
+    const { createRequire } = await import('module');
     const require = createRequire(import.meta.url);
     const nodeCrypto = require('crypto');
 
@@ -26,89 +28,110 @@ function getCrypto() {
     };
 }
 
-const cryptoGlobal = getCrypto();
+describe('KeyDerivation (Property-Based Tests)', () => {
 
-describe('KeyDerivation', () => {
-    it('should derive a CryptoKey from password and salt', async () => {
-        const password = 'test-password';
-        const salt = new Uint8Array(16);
-        cryptoGlobal.getRandomValues(salt);
+    it('Property: Deterministic Derivation (same password & salt = same key)', async () => {
+        const cryptoGlobal = await getCrypto();
 
-        const key = await KeyDerivation.deriveKey(password, salt);
+        await assertProperty(
+            [Arbitrary.string(8, 64), Arbitrary.byteArray(16, 16)],
+            async (password, salt) => {
+                // Duplicate the salt instances to ensure they aren't mutated
+                const saltA = new Uint8Array(salt);
+                const saltB = new Uint8Array(salt);
 
-        expect(key).toBeDefined();
-        expect(key.type).toBe('secret');
-        expect(key.algorithm.name).toBe('AES-GCM');
+                const [key1, err1] = await KeyDerivation.deriveKey(password, saltA);
+                expect(err1).toEqual(null);
+
+                const [key2, err2] = await KeyDerivation.deriveKey(password, saltB);
+                expect(err2).toEqual(null);
+
+                const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
+                const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
+
+                const arr1 = new Uint8Array(raw1);
+                const arr2 = new Uint8Array(raw2);
+
+                if (arr1.length !== arr2.length) return false;
+
+                for (let i = 0; i < arr1.length; i++) {
+                    if (arr1[i] !== arr2[i]) return false;
+                }
+
+                return true;
+            },
+            50
+        );
     });
 
-    it('should produce different keys for different salts', async () => {
-        const password = 'test-password';
-        const salt1 = new Uint8Array(16);
-        const salt2 = new Uint8Array(16);
+    it('Property: Salt Uniqueness and Influence (different salt = different key)', async () => {
+        const cryptoGlobal = await getCrypto();
 
-        cryptoGlobal.getRandomValues(salt1);
-        cryptoGlobal.getRandomValues(salt2);
+        await assertProperty(
+            [Arbitrary.string(8, 64), Arbitrary.byteArray(16, 16), Arbitrary.byteArray(16, 16)],
+            async (password, salt1, salt2) => {
+                // Statistical collision check (extremely unlikely for random 16 bytes)
+                let identicalSalts = true;
+                for (let i = 0; i < 16; i++) {
+                    if (salt1[i] !== salt2[i]) {
+                        identicalSalts = false;
+                        break;
+                    }
+                }
+                if (identicalSalts) return true; // Skip invalid fuzz input
 
-        const key1 = await KeyDerivation.deriveKey(password, salt1);
-        const key2 = await KeyDerivation.deriveKey(password, salt2);
+                const [key1, err1] = await KeyDerivation.deriveKey(password, salt1);
+                expect(err1).toEqual(null);
 
-        const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
-        const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
+                const [key2, err2] = await KeyDerivation.deriveKey(password, salt2);
+                expect(err2).toEqual(null);
 
-        const arr1 = new Uint8Array(raw1);
-        const arr2 = new Uint8Array(raw2);
+                const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
+                const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
 
-        let different = false;
-        for (let i = 0; i < arr1.length; i++) {
-            if (arr1[i] !== arr2[i]) {
-                different = true;
-                break;
-            }
-        }
+                const arr1 = new Uint8Array(raw1);
+                const arr2 = new Uint8Array(raw2);
 
-        expect(different).toBe(true);
+                let different = false;
+                for (let i = 0; i < arr1.length; i++) {
+                    if (arr1[i] !== arr2[i]) {
+                        different = true;
+                        break;
+                    }
+                }
+
+                if (!different) return false;
+
+                return true;
+            },
+            50
+        );
     });
 
-    it('should produce same key for same password and salt', async () => {
-        const password = 'test-password';
-        const salt = new Uint8Array(16);
-        cryptoGlobal.getRandomValues(salt);
+    it('Property: Salt Generation Uniqueness', async () => {
+        await assertProperty(
+            [], // No generative inputs needed, we are generating our own randomness internally
+            async () => {
+                const [salt1, err1] = KeyDerivation.generateSalt();
+                expect(err1).toEqual(null);
 
-        const key1 = await KeyDerivation.deriveKey(password, salt);
-        const key2 = await KeyDerivation.deriveKey(password, salt);
+                const [salt2, err2] = KeyDerivation.generateSalt();
+                expect(err2).toEqual(null);
 
-        const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
-        const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
+                expect(salt1.length).toBe(16);
+                expect(salt2.length).toBe(16);
 
-        const arr1 = new Uint8Array(raw1);
-        const arr2 = new Uint8Array(raw2);
+                let different = false;
+                for (let i = 0; i < salt1.length; i++) {
+                    if (salt1[i] !== salt2[i]) {
+                        different = true;
+                        break;
+                    }
+                }
 
-        let same = true;
-        for (let i = 0; i < arr1.length; i++) {
-            if (arr1[i] !== arr2[i]) {
-                same = false;
-                break;
-            }
-        }
-
-        expect(same).toBe(true);
-    });
-
-    it('should generate random salt', () => {
-        const salt1 = KeyDerivation.generateSalt();
-        const salt2 = KeyDerivation.generateSalt();
-
-        expect(salt1.length).toBe(16);
-        expect(salt2.length).toBe(16);
-
-        let different = false;
-        for (let i = 0; i < salt1.length; i++) {
-            if (salt1[i] !== salt2[i]) {
-                different = true;
-                break;
-            }
-        }
-
-        expect(different).toBe(true);
+                return different;
+            },
+            100 // 100 collision checks
+        );
     });
 });

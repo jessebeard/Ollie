@@ -173,9 +173,22 @@ export class Jsteg {
         let payloadToEmbed = data;
         if (options.password) {
             metadata.encrypted = true;
-            const salt = KeyDerivation.generateSalt();
-            const key = await KeyDerivation.deriveKey(options.password, salt);
-            const { ciphertext, iv } = await Encryption.encrypt(data, key);
+            const [salt, saltErr] = KeyDerivation.generateSalt();
+            if (saltErr) {
+                console.error('Jsteg: Salt generation failed:', saltErr);
+                return false;
+            }
+            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+            if (keyErr) {
+                console.error('Jsteg: Key derivation failed:', keyErr);
+                return false;
+            }
+            const [encResult, encErr] = await Encryption.encrypt(data, key);
+            if (encErr) {
+                console.error('Jsteg: Encryption failed:', encErr);
+                return false;
+            }
+            const { ciphertext, iv } = encResult;
 
             const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
             encryptedPayload.set(salt, 0);
@@ -189,7 +202,11 @@ export class Jsteg {
         if (metadata.ecc) {
 
             const eccProfile = metadata.eccProfile || 'Medium';
-            const eccResult = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            const [eccResult, eccErr] = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            if (eccErr) {
+                console.error('ECC protection failed:', eccErr);
+                return null;
+            }
             protectedPayload = eccResult.encoded;
 
             metadata.eccProfile = eccProfile;
@@ -333,22 +350,22 @@ export class Jsteg {
         }
 
         if (metadata.ecc) {
-            try {
 
-                if (metadata.eccProfile && metadata.originalLength !== undefined) {
-                    payload = ErrorCorrection.recover(
-                        payload,
-                        metadata.eccProfile,
-                        metadata.originalLength,
-                        metadata.blockCount
-                    );
-                } else {
-
-                    payload = ErrorCorrection.recover(payload);
+            if (metadata.eccProfile && metadata.originalLength !== undefined) {
+                const [recovered, recoverErr] = ErrorCorrection.recover(
+                    payload,
+                    metadata.eccProfile,
+                    metadata.originalLength,
+                    metadata.blockCount
+                );
+                if (recoverErr) {
+                    console.error('ECC recovery failed:', recoverErr);
+                    return null;
                 }
-            } catch (e) {
-                console.error('ECC recovery failed:', e);
-                return null;
+                payload = recovered;
+            } else {
+
+                payload = ErrorCorrection.recover(payload);
             }
         }
 
@@ -364,10 +381,19 @@ export class Jsteg {
                 const iv = payload.slice(16, 28);
                 const ciphertext = payload.slice(28);
 
-                const key = await KeyDerivation.deriveKey(options.password, salt);
-                payload = await Encryption.decrypt(ciphertext, key, iv);
+                const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+                if (keyErr) {
+                    console.error('Decryption failed:', keyErr);
+                    return null;
+                }
+                const [decryptedPayload, decErr] = await Encryption.decrypt(ciphertext, key, iv);
+                if (decErr) {
+                    console.error('Decryption failed:', decErr);
+                    return null;
+                }
+                payload = decryptedPayload;
             } catch (e) {
-                console.error('Decryption failed:', e);
+                console.error('Decryption error:', e);
                 return null;
             }
         }

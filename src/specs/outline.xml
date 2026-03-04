@@ -13,23 +13,24 @@
             <directory name="core" description="Core JPEG codec implementation">
                 <file name="jpeg-encoder.js" description="High-level JPEG encoder orchestrator supporting baseline and progressive encoding.">
                     <class name="JpegEncoder">
-                        <method name="encode" params="imageData, options" return="Uint8Array" description="Encodes RGBA image data into JPEG format." />
+                        <method name="encode" params="imageData, options" return="Promise<Uint8Array>" description="Encodes RGBA image data into JPEG format. Internally uses tuple-based embedSecretData for steganography." />
+                        <method name="encodeCoefficients" params="coefficients, quantizationTables, options" return="Promise<Uint8Array>" description="Re-encodes from raw DCT coefficients for lossless transcoding." />
+                        <method name="embedSecretData" params="allBlocks" return="[true, null] | [null, Error]" description="Embeds secret data into DCT coefficient blocks via F5. Returns tuple." />
                         <method name="setQuality" params="quality" description="Sets encoding quality (1-100)." />
                         <method name="enableProgressive" params="enabled" description="Enables/disables progressive encoding." />
                         <method name="enableSPIFF" params="enabled" description="Enables/disables SPIFF marker generation." />
                     </class>
                 </file>
-                <file name="jpeg-decoder.js" description="High-level JPEG decoder orchestrator supporting baseline and progressive decoding.">
+                <file name="jpeg-decoder.js" description="High-level JPEG decoder orchestrator supporting baseline and progressive decoding. Returns [result, error] tuples.">
                     <class name="JpegDecoder">
-                        <method name="decode" params="jpegData" return="ImageData" description="Decodes JPEG data into RGBA format." />
-                        <method name="setIdctMethod" params="method" description="Sets IDCT implementation (naive, reference, fastAAN)." />
-                        <method name="setHuffmanDecodeMethod" params="method" description="Sets Huffman decode strategy (naive, optimized)." />
-                        <method name="setBitReaderMode" params="mode" description="Sets BitReader implementation." />
+                        <method name="decode" params="jpegData, options" return="Promise<[result, null] | [null, Error]>" description="Decodes JPEG data into RGBA format. Wraps parseFileStructure in try/catch. Accepts options.coefficientsOnly to skip pixel reconstruction." />
+                        <method name="setIdctMethod" params="method" return="[true, null] | [null, Error]" description="Sets IDCT implementation (reference, fastAAN). Returns tuple." />
+                        <method name="setDequantizationMethod" params="method" return="[true, null] | [null, Error]" description="Sets dequantization implementation. Returns tuple." />
                     </class>
                 </file>
-                <file name="jpeg-transcoder.js" description="Updates steganography data in JPEG files WITHOUT generation loss.">
+                <file name="jpeg-transcoder.js" description="Updates steganography data in JPEG files WITHOUT generation loss. Returns [result, error] tuples.">
                     <class name="JpegTranscoder">
-                        <method name="updateSecret" params="jpegBytes, newSecretData, options" return="Promise<Uint8Array>" description="Updates steganography data in a JPEG (lossless)." />
+                        <method name="updateSecret" params="jpegBytes, newSecretData, options" return="Promise<[Uint8Array, null] | [null, Error]>" description="Updates steganography data in a JPEG (lossless). Returns tuple." />
                     </class>
                 </file>
 
@@ -37,77 +38,92 @@
                     <file name="colorspace.js" description="RGB to YCbCr color space conversion.">
                         <function name="rgbToYCbCr" params="r, g, b" return="{y, cb, cr}" description="Converts RGB values to YCbCr color space." />
                     </file>
-                    <file name="blocks.js" description="Handles image padding and extraction of 8x8 pixel blocks.">
-                        <function name="padDimensions" params="width, height" return="{width, height}" description="Calculates new dimensions padded to multiples of 8." />
-                        <function name="extractBlock" params="data, imgWidth, imgHeight, x, y" return="Float32Array(64)" description="Extracts an 8x8 block from the flattened image data." />
+                    <file name="blocks.js" description="Handles image padding and extraction of 8x8 pixel blocks. Returns [result, error] tuples.">
+                        <function name="padDimensions" params="width, height" return="[{width, height}, null]" description="Calculates new dimensions padded to multiples of 8." />
+                        <function name="padDimensions420" params="width, height" return="[{width, height}, null]" description="Calculates new dimensions padded to multiples of 16 for 4:2:0 subsampling." />
+                        <function name="extractBlock" params="data, imgWidth, imgHeight, x, y" return="[Float32Array(64), null]" description="Extracts an 8x8 block from the flattened image data." />
                     </file>
-                    <file name="dct.js" description="Implements the Forward Discrete Cosine Transform (FDCT).">
-                        <function name="forwardDCT" params="block" return="Float32Array(64)" description="Performs 2D FDCT on an 8x8 block." />
+                    <file name="colorspace.js" description="RGB/YCbCr color space conversion. Returns [result, error] tuples.">
+                        <function name="rgbToYcbcr" params="r, g, b" return="[{y, cb, cr}, null]" description="Converts RGB to YCbCr using JFIF standard formulas." />
+                        <function name="ycbcrToRgb" params="y, cb, cr" return="[{r, g, b}, null]" description="Converts YCbCr to RGB using JFIF standard formulas." />
                     </file>
-                    <file name="quantization.js" description="Defines quantization tables and applies quantization.">
+                    <file name="downsampling.js" description="Chroma downsampling for 4:2:0 encoding. Returns [result, error] tuples.">
+                        <function name="downsampleBlock420" params="source, srcWidth, srcX, srcY, imgWidth, imgHeight" return="[Float32Array(64), null]" description="Downsample a 16x16 chroma region to 8x8 using box filter averaging." />
+                        <function name="extractLumaBlocks420" params="yChannel, srcWidth, srcX, srcY, imgWidth, imgHeight" return="[Float32Array[4], null]" description="Extract 4 luma blocks from a 16x16 MCU region." />
+                    </file>
+                    <file name="dct.js" description="Implements the Forward Discrete Cosine Transform (FDCT). Returns [result, error] tuples.">
+                        <function name="forwardDCT" params="block" return="[Float32Array(64), null] | [null, Error]" description="Performs 2D FDCT on an 8x8 block (alias for forwardDCTNaive)." />
+                        <function name="forwardDCTNaive" params="block" return="[Float32Array(64), null] | [null, Error]" description="Naive separable FDCT implementation." />
+                        <function name="forwardDCTAAN" params="block" return="[Float32Array(64), null] | [null, Error]" description="AAN (Arai, Agui, Nakajima) fast FDCT implementation." />
+                    </file>
+                    <file name="quantization.js" description="Defines quantization tables and applies quantization. Returns [result, error] tuples.">
                         <constant name="QUANTIZATION_TABLE_LUMA" type="Int32Array" />
                         <constant name="QUANTIZATION_TABLE_CHROMA" type="Int32Array" />
-                        <function name="quantize" params="block, table" return="Int32Array(64)" description="Divides DCT coefficients by the quantization table." />
+                        <function name="quantize" params="block, table" return="[Int32Array(64), null]" description="Divides DCT coefficients by the quantization table." />
+                        <function name="getScaledQuantizationTables" params="quality" return="[{luma, chroma}, null]" description="Computes quality-scaled quantization tables (IJG algorithm). Cached." />
                     </file>
-                    <file name="zigzag.js" description="Implements ZigZag reordering of quantized coefficients.">
+                    <file name="zigzag.js" description="Implements ZigZag reordering of quantized coefficients. Returns [result, error] tuples.">
                         <constant name="ZIGZAG_ORDER" type="Int32Array" />
-                        <function name="zigZag" params="block" return="Int32Array(64)" description="Reorders 8x8 block into 1D array using ZigZag pattern." />
+                        <function name="zigZag" params="block" return="[Float32Array(64), null] | [null, Error]" description="Reorders 8x8 block into 1D array using ZigZag pattern." />
                     </file>
-                    <file name="huffman.js" description="Implements Huffman entropy coding.">
+                    <file name="huffman.js" description="Implements Huffman entropy coding. encodeBlock returns [result, error] tuples.">
                         <constant name="DC_LUMA_TABLE" type="Object" />
                         <constant name="AC_LUMA_TABLE" type="Object" />
                         <function name="computeCategory" params="val" return="number" description="Computes the SSSS category for a value." />
                         <function name="getBitRepresentation" params="val" return="number" description="Computes the bit representation of a value within its category." />
-                        <function name="encodeBlock" params="block, previousDC, writer, dcTable, acTable" return="number" description="Encodes a single block using Huffman tables. Returns the new DC value." />
+                        <function name="encodeBlock" params="block, previousDC, writer, dcTable, acTable, Ss, Se" return="[number, null] | [null, Error]" description="Encodes a single block using Huffman tables. Returns DC value as tuple." />
                     </file>
                     <file name="progressive-encoding.js" description="Implements progressive JPEG multi-scan encoding." />
                     <file name="spiff-generation.js" description="Generates SPIFF (APP8) markers for JPEG files." />
                 </directory>
 
                 <directory name="decoder" description="Decoding algorithms">
-                    <file name="quantization-parser.js" description="Parses DQT segments and extracts quantization tables.">
-                        <function name="parseQuantizationTable" params="data" return="Map<id, table>" description="Extracts quantization tables from DQT segment." />
+                    <file name="quantization-parser.js" description="Parses DQT segments. Returns [result, error] tuples.">
+                        <function name="parseQuantizationTable" params="data, offset" return="[{table, id, precision, nextOffset}, null] | [null, Error]" description="Parses single quantization table from DQT segment." />
+                        <function name="parseAllQuantizationTables" params="data" return="[Map, null] | [null, Error]" description="Parses all tables from a DQT segment." />
+                        <function name="parseQuantizationTablesFromSegments" params="segments" return="[Map, null] | [null, Error]" description="Parses tables from multiple DQT segments." />
                     </file>
-                    <file name="huffman-parser.js" description="Parses DHT segments and builds Huffman decoding lookup tables.">
+                    <file name="huffman-parser.js" description="Parses DHT segments. Returns [result, error] tuples.">
                         <class name="HuffmanTable">
-                            <method name="constructor" params="bits, values, tableClass, tableId" description="Builds lookup tables from BITS and HUFFVAL arrays." />
-                            <method name="decode" params="bitReader" return="symbol" description="Decodes next symbol from bitstream using configured method." />
-                            <method name="setDecodeMethod" params="method" description="Static method to switch between naive and optimized decoding." />
+                            <method name="constructor" params="bits, values, tableClass, tableId" description="Builds optimized lookup table from BITS and HUFFVAL arrays." />
+                            <method name="decode" params="bitReader" return="[symbol, null] | [null, Error]" description="Decodes next symbol via optimized 16-bit LUT." />
                         </class>
-                        <function name="parseHuffmanTable" params="data" return="Map<id, HuffmanTable>" description="Extracts Huffman tables from DHT segment." />
+                        <function name="parseHuffmanTable" params="data, offset" return="[{table, nextOffset}, null] | [null, Error]" description="Parses single Huffman table from DHT segment." />
+                        <function name="parseAllHuffmanTables" params="data" return="[Map, null] | [null, Error]" description="Parses all tables from a DHT segment." />
+                        <function name="parseHuffmanTablesFromSegments" params="segments" return="[Map, null] | [null, Error]" description="Parses tables from multiple DHT segments." />
                     </file>
-                    <file name="huffman-decode-naive.js" description="Naive Huffman decoding using Map-based lookup (O(N)).">
-                        <function name="buildNaiveLookup" params="table" description="Builds Map-based lookup table." />
-                        <function name="decodeNaive" params="table, bitReader" return="symbol" description="Decodes symbol using Map lookup." />
-                    </file>
-                    <file name="huffman-decode-optimized.js" description="Optimized Huffman decoding using 16-bit LUT (O(1)).">
+                    <file name="huffman-decode-optimized.js" description="Optimized Huffman decoding (O(1) via 16-bit LUT). Returns [result, error] tuples.">
                         <function name="buildOptimizedLookup" params="table" description="Builds 16-bit Uint16Array lookup table." />
-                        <function name="decodeOptimized" params="table, bitReader" return="symbol" description="Decodes symbol using direct array lookup." />
+                        <function name="decodeOptimized" params="table, bitReader" return="[symbol, null] | [null, Error]" description="Decodes symbol using direct array lookup." />
                     </file>
-                    <file name="frame-parser.js" description="Parses SOF0 frame header.">
-                        <function name="parseFrameHeader" params="data" return="FrameInfo" description="Extracts image dimensions, components, and sampling factors." />
+                    <file name="frame-parser.js" description="Parses SOF0 frame header. Returns [result, error] tuples.">
+                        <function name="parseFrameHeader" params="data" return="[FrameInfo, null] | [null, Error]" description="Extracts image dimensions, components, and sampling factors." />
                     </file>
-                    <file name="scan-parser.js" description="Parses SOS scan header.">
-                        <function name="parseScanHeader" params="data" return="ScanInfo" description="Extracts scan parameters and component-to-table mappings." />
+                    <file name="scan-parser.js" description="Parses SOS scan header. Returns [result, error] tuples.">
+                        <function name="parseScanHeader" params="data" return="[ScanInfo, null] | [null, Error]" description="Extracts scan parameters and component-to-table mappings." />
                     </file>
-                    <file name="huffman-decoder.js" description="Decodes Huffman-encoded bitstream into quantized coefficients.">
-                        <function name="decodeBlock" params="bitReader, dcTable, acTable, previousDC" return="{block, dc}" description="Decodes one 8x8 block of quantized coefficients." />
-                        <function name="decodeDC" params="bitReader, table, previousDC" return="number" description="Decodes DC coefficient with differential coding." />
-                        <function name="decodeAC" params="bitReader, table, block" description="Decodes AC coefficients with run-length encoding." />
+                    <file name="huffman-decoder.js" description="Decodes Huffman-encoded bitstream into quantized coefficients. Returns [result, error] tuples.">
+                        <function name="decodeBlock" params="bitReader, dcTable, acTable, previousDC" return="[{block, dc}, null] | [null, Error]" description="Decodes one 8x8 block of quantized coefficients." />
+                        <function name="decodeDC" params="bitReader, table, previousDC" return="[number, null] | [null, Error]" description="Decodes DC coefficient with differential coding." />
+                        <function name="decodeAC" params="bitReader, table, block" return="[true, null] | [null, Error]" description="Decodes AC coefficients with run-length encoding." />
                     </file>
-                    <file name="inverse-zigzag.js" description="Converts 1D coefficient array to 8x8 2D block.">
-                        <constant name="INVERSE_ZIGZAG_ORDER" type="Int32Array" />
-                        <function name="inverseZigZag" params="array" return="Float32Array(64)" description="Reorders 1D array into 8x8 block." />
+                    <file name="inverse-zigzag.js" description="Converts 1D coefficient array to 8x8 2D block. Returns [result, error] tuples.">
+                        <constant name="ZIGZAG_ORDER" type="Int32Array" />
+                        <function name="inverseZigZag" params="array" return="[Float32Array(64), null] | [null, Error]" description="Reorders 1D array into 8x8 block." />
                     </file>
-                    <file name="dequantization.js" description="Multiplies quantized coefficients by quantization table.">
-                        <function name="dequantize" params="block, table" return="Float32Array(64)" description="Reverses quantization by multiplication." />
+                    <file name="dequantization.js" description="Multiplies quantized coefficients by quantization table. Returns [result, error] tuples.">
+                        <function name="dequantize" params="block, table" return="[Float32Array(64), null] | [null, Error]" description="Reverses quantization by multiplication." />
+                        <function name="dequantizeBypass" params="block, table" return="[Float32Array(64), null]" description="Bypass dequantization for debugging." />
                     </file>
-                    <file name="idct.js" description="Implements the Inverse Discrete Cosine Transform (IDCT) with multiple implementations.">
-                        <function name="idctNaive" params="block" return="Float32Array(64)" description="Naive IDCT implementation (O(N³))." />
-                        <function name="idctAAN" params="block" return="Float32Array(64)" description="Optimized AAN IDCT implementation (O(N))." />
-                        <function name="idctPureRef" params="block" return="Float32Array(64)" description="Pure reference IDCT from T.81 specification." />
-                        <function name="idctOptimizedRef" params="block" return="Float32Array(64)" description="Optimized reference using separable 1D transforms." />
-                        <function name="idctFastAAN" params="block" return="Float32Array(64)" description="Fast AAN algorithm implementation." />
+                    <file name="idct.js" description="IDCT implementations (naive + AAN). Returns [result, error] tuples.">
+                        <function name="idct" params="block" return="[Float32Array(64), null] | [null, Error]" description="2D IDCT using cosine tables." />
+                        <function name="idctNaive" params="block" return="[Float32Array(64), null] | [null, Error]" description="Alias for idct (naive O(N³))." />
+                        <function name="idctAAN" params="block" return="[Float32Array(64), null] | [null, Error]" description="Optimized AAN IDCT (O(N))." />
+                    </file>
+                    <file name="idct-spec.js" description="Reference IDCT implementations from T.81 specification. Returns [result, error] tuples.">
+                        <function name="idctPureRef" params="block" return="[Float32Array(64), null] | [null, Error]" description="Pure reference IDCT from T.81." />
+                        <function name="idctOptimizedRef" params="block" return="[Float32Array(64), null] | [null, Error]" description="Optimized separable 1D IDCT." />
+                        <function name="idctFastAAN" params="block" return="[Float32Array(64), null]" description="Fast AAN algorithm (in-place)." />
                     </file>
                     <file name="colorspace-decoder.js" description="Converts YCbCr to RGB color space.">
                         <function name="ycbcrToRgb" params="y, cb, cr" return="{r, g, b}" description="Converts YCbCr values to RGB (0-255)." />
@@ -119,14 +135,28 @@
                         <function name="assembleImage" params="blocks, width, height, components" return="ImageData" description="Combines blocks into final RGBA image." />
                     </file>
                     <file name="progressive-decoding.js" description="Implements progressive JPEG multi-scan decoding." />
-                    <file name="spiff-parsing.js" description="Parses SPIFF (APP8) markers from JPEG files." />
+                    <file name="spiff-parser.js" description="Parses SPIFF (APP8) markers. Returns [result, error] tuples.">
+                        <function name="parseSpiffHeader" params="data" return="[SpiffInfo, null] | [null, Error]" description="Parses SPIFF header from APP8 segment data." />
+                    </file>
                 </directory>
 
                 <directory name="steganography" description="Steganography and data embedding">
                     <file name="index.js" description="Public API for steganography module." />
                     <file name="jsteg.js" description="Core steganography implementation using DCT coefficient modification." />
-                    <file name="chunk-manager.js" description="Manages data chunking, splitting, and reassembly across multiple files." />
-                    <file name="error-correction.js" description="Wrapper for Reed-Solomon error correction integration." />
+                    <file name="f5.js" description="F5 steganography algorithm with matrix encoding. Supports container format embedding/extraction with ECC." />
+                    <file name="container-format.js" description="Structured container format for steganographic payloads. Returns [result, error] tuples." />
+                    <file name="chunk-manager.js" description="Manages data chunking, splitting, and reassembly across multiple files. Returns [result, error] tuples." />
+                    <file name="error-correction.js" description="Wrapper for Reed-Solomon error correction integration. Returns [result, error] tuples." />
+                    <file name="batch-embedder.js" description="Embeds data across multiple images with capacity-aware chunking. Returns [result, error] tuples.">
+                        <class name="BatchEmbedder">
+                            <method name="embed" params="data, imageFiles, options, onProgress" return="Promise<[Array<{name, data}>, null] | [null, Error]>" description="Embeds data across multiple images. Returns tuple of output files array." />
+                        </class>
+                    </file>
+                    <file name="batch-extractor.js" description="Extracts and reassembles data from multiple images. Returns [result, error] tuples.">
+                        <class name="BatchExtractor">
+                            <method name="extract" params="imageFiles, password, onProgress" return="Promise<[{data, filename, metadata}, null] | [null, Error]>" description="Extracts and reassembles data from multiple images. Returns tuple." />
+                        </class>
+                    </file>
                 </directory>
 
                 <directory name="EC" description="Error correction (Reed-Solomon)">
@@ -136,25 +166,23 @@
                     <file name="reedsolomon.js" description="Backward compatibility re-export (delegates to index.js)." />
                 </directory>
 
-                <directory name="crypto" description="Cryptography utilities">
+                <directory name="crypto" description="Cryptography utilities. All functions return [result, error] tuples.">
                     <file name="index.js" description="Public API for crypto module." />
-                    <file name="encryption.js" description="AES-GCM encryption/decryption for embedded data." />
-                    <file name="key-derivation.js" description="PBKDF2-based key derivation from passwords." />
+                    <file name="encryption.js" description="AES-GCM encryption/decryption. Returns [result, error] tuples." />
+                    <file name="key-derivation.js" description="PBKDF2-based key derivation. Returns [key, error] tuples." />
                 </directory>
 
-                <directory name="vault" description="Password Vault Logic">
-                    <file name="vault-manager.js" description="Core vault management. Handles in-memory storage, CRUD operations, and serialization.">
+                <directory name="vault" description="Password Vault Logic (Immutable State Machine)">
+                    <file name="vault-manager.js" description="Core vault management. Immutable state machine — all mutating methods return [newVault, error] tuples.">
                         <class name="PasswordVault">
-                            <method name="constructor" description="Initializes an empty vault with metadata." />
-                            <method name="addEntry" params="entry" return="Object" description="Adds validation-checked entry. Auto-generates ID/timestamps. Fields: title, url, username, password, notes, tags, totp, customFields." />
-                            <method name="updateEntry" params="id, updates" return="Object" description="Updates existing entry. Updates modified timestamp." />
-                            <method name="deleteEntry" params="id" description="Removes entry by ID." />
-                            <method name="search" params="query, tags" return="Array" description="Filters entries by text query (title/url/user/notes) and exact tag match." />
+                            <method name="constructor" params="entries, metadata, isUnlocked, masterPassword" description="Initializes vault with explicit state. Defaults to empty, locked." />
+                            <method name="addEntry" params="entry" return="[PasswordVault, Error]" description="Returns new vault with appended entry. Original is unchanged." />
+                            <method name="updateEntry" params="id, updates" return="[PasswordVault, Error]" description="Returns new vault with updated entry. Original is unchanged." />
+                            <method name="deleteEntry" params="id" return="[PasswordVault, Error]" description="Returns new vault without specified entry. Original is unchanged." />
+                            <method name="search" params="query, tags" return="Array" description="Filters entries by text query and exact tag match. Pure read-only." />
                             <method name="toJSON" return="Object" description="Serializes entries and metadata for storage." />
-                            <method name="fromJSON" params="data" description="Rehydrates vault from storage. Strict schema check." />
-                            <method name="save" params="imageFiles, password" return="Promise" description="Encrypts/embeds vault into images." />
-                            <method name="load" params="imageFiles, password" return="Promise" description="Extracts/decrypts vault from images." />
-                            <method name="lock" description="Locks vault (clears master password, keeps data in memory)." />
+                            <method name="fromJSON" params="data" return="[PasswordVault, Error]" description="Static. Rehydrates vault from storage. Returns tuple." />
+                            <method name="lock" return="PasswordVault" description="Returns new locked vault with master password cleared." />
                         </class>
                     </file>
                 </directory>
@@ -162,8 +190,14 @@
                 <directory name="specs" description="Project documentation and specifications">
                     <file name="outline.xml" description="Project structure and component overview (this file)." />
                     <file name="test-outline.xml" description="Test suite structure and component overview." />
+                    <file name="testing-specs.xml" description="Documentation for the testing framework." />
                     <file name="modern-jpeg-spec.xml" description="JPEG specification reference and implementation notes." />
                     <file name="AAN-algo-spec.xml" description="Fast AAN IDCT algorithm specification." />
+                    <directory name="project rules" description="Architectural code standards and constraints">
+                        <file name="constitution.md" description="Project mission, identity, and architectural philosophy." />
+                        <file name="test-specs.md" description="Comprehensive list of testing rules and philosophy (PBT, TDD, environment parity)." />
+                        <file name="code-quality.md" description="Rules surrounding Javascript constraints, patterns, and safety (tuple returns, determinism, dead code)." />
+                    </directory>
                 </directory>
             </directory>
 
@@ -175,23 +209,23 @@
                         <method name="flush" return="Uint8Array" description="Flushes pending bits and returns the final byte array." />
                     </class>
                 </file>
-                <file name="bit-reader.js" description="Wrapper class that delegates to naive or optimized BitReader implementations.">
+                <file name="bit-core.js" description="Pure, side-effect-free bitwise operations. Core functions (readBit, readBits, peekBits, peek16Bits, handleByteStuffing) accept explicit state and return [value, newByteOffset, newBitOffset, error] tuples." />
+                <file name="bit-reader.js" description="Stateful wrapper that delegates to the optimized BitReader.">
                     <class name="BitReader">
-                        <method name="constructor" params="data" description="Initializes reader with byte array, uses configured mode." />
-                        <method name="readBit" return="number" description="Reads a single bit, skips stuffed bytes without copying." />
+                        <method name="constructor" params="data" description="Initializes reader with byte array, always uses optimized implementation." />
+                        <method name="readBit" return="number" description="Reads a single bit." />
                         <method name="readBits" params="length" return="number" description="Reads 1-16 bits as an integer." />
-                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits using try-finally." />
-                        <method name="peek16Bits" return="number" description="Fast lookahead for 16 bits with special byte-aligned path." />
-                        <method name="skipBits" params="length" description="Efficiently advances pointer, handles byte stuffing." />
+                        <method name="peekBits" params="length" return="number" description="Looks ahead without consuming bits." />
+                        <method name="peek16Bits" return="number" description="Fast lookahead for 16 bits." />
+                        <method name="skipBits" params="length" description="Advances pointer, handles byte stuffing." />
                     </class>
                 </file>
-                <file name="bit-reader-naive.js" description="Simple Map-based BitReader implementation." />
-                <file name="bit-reader-optimized.js" description="Optimized BitReader with direct byte manipulation." />
+                <file name="bit-reader-optimized.js" description="Optimized BitReader with direct byte manipulation. Delegates to bit-core.js pure functions." />
                 <file name="marker-parser.js" description="Parses JPEG file structure and extracts segments.">
                     <function name="findNextMarker" params="data, offset" return="{marker, offset}" description="Locates next 0xFFxx marker." />
                     <function name="readMarkerSegment" params="data, offset" return="{type, data, nextOffset}" description="Extracts segment payload." />
                     <function name="parseFileStructure" params="jpegBytes" return="SegmentMap" description="Builds map of all segments in file." />
-                </function>
+                </file>
             </directory>
 
         </directory>
@@ -218,8 +252,16 @@
         <feature name="Container Format" status="complete" description="Structured metadata format with versioning." />
         <feature name="Reed-Solomon ECC" status="complete" description="Error correction for embedded data." />
         <feature name="Multi-File Sharding" status="complete" description="Data splitting across multiple JPEG files." />
-        <feature name="Multiple IDCT Algorithms" status="complete" description="Naive, Reference, Fast AAN implementations." />
-        <feature name="Huffman Decode Strategies" status="complete" description="Naive Map-based and optimized 16-bit LUT." />
-        <feature name="BitReader Variants" status="complete" description="Multiple BitReader implementations for performance tuning." />
+        <feature name="Multiple IDCT Algorithms" status="complete" description="Reference and Fast AAN implementations." />
+        <feature name="Password Vault" status="complete" description="Immutable state machine password manager with PBT-validated serialization." />
+        <feature name="Property-Based Testing" status="complete" description="Custom PBT harness for fuzzing crypto, chunk, and vault invariants." />
     </features>
+
+    <rules>
+        <rule>No Dependencies or Third-Party Libraries — code must be built entirely in plain JavaScript.</rule>
+        <rule>Defensive Programming — functions must explicitly validate parameters and structure (e.g., verifying JPEG signatures fail-fast).</rule>
+        <rule>Environment Agnosticism — core components must execute uniformly on browser engines and Node.js.</rule>
+        <rule>Test-Driven Development (TDD) — code design must be guided by tests establishing expected behavior.</rule>
+        <rule>Property-Based Security — security and robustness must be validated algorithmically against auto-generated invariant tests.</rule>
+    </rules>
 </project>

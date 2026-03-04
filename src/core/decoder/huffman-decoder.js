@@ -12,22 +12,23 @@
  * @param {BitReader} bitReader - Bit reader positioned at DC coefficient
  * @param {HuffmanTable} table - DC Huffman table
  * @param {number} previousDC - Previous DC value for this component
- * @returns {number} Decoded DC coefficient
+ * @returns {[number, null] | [null, Error]} Tuple: decoded DC coefficient, or error
  */
 export function decodeDC(bitReader, table, previousDC) {
-    
-    const category = table.decode(bitReader);
+
+    const [category, catErr] = table.decode(bitReader);
+    if (catErr) return [null, catErr];
 
     if (category === 0) {
-        
-        return previousDC;
+
+        return [previousDC, null];
     }
 
     const bits = bitReader.readBits(category);
 
     const value = decodeValue(bits, category);
 
-    return previousDC + value;
+    return [previousDC + value, null];
 }
 
 /**
@@ -37,15 +38,17 @@ export function decodeDC(bitReader, table, previousDC) {
  * @param {BitReader} bitReader - Bit reader positioned at AC coefficients
  * @param {HuffmanTable} table - AC Huffman table
  * @param {Int32Array} block - 64-element block to fill (DC already set at index 0)
+ * @returns {[true, null] | [null, Error]} Tuple: success indicator, or error
  */
 export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
     let k = Ss;
 
-    if (k === 0) k = 1; 
+    if (k === 0) k = 1;
 
     while (k <= Se) {
-        
-        const symbol = table.decode(bitReader);
+
+        const [symbol, symErr] = table.decode(bitReader);
+        if (symErr) return [null, symErr];
 
         if (symbol === 0x00) {
 
@@ -53,9 +56,9 @@ export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
         }
 
         if (symbol === 0xF0) {
-            
+
             for (let i = 0; i < 16 && k <= Se; i++, k++) {
-                
+
             }
             continue;
         }
@@ -64,7 +67,7 @@ export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
         const size = symbol & 0x0F;
 
         for (let i = 0; i < runLength && k <= Se; i++, k++) {
-            
+
         }
 
         if (k > Se) break;
@@ -75,6 +78,8 @@ export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
             k++;
         }
     }
+
+    return [true, null];
 }
 
 /**
@@ -86,7 +91,7 @@ export function decodeAC(bitReader, table, block, Ss = 1, Se = 63) {
  * @returns {number} Decoded value
  */
 export function decodeValue(bits, size) {
-    
+
     const highBit = 1 << (size - 1);
 
     if (bits >= highBit) {
@@ -107,7 +112,7 @@ export function decodeValue(bits, size) {
  * @param {Int32Array} [block] - Existing block to update (optional)
  * @param {number} [Ss] - Start of spectral selection (0-63)
  * @param {number} [Se] - End of spectral selection (0-63)
- * @returns {{block: Int32Array, dc: number}} Decoded block and new DC value
+ * @returns {[{block: Int32Array, dc: number}, null] | [null, Error]} Tuple: decoded block and DC, or error
  */
 export function decodeBlock(bitReader, dcTable, acTable, previousDC, block = null, Ss = 0, Se = 63) {
     if (!block) {
@@ -117,15 +122,18 @@ export function decodeBlock(bitReader, dcTable, acTable, previousDC, block = nul
     let dc = previousDC;
 
     if (Ss === 0) {
-        dc = decodeDC(bitReader, dcTable, previousDC);
+        const [dcVal, dcErr] = decodeDC(bitReader, dcTable, previousDC);
+        if (dcErr) return [null, dcErr];
+        dc = dcVal;
         block[0] = dc;
     }
 
     if (Se > 0) {
-        
+
         const acStart = Math.max(1, Ss);
-        decodeAC(bitReader, acTable, block, acStart, Se);
+        const [, acErr] = decodeAC(bitReader, acTable, block, acStart, Se);
+        if (acErr) return [null, acErr];
     }
 
-    return { block, dc };
+    return [{ block, dc }, null];
 }

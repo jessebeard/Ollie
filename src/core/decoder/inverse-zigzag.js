@@ -20,11 +20,11 @@ export const ZIGZAG_ORDER = new Int32Array([
  * Convert 1D zigzag-ordered array to 8x8 2D block
  * 
  * @param {Int32Array|Float32Array} zigzagArray - 64-element array in zigzag order
- * @returns {Float32Array} 64-element array in natural 2D order (row-major)
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: 64-element array in natural 2D order, or error
  */
 export function inverseZigZag(zigzagArray, outputBuffer = null) {
     if (zigzagArray.length !== 64) {
-        throw new Error(`Invalid zigzag array length: ${zigzagArray.length} (expected 64)`);
+        return [null, new Error(`Invalid zigzag array length: ${zigzagArray.length} (expected 64)`)];
     }
 
     const block = outputBuffer || new Float32Array(64);
@@ -33,5 +33,5 @@ export function inverseZigZag(zigzagArray, outputBuffer = null) {
         block[ZIGZAG_ORDER[i]] = zigzagArray[i];
     }
 
-    return block;
+    return [block, null];
 }

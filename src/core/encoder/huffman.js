@@ -68,8 +68,19 @@ const STD_AC_LUMINANCE_VALUES = [
 
 export const AC_LUMA_TABLE = generateHuffmanTable(STD_AC_LUMINANCE_NRCODES, STD_AC_LUMINANCE_VALUES);
 
+/**
+ * Encodes a single 8x8 block of quantized DCT coefficients.
+ * @param {Int32Array} block - 64-element quantized coefficient block
+ * @param {number} previousDC - Previous block's DC value for differential coding
+ * @param {BitWriter} writer - BitWriter to write encoded data to
+ * @param {Object} dcTable - DC Huffman table
+ * @param {Object} acTable - AC Huffman table
+ * @param {number} Ss - Start of spectral selection
+ * @param {number} Se - End of spectral selection
+ * @returns {[number, null] | [null, Error]} DC value of this block as tuple
+ */
 export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, acTable = AC_LUMA_TABLE, Ss = 0, Se = 63) {
-    
+
     if (Ss === 0) {
         const dcVal = block[0];
         const diff = dcVal - previousDC;
@@ -94,8 +105,10 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
                 let safety = 0;
                 while (zeroRun >= 16) {
                     safety++;
-                    if (safety > 100) { throw new Error('Infinite loop in Huffman zeroRun'); }
-                    
+                    if (safety > 100) {
+                        return [null, new Error('Infinite loop in Huffman zeroRun')];
+                    }
+
                     const zrl = acTable[0xF0];
                     writer.writeBits(zrl.code, zrl.length);
                     zeroRun -= 16;
@@ -118,5 +131,5 @@ export function encodeBlock(block, previousDC, writer, dcTable = DC_LUMA_TABLE, 
         }
     }
 
-    return block[0]; 
+    return [block[0], null];
 }

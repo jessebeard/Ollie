@@ -21,12 +21,18 @@ export const QUANTIZATION_TABLE_CHROMA = new Int32Array([
     99, 99, 99, 99, 99, 99, 99, 99
 ]);
 
+/**
+ * Quantizes a block of DCT coefficients.
+ * @param {Float32Array} block - 64-element DCT coefficient block
+ * @param {Int32Array|Uint8Array} table - 64-element quantization table
+ * @returns {[Int32Array, null]} Quantized coefficients as tuple
+ */
 export function quantize(block, table) {
     const result = new Int32Array(64);
     for (let i = 0; i < 64; i++) {
         result[i] = Math.round(block[i] / table[i]);
     }
-    return result;
+    return [result, null];
 }
 
 const tableCache = new Map();
@@ -37,14 +43,14 @@ const tableCache = new Map();
  * Results are cached for performance when encoding multiple images.
  * 
  * @param {number} quality - Quality factor (1-100). Higher = better quality, larger file.
- * @returns {{ luma: Int32Array, chroma: Int32Array }} Scaled quantization tables.
+ * @returns {[{ luma: Int32Array, chroma: Int32Array }, null]} Scaled quantization tables as tuple.
  */
 export function getScaledQuantizationTables(quality) {
-    
+
     quality = Math.max(1, Math.min(100, Math.round(quality)));
 
     if (tableCache.has(quality)) {
-        return tableCache.get(quality);
+        return [tableCache.get(quality), null];
     }
 
     let scale;
@@ -58,12 +64,12 @@ export function getScaledQuantizationTables(quality) {
     const chroma = new Int32Array(64);
 
     for (let i = 0; i < 64; i++) {
-        
+
         luma[i] = Math.max(1, Math.min(255, Math.floor((QUANTIZATION_TABLE_LUMA[i] * scale + 50) / 100)));
         chroma[i] = Math.max(1, Math.min(255, Math.floor((QUANTIZATION_TABLE_CHROMA[i] * scale + 50) / 100)));
     }
 
     const tables = { luma, chroma };
     tableCache.set(quality, tables);
-    return tables;
+    return [tables, null];
 }

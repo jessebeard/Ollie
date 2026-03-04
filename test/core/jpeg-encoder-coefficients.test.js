@@ -10,23 +10,24 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
      * Validates that encoding from coefficients works.
      */
     it('Encode from Coefficients - Basic', async () => {
-        
+
         const width = 64;
         const height = 64;
         const data = new Uint8ClampedArray(width * height * 4);
 
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = 128;     
-            data[i + 1] = 128; 
-            data[i + 2] = 128; 
-            data[i + 3] = 255; 
+            data[i] = 128;
+            data[i + 1] = 128;
+            data[i + 2] = 128;
+            data[i + 3] = 255;
         }
 
         const encoder1 = new JpegEncoder(90);
         const jpeg1 = await encoder1.encode({ width, height, data });
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg1, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(jpeg1, { skipExtraction: true });
+        expect(err).toBeNull();
 
         expect(decoded.coefficients).toBeDefined();
         expect(decoded.quantizationTables).toBeDefined();
@@ -51,7 +52,7 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
      * Test: Coefficient Encoding with 4:2:0 Subsampling
      */
     it('Encode from Coefficients - 4:2:0 Subsampling', async () => {
-        
+
         const width = 128;
         const height = 128;
         const data = new Uint8ClampedArray(width * height * 4);
@@ -70,7 +71,8 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
         const jpeg1 = await encoder1.encode({ width, height, data });
 
         const decoder = new JpegDecoder();
-        const decoded = await decoder.decode(jpeg1, { skipExtraction: true });
+        const [decoded, err] = await decoder.decode(jpeg1, { skipExtraction: true });
+        expect(err).toBeNull();
 
         const encoder2 = new JpegEncoder(90);
         const jpeg2 = await encoder2.encodeCoefficients(
@@ -80,10 +82,12 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
         );
 
         const decoder2 = new JpegDecoder();
-        const original = await decoder2.decode(jpeg1);
+        const [original, errOrig] = await decoder2.decode(jpeg1);
+        expect(errOrig).toBeNull();
 
         const decoder3 = new JpegDecoder();
-        const transcoded = await decoder3.decode(jpeg2);
+        const [transcoded, errTrans] = await decoder3.decode(jpeg2);
+        expect(errTrans).toBeNull();
 
         expect(original.width).toBe(transcoded.width);
         expect(original.height).toBe(transcoded.height);
@@ -117,7 +121,8 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
         const jpeg1 = await encoder1.encode({ width, height, data });
 
         const decoder1 = new JpegDecoder();
-        const decoded1 = await decoder1.decode(jpeg1, { skipExtraction: true });
+        const [decoded1, err1] = await decoder1.decode(jpeg1, { skipExtraction: true });
+        expect(err1).toBeNull();
 
         expect(decoded1.coefficients[1]).toBeDefined();
         expect(decoded1.coefficients[2]).toBeDefined();
@@ -135,7 +140,8 @@ describe('JPEG Encoder - Coefficient Encoding', () => {
         );
 
         const decoder2 = new JpegDecoder();
-        const decoded2 = await decoder2.decode(jpeg2, { skipExtraction: true });
+        const [decoded2, err2] = await decoder2.decode(jpeg2, { skipExtraction: true });
+        expect(err2).toBeNull();
 
         expect(decoded2.coefficients[1].blocks.length).toBe(comp1Blocks);
         expect(decoded2.coefficients[2].blocks.length).toBe(comp2Blocks);

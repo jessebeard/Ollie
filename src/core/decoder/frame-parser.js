@@ -16,18 +16,18 @@
 /**
  * Parse SOF0 frame header
  * @param {Uint8Array} segmentData - SOF0 segment data (without marker and length)
- * @returns {Object} Frame information
+ * @returns {[Object, null] | [null, Error]} Tuple: frame information, or error
  */
 export function parseFrameHeader(segmentData) {
     if (segmentData.length < 6) {
-        throw new Error('Invalid SOF0 segment: too short');
+        return [null, new Error('Invalid SOF0 segment: too short')];
     }
 
     let offset = 0;
 
     const precision = segmentData[offset++];
     if (precision !== 8) {
-        throw new Error(`Unsupported sample precision: ${precision} (baseline requires 8)`);
+        return [null, new Error(`Unsupported sample precision: ${precision} (baseline requires 8)`)];
     }
 
     const height = (segmentData[offset] << 8) | segmentData[offset + 1];
@@ -37,18 +37,18 @@ export function parseFrameHeader(segmentData) {
     offset += 2;
 
     if (width === 0 || height === 0) {
-        throw new Error(`Invalid image dimensions: ${width}x${height}`);
+        return [null, new Error(`Invalid image dimensions: ${width}x${height}`)];
     }
 
     const numComponents = segmentData[offset++];
 
     if (numComponents !== 1 && numComponents !== 3) {
-        throw new Error(`Unsupported number of components: ${numComponents} (expected 1 or 3)`);
+        return [null, new Error(`Unsupported number of components: ${numComponents} (expected 1 or 3)`)];
     }
 
     const expectedLength = 6 + (numComponents * 3);
     if (segmentData.length < expectedLength) {
-        throw new Error('Incomplete SOF0 component data');
+        return [null, new Error('Incomplete SOF0 component data')];
     }
 
     const components = [];
@@ -62,11 +62,11 @@ export function parseFrameHeader(segmentData) {
         const quantTableId = segmentData[offset++];
 
         if (hSampling < 1 || hSampling > 4 || vSampling < 1 || vSampling > 4) {
-            throw new Error(`Invalid sampling factors: H=${hSampling}, V=${vSampling}`);
+            return [null, new Error(`Invalid sampling factors: H=${hSampling}, V=${vSampling}`)];
         }
 
         if (quantTableId > 3) {
-            throw new Error(`Invalid quantization table ID: ${quantTableId}`);
+            return [null, new Error(`Invalid quantization table ID: ${quantTableId}`)];
         }
 
         components.push({
@@ -86,7 +86,7 @@ export function parseFrameHeader(segmentData) {
     const mcuCols = Math.ceil(width / mcuWidth);
     const mcuRows = Math.ceil(height / mcuHeight);
 
-    return {
+    return [{
         precision,
         width,
         height,
@@ -98,5 +98,5 @@ export function parseFrameHeader(segmentData) {
         mcuHeight,
         mcuCols,
         mcuRows
-    };
+    }, null];
 }

@@ -10,10 +10,10 @@ import { getScaledQuantizationTables } from '../../src/core/encoder/quantization
 function createTestImage(width, height) {
     const data = new Uint8Array(width * height * 4);
     for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.floor(Math.random() * 256);     
-        data[i + 1] = Math.floor(Math.random() * 256); 
-        data[i + 2] = Math.floor(Math.random() * 256); 
-        data[i + 3] = 255; 
+        data[i] = Math.floor(Math.random() * 256);
+        data[i + 1] = Math.floor(Math.random() * 256);
+        data[i + 2] = Math.floor(Math.random() * 256);
+        data[i + 3] = 255;
     }
     return { width, height, data };
 }
@@ -22,7 +22,7 @@ function extractDQTTables(jpegBytes) {
     const tables = [];
     for (let i = 0; i < jpegBytes.length - 1; i++) {
         if (jpegBytes[i] === 0xFF && jpegBytes[i + 1] === 0xDB) {
-            
+
             const length = (jpegBytes[i + 2] << 8) | jpegBytes[i + 3];
             const tableId = jpegBytes[i + 4] & 0x0F;
             const precision = (jpegBytes[i + 4] >> 4) & 0x0F;
@@ -32,7 +32,7 @@ function extractDQTTables(jpegBytes) {
                     ((jpegBytes[i + 5 + j * 2] << 8) | jpegBytes[i + 5 + j * 2 + 1]);
             }
             tables.push({ id: tableId, values });
-            i += length + 1; 
+            i += length + 1;
         }
     }
     return tables;
@@ -77,7 +77,7 @@ describe('JpegEncoder Quality Levels', () => {
         const encoder50 = new JpegEncoder(50);
         const bytes50 = await encoder50.encode(imageData);
         const tables50 = extractDQTTables(bytes50);
-        const expected50 = getScaledQuantizationTables(50);
+        const [expected50] = getScaledQuantizationTables(50);
 
         expect(tables50.length).toBe(2);
 
@@ -92,21 +92,21 @@ describe('JpegEncoder Quality Levels', () => {
     });
 
     it('caches quantization tables for same quality', () => {
-        
-        const tables1 = getScaledQuantizationTables(75);
-        const tables2 = getScaledQuantizationTables(75);
+
+        const [tables1] = getScaledQuantizationTables(75);
+        const [tables2] = getScaledQuantizationTables(75);
 
         expect(tables1).toBe(tables2);
     });
 
     it('clamps quality to valid range', () => {
-        
-        const tablesLow = getScaledQuantizationTables(-10);
-        const tables1 = getScaledQuantizationTables(1);
+
+        const [tablesLow] = getScaledQuantizationTables(-10);
+        const [tables1] = getScaledQuantizationTables(1);
         expect(tablesLow.luma).toEqual(tables1.luma);
 
-        const tablesHigh = getScaledQuantizationTables(150);
-        const tables100 = getScaledQuantizationTables(100);
+        const [tablesHigh] = getScaledQuantizationTables(150);
+        const [tables100] = getScaledQuantizationTables(100);
         expect(tablesHigh.luma).toEqual(tables100.luma);
     });
 });

@@ -89,7 +89,7 @@ export class BatchEmbedder {
                 }
             } catch (error) {
                 console.error(`Failed to process ${file.name}:`, error);
-                throw new Error(`Failed to process ${file.name}: ${error.message}`);
+                return [null, new Error(`Failed to process ${file.name}: ${error.message}`)];
             }
         }
 
@@ -102,7 +102,8 @@ export class BatchEmbedder {
             const { file, jpegBytes } = normalizedImages[i];
 
             const decoder = new JpegDecoder();
-            const decoded = await decoder.decode(jpegBytes, { skipExtraction: true });
+            const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
+            if (decodeErr) throw decodeErr;
 
             const allBlocks = [];
 
@@ -137,7 +138,7 @@ export class BatchEmbedder {
                     decodedKeys: Object.keys(decoded),
                     componentKeys: decoder.components ? Object.keys(decoder.components) : []
                 });
-                throw new Error(`Failed to extract blocks from ${file.name} for capacity calculation`);
+                return [null, new Error(`Failed to extract blocks from ${file.name} for capacity calculation`)];
             }
 
             const representativeMetadata = {
@@ -184,10 +185,10 @@ export class BatchEmbedder {
         console.log(`Total capacity: ${totalCapacity} bytes, Data: ${data.length} bytes`);
 
         if (data.length > totalCapacity) {
-            throw new Error(
+            return [null, new Error(
                 `Insufficient capacity! Data: ${data.length} bytes, Available: ${totalCapacity} bytes. ` +
                 `Need ${Math.ceil((data.length - totalCapacity) / 1000)} KB more capacity.`
-            );
+            )];
         }
 
         const chunks = this.allocateDataToImages(data, imageCapacities);
@@ -212,10 +213,14 @@ export class BatchEmbedder {
                     eccProfile: options.eccProfile || 'Medium'
                 };
 
-                const encodedBytes = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {
+                const [encodedBytes, transErr] = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {
                     metadata: metadata,
                     password: options.password
                 });
+
+                if (transErr) {
+                    return [null, new Error(`Failed to embed into ${imageInfo.file.name}: ${transErr.message}`)];
+                }
 
                 results.push({
                     name: `steg_${i}_${imageInfo.file.name}`,
@@ -224,7 +229,7 @@ export class BatchEmbedder {
 
             } catch (error) {
                 console.error(`Error processing ${imageInfo.file.name}:`, error);
-                throw new Error(`Failed to embed into ${imageInfo.file.name}: ${error.message}`);
+                return [null, new Error(`Failed to embed into ${imageInfo.file.name}: ${error.message}`)];
             }
         }
 
@@ -232,7 +237,7 @@ export class BatchEmbedder {
             onProgress(chunks.length, chunks.length, 'Done');
         }
 
-        return results;
+        return [results, null];
     }
 
     /**
@@ -292,10 +297,10 @@ export class BatchEmbedder {
         }
 
         if (offset < data.length) {
-            throw new Error(
+            return [null, new Error(
                 `Not enough image capacity! Embedded ${offset} bytes of ${data.length} bytes. ` +
                 `Missing ${data.length - offset} bytes.`
-            );
+            )];
         }
 
         return chunks;

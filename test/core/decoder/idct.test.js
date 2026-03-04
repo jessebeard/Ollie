@@ -11,20 +11,13 @@ implementations.forEach(({ name, fn: idct }) => {
     describe(name, () => {
         it('should validate coefficient block length', async () => {
             const invalid = new Float32Array(32);
-
-            let errorThrown = false;
-            try {
-                idct(invalid);
-            } catch (e) {
-                errorThrown = true;
-                
-            }
-
+            const [, err] = idct(invalid);
+            expect(err).toBeDefined();
         });
 
         it('should handle all-zero blocks', async () => {
             const coefficients = new Float32Array(64);
-            const result = idct(coefficients);
+            const [result, resultErr] = idct(coefficients);
 
             for (let i = 0; i < 64; i++) {
                 expect(Math.abs(result[i]) < 0.001).toBe(true);
@@ -35,7 +28,7 @@ implementations.forEach(({ name, fn: idct }) => {
             const coefficients = new Float32Array(64);
             coefficients[0] = 100;
 
-            const result = idct(coefficients);
+            const [result, resultErr] = idct(coefficients);
 
             const avgValue = result[0];
 
@@ -45,13 +38,13 @@ implementations.forEach(({ name, fn: idct }) => {
         });
 
         it('should roundtrip with forward DCT for constant block', async () => {
-            
+
             const original = new Float32Array(64);
             original.fill(128);
 
-            const coefficients = forwardDCT(original);
+            const [coefficients] = forwardDCT(original);
 
-            const reconstructed = idct(coefficients);
+            const [reconstructed, reconstructedErr] = idct(coefficients);
 
             for (let i = 0; i < 64; i++) {
                 const diff = Math.abs(reconstructed[i] - original[i]);
@@ -63,7 +56,7 @@ implementations.forEach(({ name, fn: idct }) => {
         });
 
         it('should roundtrip with forward DCT for gradient block', async () => {
-            
+
             const original = new Float32Array(64);
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
@@ -71,20 +64,20 @@ implementations.forEach(({ name, fn: idct }) => {
                 }
             }
 
-            const coefficients = forwardDCT(original);
-            const reconstructed = idct(coefficients);
+            const [coefficients] = forwardDCT(original);
+            const [reconstructed, reconstructedErr] = idct(coefficients);
 
             for (let i = 0; i < 64; i++) {
                 const diff = Math.abs(reconstructed[i] - original[i]);
                 if (diff >= 2) {
                     console.log(`Gradient block mismatch at ${i}: expected ${original[i]}, got ${reconstructed[i]}, diff ${diff}`);
                 }
-                expect(diff < 2).toBe(true); 
+                expect(diff < 2).toBe(true);
             }
         });
 
         it('should roundtrip with forward DCT for checkerboard pattern', async () => {
-            
+
             const original = new Float32Array(64);
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
@@ -92,8 +85,8 @@ implementations.forEach(({ name, fn: idct }) => {
                 }
             }
 
-            const coefficients = forwardDCT(original);
-            const reconstructed = idct(coefficients);
+            const [coefficients] = forwardDCT(original);
+            const [reconstructed, reconstructedErr] = idct(coefficients);
 
             for (let i = 0; i < 64; i++) {
                 expect(Math.abs(reconstructed[i] - original[i]) < 2).toBe(true);
@@ -101,14 +94,14 @@ implementations.forEach(({ name, fn: idct }) => {
         });
 
         it('should roundtrip with forward DCT for random block', async () => {
-            
+
             const original = new Float32Array(64);
             for (let i = 0; i < 64; i++) {
                 original[i] = Math.floor(Math.random() * 256);
             }
 
-            const coefficients = forwardDCT(original);
-            const reconstructed = idct(coefficients);
+            const [coefficients] = forwardDCT(original);
+            const [reconstructed, reconstructedErr] = idct(coefficients);
 
             for (let i = 0; i < 64; i++) {
                 expect(Math.abs(reconstructed[i] - original[i]) < 2).toBe(true);

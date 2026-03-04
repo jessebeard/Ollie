@@ -5,9 +5,9 @@ describe('IDCT Spec Implementations', () => {
     it('should handle DC-only block (constant value)', async () => {
 
         const coeffs = new Float32Array(64);
-        coeffs[0] = 100 * 8;  
+        coeffs[0] = 100 * 8;
 
-        const result = idctPureRef(coeffs);
+        const [result, resultErr] = idctPureRef(coeffs);
 
         for (let i = 0; i < 64; i++) {
             const expected = 100;
@@ -15,7 +15,7 @@ describe('IDCT Spec Implementations', () => {
             if (diff >= 1.0) {
                 console.log(`Pixel ${i}: expected ${expected}, got ${result[i]}, diff ${diff}`);
             }
-            expect(diff < 1.0).toBe(true);  
+            expect(diff < 1.0).toBe(true);
         }
     });
 
@@ -23,8 +23,8 @@ describe('IDCT Spec Implementations', () => {
         const coeffs = new Float32Array(64);
         coeffs[0] = 64 * 100;
 
-        const pure = idctPureRef(coeffs);
-        const opt = idctOptimizedRef(coeffs);
+        const [pure, pureErr] = idctPureRef(coeffs);
+        const [opt, optErr] = idctOptimizedRef(coeffs);
 
         for (let i = 0; i < 64; i++) {
             const diff = Math.abs(pure[i] - opt[i]);
@@ -33,12 +33,8 @@ describe('IDCT Spec Implementations', () => {
     });
 
     it('should validate coefficient block length', async () => {
-        let threw = false;
-        try {
-            idctPureRef(new Float32Array(32));
-        } catch (e) {
-            threw = true;
-        }
-        expect(threw).toBe(true);
+        const [, err] = idctPureRef(new Float32Array(32));
+        expect(err).toBeDefined();
+        expect(err.message).toBeDefined();
     });
 });

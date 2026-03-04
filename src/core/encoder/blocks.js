@@ -1,9 +1,9 @@
 
 export function padDimensions(width, height) {
-    return {
+    return [{
         width: Math.ceil(width / 8) * 8,
         height: Math.ceil(height / 8) * 8
-    };
+    }, null];
 }
 
 /**
@@ -11,10 +11,10 @@ export function padDimensions(width, height) {
  * In 4:2:0, MCUs are 16x16 pixels (2x2 luma blocks + 1 Cb + 1 Cr).
  */
 export function padDimensions420(width, height) {
-    return {
+    return [{
         width: Math.ceil(width / 16) * 16,
         height: Math.ceil(height / 16) * 16
-    };
+    }, null];
 }
 
 /**
@@ -25,6 +25,7 @@ export function padDimensions420(width, height) {
  * @param {number} imgHeight - Original image height
  * @param {number} x - Block x offset (must be multiple of 8)
  * @param {number} y - Block y offset (must be multiple of 8)
+ * @returns {[Float32Array, null]} 8x8 block as tuple
  */
 export function extractBlock(data, imgWidth, imgHeight, x, y) {
     const block = new Float32Array(64);
@@ -42,5 +43,5 @@ export function extractBlock(data, imgWidth, imgHeight, x, y) {
         }
     }
 
-    return block;
+    return [block, null];
 }

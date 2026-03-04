@@ -12,7 +12,6 @@
 /**
  * Huffman Table class for decoding
  */
-import { decodeNaive, buildNaiveLookup } from './huffman-decode-naive.js';
 import { decodeOptimized, buildOptimizedLookup } from './huffman-decode-optimized.js';
 
 /**
@@ -20,40 +19,22 @@ import { decodeOptimized, buildOptimizedLookup } from './huffman-decode-optimize
  */
 export class HuffmanTable {
     constructor(bits, values, tableClass, tableId) {
-        this.bits = bits;           
-        this.values = values;       
-        this.tableClass = tableClass; 
-        this.tableId = tableId;     
+        this.bits = bits;
+        this.values = values;
+        this.tableClass = tableClass;
+        this.tableId = tableId;
 
-        buildNaiveLookup(this);
         buildOptimizedLookup(this);
     }
 
     /**
      * Decode a symbol from a BitReader
-     * This method delegates to the currently selected implementation
+     * This method delegates to the optimized implementation
      * @param {BitReader} bitReader - Bit reader positioned at start of code
-     * @returns {number} Decoded symbol
+     * @returns {[number, null] | [null, Error]} Tuple: decoded symbol, or error
      */
     decode(bitReader) {
-        
         return decodeOptimized(this, bitReader);
-    }
-
-    /**
-     * Set the decoding method globally for all HuffmanTable instances
-     * @param {string} method - 'naive' or 'optimized'
-     */
-    static setDecodeMethod(method) {
-        if (method === 'naive') {
-            HuffmanTable.prototype.decode = function (bitReader) {
-                return decodeNaive(this, bitReader);
-            };
-        } else {
-            HuffmanTable.prototype.decode = function (bitReader) {
-                return decodeOptimized(this, bitReader);
-            };
-        }
     }
 }
 
@@ -61,27 +42,27 @@ export class HuffmanTable {
  * Parse a single Huffman table from DHT segment data
  * @param {Uint8Array} data - DHT segment data (without marker and length)
  * @param {number} offset - Offset within the segment data
- * @returns {{table: HuffmanTable, nextOffset: number}}
+ * @returns {[{table: HuffmanTable, nextOffset: number}, null] | [null, Error]}
  */
 export function parseHuffmanTable(data, offset = 0) {
     if (offset >= data.length) {
-        throw new Error('Invalid DHT offset');
+        return [null, new Error('Invalid DHT offset')];
     }
 
     const tcTh = data[offset];
-    const tableClass = (tcTh >> 4) & 0x0F; 
-    const tableId = tcTh & 0x0F; 
+    const tableClass = (tcTh >> 4) & 0x0F;
+    const tableId = tcTh & 0x0F;
 
     if (tableClass !== 0 && tableClass !== 1) {
-        throw new Error(`Invalid Huffman table class: ${tableClass}`);
+        return [null, new Error(`Invalid Huffman table class: ${tableClass}`)];
     }
 
     if (tableId > 3) {
-        throw new Error(`Invalid Huffman table ID: ${tableId}`);
+        return [null, new Error(`Invalid Huffman table ID: ${tableId}`)];
     }
 
     if (offset + 1 + 16 > data.length) {
-        throw new Error('Incomplete Huffman BITS array');
+        return [null, new Error('Incomplete Huffman BITS array')];
     }
 
     const bits = new Uint8Array(16);
@@ -95,11 +76,11 @@ export function parseHuffmanTable(data, offset = 0) {
     }
 
     if (totalSymbols > 256) {
-        throw new Error(`Invalid BITS sum: ${totalSymbols} (max 256)`);
+        return [null, new Error(`Invalid BITS sum: ${totalSymbols} (max 256)`)];
     }
 
     if (offset + 1 + 16 + totalSymbols > data.length) {
-        throw new Error('Incomplete Huffman HUFFVAL array');
+        return [null, new Error('Incomplete Huffman HUFFVAL array')];
     }
 
     const values = new Uint8Array(totalSymbols);
@@ -109,46 +90,48 @@ export function parseHuffmanTable(data, offset = 0) {
 
     const table = new HuffmanTable(bits, values, tableClass, tableId);
 
-    return {
+    return [{
         table,
         nextOffset: offset + 1 + 16 + totalSymbols
-    };
+    }, null];
 }
 
 /**
  * Parse all Huffman tables from a DHT segment
  * @param {Uint8Array} segmentData - DHT segment data (without marker and length)
- * @returns {Map<string, HuffmanTable>} Map of "class_id" to Huffman table
+ * @returns {[Map<string, HuffmanTable>, null] | [null, Error]}
  */
 export function parseAllHuffmanTables(segmentData) {
     const tables = new Map();
     let offset = 0;
 
     while (offset < segmentData.length) {
-        const result = parseHuffmanTable(segmentData, offset);
+        const [result, err] = parseHuffmanTable(segmentData, offset);
+        if (err) return [null, err];
         const key = `${result.table.tableClass}_${result.table.tableId}`;
         tables.set(key, result.table);
         offset = result.nextOffset;
     }
 
-    return tables;
+    return [tables, null];
 }
 
 /**
  * Parse Huffman tables from multiple DHT segments
  * @param {Array<{data: Uint8Array}>} dhtSegments - Array of DHT segment objects
- * @returns {Map<string, HuffmanTable>} Map of "class_id" to Huffman table
+ * @returns {[Map<string, HuffmanTable>, null] | [null, Error]}
  */
 export function parseHuffmanTablesFromSegments(dhtSegments) {
     const allTables = new Map();
 
     for (const segment of dhtSegments) {
-        const tables = parseAllHuffmanTables(segment.data);
-        
+        const [tables, err] = parseAllHuffmanTables(segment.data);
+        if (err) return [null, err];
+
         for (const [key, table] of tables) {
             allTables.set(key, table);
         }
     }
 
-    return allTables;
+    return [allTables, null];
 }

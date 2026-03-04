@@ -18,7 +18,7 @@ describe('HuffmanTableParser', () => {
         data[17] = 0;
         data[18] = 1;
 
-        const result = parseHuffmanTable(data, 0);
+        const [result, resultErr] = parseHuffmanTable(data, 0);
 
         expect(result.table.tableClass).toBe(0);
         expect(result.table.tableId).toBe(0);
@@ -37,7 +37,7 @@ describe('HuffmanTableParser', () => {
         data[18] = 0x02;
         data[19] = 0x03;
 
-        const result = parseHuffmanTable(data, 0);
+        const [result, resultErr] = parseHuffmanTable(data, 0);
 
         expect(result.table.tableClass).toBe(1);
         expect(result.table.tableId).toBe(0);
@@ -54,7 +54,7 @@ describe('HuffmanTableParser', () => {
         for (const { tcTh, expectedId } of testCases) {
             const data = new Uint8Array(1 + 16 + 0);
             data[0] = tcTh;
-            const result = parseHuffmanTable(data, 0);
+            const [result, resultErr] = parseHuffmanTable(data, 0);
             expect(result.table.tableId).toBe(expectedId);
         }
     });
@@ -72,7 +72,7 @@ describe('HuffmanTableParser', () => {
             data[17 + i] = i + 10;
         }
 
-        const result = parseHuffmanTable(data, 0);
+        const [result, resultErr] = parseHuffmanTable(data, 0);
 
         expect(result.table.bits[0]).toBe(0);
         expect(result.table.bits[1]).toBe(2);
@@ -90,7 +90,7 @@ describe('HuffmanTableParser', () => {
         data[19] = 0xCC;
         data[20] = 0xDD;
 
-        const result = parseHuffmanTable(data, 0);
+        const [result, resultErr] = parseHuffmanTable(data, 0);
 
         expect(result.table.values.length).toBe(4);
         expect(result.table.values[0]).toBe(0xAA);
@@ -105,14 +105,9 @@ describe('HuffmanTableParser', () => {
             data[1 + i] = 20; 
         }
 
-        let errorThrown = false;
-        try {
-            parseHuffmanTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid BITS sum: 320 (max 256)');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseHuffmanTableErrResult] = parseHuffmanTable(data, 0);
+        expect(parseHuffmanTableErrResult).toBeDefined();
+        expect(parseHuffmanTableErrResult.message).toBe('Invalid BITS sum: 320 (max 256)');
     });
 
     it('should build lookup table for fast decoding', () => {
@@ -145,7 +140,7 @@ describe('HuffmanTableParser', () => {
         data[table1Size + 18] = 11;
         data[table1Size + 19] = 12;
 
-        const tables = parseAllHuffmanTables(data);
+        const [tables, tablesErr] = parseAllHuffmanTables(data);
 
         expect(tables.size).toBe(2);
         expect(tables.has('0_0')).toBe(true); 
@@ -156,42 +151,27 @@ describe('HuffmanTableParser', () => {
         const data = new Uint8Array(1 + 16);
         data[0] = 0x20; 
 
-        let errorThrown = false;
-        try {
-            parseHuffmanTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid Huffman table class: 2');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseHuffmanTableErrResult] = parseHuffmanTable(data, 0);
+        expect(parseHuffmanTableErrResult).toBeDefined();
+        expect(parseHuffmanTableErrResult.message).toBe('Invalid Huffman table class: 2');
     });
 
     it('should validate table ID range', () => {
         const data = new Uint8Array(1 + 16);
         data[0] = 0x04; 
 
-        let errorThrown = false;
-        try {
-            parseHuffmanTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Invalid Huffman table ID: 4');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseHuffmanTableErrResult] = parseHuffmanTable(data, 0);
+        expect(parseHuffmanTableErrResult).toBeDefined();
+        expect(parseHuffmanTableErrResult.message).toBe('Invalid Huffman table ID: 4');
     });
 
     it('should throw error on incomplete BITS array', () => {
         const data = new Uint8Array(10); 
         data[0] = 0x00;
 
-        let errorThrown = false;
-        try {
-            parseHuffmanTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Incomplete Huffman BITS array');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseHuffmanTableErrResult] = parseHuffmanTable(data, 0);
+        expect(parseHuffmanTableErrResult).toBeDefined();
+        expect(parseHuffmanTableErrResult.message).toBe('Incomplete Huffman BITS array');
     });
 
     it('should throw error on incomplete HUFFVAL array', () => {
@@ -199,14 +179,9 @@ describe('HuffmanTableParser', () => {
         data[0] = 0x00;
         data[1] = 2; 
 
-        let errorThrown = false;
-        try {
-            parseHuffmanTable(data, 0);
-        } catch (e) {
-            errorThrown = true;
-            expect(e.message).toBe('Incomplete Huffman HUFFVAL array');
-        }
-        expect(errorThrown).toBe(true);
+        const [, parseHuffmanTableErrResult] = parseHuffmanTable(data, 0);
+        expect(parseHuffmanTableErrResult).toBeDefined();
+        expect(parseHuffmanTableErrResult.message).toBe('Incomplete Huffman HUFFVAL array');
     });
 
     it('should decode simple Huffman codes', () => {
@@ -219,11 +194,11 @@ describe('HuffmanTableParser', () => {
 
         const data1 = new Uint8Array([0b00000000]); 
         const reader1 = new BitReader(data1);
-        expect(table.decode(reader1)).toBe(5);
+        { const [sym] = table.decode(reader1); expect(sym).toBe(5); }
 
         const data2 = new Uint8Array([0b10000000]); 
         const reader2 = new BitReader(data2);
-        expect(table.decode(reader2)).toBe(6);
+        { const [sym] = table.decode(reader2); expect(sym).toBe(6); }
     });
 
     it('should parse tables from multiple DHT segments', () => {
@@ -243,7 +218,7 @@ describe('HuffmanTableParser', () => {
             { data: seg2 }
         ];
 
-        const tables = parseHuffmanTablesFromSegments(segments);
+        const [tables, tablesErr] = parseHuffmanTablesFromSegments(segments);
 
         expect(tables.size).toBe(2);
         expect(tables.get('0_0').values[0]).toBe(100);

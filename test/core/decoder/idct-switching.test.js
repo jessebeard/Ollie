@@ -20,7 +20,7 @@ describe('IDCT Switching', () => {
         let called = false;
         const spyIdct = (coeffs) => {
             called = true;
-            return new Float32Array(64);
+            return [new Float32Array(64), null];
         };
 
         const decoder = new JpegDecoder();
@@ -35,7 +35,7 @@ describe('IDCT Switching', () => {
 
         decoder.components = {
             1: {
-                blocks: [new Int32Array(64)], 
+                blocks: [new Int32Array(64)],
                 blocksH: 1,
                 blocksV: 1,
                 hSampling: 1,

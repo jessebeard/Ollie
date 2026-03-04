@@ -39,7 +39,7 @@ export function buildOptimizedLookup(table) {
             symbolIndex++;
         }
 
-        code <<= 1; 
+        code <<= 1;
     }
 }
 
@@ -47,7 +47,7 @@ export function buildOptimizedLookup(table) {
  * Decode a symbol using the optimized method
  * @param {HuffmanTable} table - The Huffman table instance
  * @param {BitReader} bitReader - Bit reader positioned at start of code
- * @returns {number} Decoded symbol
+ * @returns {[number, null] | [null, Error]} Tuple: decoded symbol, or error
  */
 export function decodeOptimized(table, bitReader) {
     if (!table.fastLookup) {
@@ -60,10 +60,10 @@ export function decodeOptimized(table, bitReader) {
     const length = entry >> 8;
 
     if (length === 0) {
-        throw new Error('Invalid Huffman code');
+        return [null, new Error('Invalid Huffman code')];
     }
 
     bitReader.skipBits(length);
 
-    return entry & 0xFF;
+    return [entry & 0xFF, null];
 }

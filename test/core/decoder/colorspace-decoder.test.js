@@ -3,22 +3,22 @@ import { ycbcrToRgb, rgbToYcbcr } from '../../../src/core/encoder/colorspace.js'
 
 describe('YCbCr to RGB Conversion', () => {
     it('should convert black correctly', () => {
-        const result = ycbcrToRgb(0, 128, 128);
+        const [result] = ycbcrToRgb(0, 128, 128);
         expect(result.r).toBe(0);
         expect(result.g).toBe(0);
         expect(result.b).toBe(0);
     });
 
     it('should convert white correctly', () => {
-        const result = ycbcrToRgb(255, 128, 128);
+        const [result] = ycbcrToRgb(255, 128, 128);
         expect(result.r).toBe(255);
         expect(result.g).toBe(255);
         expect(result.b).toBe(255);
     });
 
     it('should convert pure red correctly', () => {
-        const { y, cb, cr } = rgbToYcbcr(255, 0, 0);
-        const result = ycbcrToRgb(y, cb, cr);
+        const [{ y, cb, cr }] = rgbToYcbcr(255, 0, 0);
+        const [result] = ycbcrToRgb(y, cb, cr);
 
         expect(Math.abs(result.r - 255) <= 2).toBe(true);
         expect(Math.abs(result.g - 0) <= 2).toBe(true);
@@ -26,8 +26,8 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should convert pure green correctly', () => {
-        const { y, cb, cr } = rgbToYcbcr(0, 255, 0);
-        const result = ycbcrToRgb(y, cb, cr);
+        const [{ y, cb, cr }] = rgbToYcbcr(0, 255, 0);
+        const [result] = ycbcrToRgb(y, cb, cr);
 
         expect(Math.abs(result.r - 0) <= 2).toBe(true);
         expect(Math.abs(result.g - 255) <= 2).toBe(true);
@@ -35,8 +35,8 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should convert pure blue correctly', () => {
-        const { y, cb, cr } = rgbToYcbcr(0, 0, 255);
-        const result = ycbcrToRgb(y, cb, cr);
+        const [{ y, cb, cr }] = rgbToYcbcr(0, 0, 255);
+        const [result] = ycbcrToRgb(y, cb, cr);
 
         expect(Math.abs(result.r - 0) <= 2).toBe(true);
         expect(Math.abs(result.g - 0) <= 2).toBe(true);
@@ -44,8 +44,8 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should clamp RGB values to 0-255 range', () => {
-        
-        const result = ycbcrToRgb(255, 0, 255);
+
+        const [result] = ycbcrToRgb(255, 0, 255);
 
         expect(result.r >= 0 && result.r <= 255).toBe(true);
         expect(result.g >= 0 && result.g <= 255).toBe(true);
@@ -53,7 +53,7 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should handle grayscale values', () => {
-        const result = ycbcrToRgb(128, 128, 128);
+        const [result] = ycbcrToRgb(128, 128, 128);
 
         expect(result.r).toBe(128);
         expect(result.g).toBe(128);
@@ -62,8 +62,8 @@ describe('YCbCr to RGB Conversion', () => {
 
     it('should roundtrip with RGB to YCbCr', () => {
         const original = { r: 100, g: 150, b: 200 };
-        const { y, cb, cr } = rgbToYcbcr(original.r, original.g, original.b);
-        const result = ycbcrToRgb(y, cb, cr);
+        const [{ y, cb, cr }] = rgbToYcbcr(original.r, original.g, original.b);
+        const [result] = ycbcrToRgb(y, cb, cr);
 
         expect(Math.abs(result.r - original.r) <= 2).toBe(true);
         expect(Math.abs(result.g - original.g) <= 2).toBe(true);
@@ -71,12 +71,12 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should use JFIF standard formulas', () => {
-        
-        const y = 128;
-        const cb = 100; 
-        const cr = 150; 
 
-        const result = ycbcrToRgb(y, cb, cr);
+        const y = 128;
+        const cb = 100;
+        const cr = 150;
+
+        const [result] = ycbcrToRgb(y, cb, cr);
 
         const expectedR = 128 + 1.402 * (150 - 128);
         const expectedG = 128 - 0.344136 * (100 - 128) - 0.714136 * (150 - 128);
@@ -88,7 +88,7 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should handle edge case with Cb=0, Cr=0', () => {
-        const result = ycbcrToRgb(128, 0, 0);
+        const [result] = ycbcrToRgb(128, 0, 0);
 
         expect(result.r >= 0 && result.r <= 255).toBe(true);
         expect(result.g >= 0 && result.g <= 255).toBe(true);
@@ -96,7 +96,7 @@ describe('YCbCr to RGB Conversion', () => {
     });
 
     it('should handle edge case with Cb=255, Cr=255', () => {
-        const result = ycbcrToRgb(128, 255, 255);
+        const [result] = ycbcrToRgb(128, 255, 255);
 
         expect(result.r >= 0 && result.r <= 255).toBe(true);
         expect(result.g >= 0 && result.g <= 255).toBe(true);

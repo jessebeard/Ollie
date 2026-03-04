@@ -89,7 +89,8 @@ export function initDecoderUI() {
             const passwordInput = document.getElementById('decrypt-password');
             const password = passwordInput ? passwordInput.value : null;
 
-            const result = await decoder.decode(bytes, { password });
+            const [result, err] = await decoder.decode(bytes, { password });
+            if (err) throw err;
 
             decodedCanvas.width = result.width;
             decodedCanvas.height = result.height;

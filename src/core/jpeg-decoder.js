@@ -50,8 +50,9 @@ export class JpegDecoder {
     setDequantizationMethod(method) {
         if (typeof method === 'function') {
             this.dequantizeMethod = method;
+            return [true, null];
         } else {
-            throw new Error('setDequantizationMethod expects a function');
+            return [null, new Error('setDequantizationMethod expects a function')];
         }
     }
 
@@ -78,13 +79,14 @@ export class JpegDecoder {
                     this.idctMethod = idctNaive;
                     break;
                 default:
-                    throw new Error(`Unknown IDCT method identifier: ${method}`);
+                    return [null, new Error(`Unknown IDCT method identifier: ${method}`)];
             }
         } else if (typeof method === 'function') {
             this.idctMethod = method;
         } else {
-            throw new Error('setIdctMethod expects a function or a known method identifier string');
+            return [null, new Error('setIdctMethod expects a function or a known method identifier string')];
         }
+        return [true, null];
     }
 
     /**
@@ -97,10 +99,21 @@ export class JpegDecoder {
     async decode(jpegBytes, options = {}) {
         this.reset();
 
-        const segments = parseFileStructure(jpegBytes);
+        // Defensive Programming / Fast Failure:
+        // Must strictly start with SOI Marker: FF D8
+        if (!jpegBytes || jpegBytes.length < 2 || jpegBytes[0] !== 0xFF || jpegBytes[1] !== 0xD8) {
+            return [null, new Error('Invalid JPEG signature: Missing SOI marker FF D8 at start of file')];
+        }
+
+        let segments;
+        try {
+            segments = parseFileStructure(jpegBytes);
+        } catch (e) {
+            return [null, e instanceof Error ? e : new Error(String(e))];
+        }
 
         if (!segments.has('SOI')) {
-            throw new Error('Invalid JPEG: Missing SOI marker');
+            return [null, new Error('Invalid JPEG: Missing SOI marker')];
         }
 
         if (segments.has('APP0')) {
@@ -128,10 +141,11 @@ export class JpegDecoder {
         if (segments.has('APP8')) {
             const app8Segments = segments.get('APP8');
             for (const segment of app8Segments) {
-                try {
-                    this.spiff = parseSpiffHeader(segment.data);
-                } catch (e) {
-                    console.warn('Failed to parse APP8 (SPIFF) segment:', e.message);
+                const [spiffResult, spiffErr] = parseSpiffHeader(segment.data);
+                if (!spiffErr) {
+                    this.spiff = spiffResult;
+                } else {
+                    console.warn('Failed to parse APP8 (SPIFF) segment:', spiffErr.message);
                 }
             }
         }
@@ -139,7 +153,8 @@ export class JpegDecoder {
         if (segments.has('DQT')) {
             const dqtSegments = segments.get('DQT');
             for (const segment of dqtSegments) {
-                const tables = parseAllQuantizationTables(segment.data);
+                const [tables, dqtErr] = parseAllQuantizationTables(segment.data);
+                if (dqtErr) return [null, dqtErr];
                 for (const [id, table] of tables) {
                     this.quantizationTables.set(id, table);
                 }
@@ -157,7 +172,8 @@ export class JpegDecoder {
         if (segments.has('DHT')) {
             const dhtSegments = segments.get('DHT');
             for (const segment of dhtSegments) {
-                const tables = parseAllHuffmanTables(segment.data);
+                const [tables, dhtErr] = parseAllHuffmanTables(segment.data);
+                if (dhtErr) return [null, dhtErr];
                 for (const [key, table] of tables) {
                     this.huffmanTables.set(key, table);
                 }
@@ -170,27 +186,51 @@ export class JpegDecoder {
         } else if (segments.has('SOF2')) {
             sofData = segments.get('SOF2')[0].data;
         } else {
-            throw new Error('Unsupported JPEG: Missing SOF0 or SOF2 marker');
+            return [null, new Error('Unsupported JPEG: Missing SOF0 or SOF2 marker')];
         }
 
         this.frameHeader = parseFrameHeader(sofData);
+        if (this.frameHeader[1]) return [null, this.frameHeader[1]];
+        this.frameHeader = this.frameHeader[0];
         this.frameHeader.sofType = segments.has('SOF2') ? 0xC2 : 0xC0;
-        this.initializeComponents();
+        const initErr = this.initializeComponents();
+        if (initErr) return [null, initErr];
 
         if (!segments.has('SOS')) {
-            throw new Error('Invalid JPEG: Missing SOS marker');
+            return [null, new Error('Invalid JPEG: Missing SOS marker')];
         }
 
         const sosSegments = segments.get('SOS');
         for (const sosSegment of sosSegments) {
-            const scanHeader = parseScanHeader(sosSegment.data, this.frameHeader);
+            const [scanHeader, scanErr] = parseScanHeader(sosSegment.data, this.frameHeader);
+            if (scanErr) return [null, scanErr];
             const scanData = sosSegment.scanData;
 
             if (!scanData) {
-                throw new Error('Invalid JPEG: Missing scan data');
+                return [null, new Error('Invalid JPEG: Missing scan data')];
             }
 
-            this.decodeScan(scanData, scanHeader);
+            const scanDecErr = this.decodeScan(scanData, scanHeader);
+            if (scanDecErr) return [null, scanDecErr];
+        }
+
+        // Fast path: return raw coefficients without image reconstruction
+        if (options.coefficientsOnly) {
+            return [{
+                width: this.frameHeader.width,
+                height: this.frameHeader.height,
+                coefficients: this.components,
+                quantizationTables: this.quantizationTables,
+                metadata: {
+                    width: this.frameHeader.width,
+                    height: this.frameHeader.height,
+                    components: this.frameHeader.components.length,
+                    progressive: this.frameHeader.sofType === 0xC2,
+                    chromaSubsampling: this.frameHeader.components.length >= 3
+                        ? this.getChromaSubsamplingString(this.frameHeader.components)
+                        : '4:4:4'
+                }
+            }, null];
         }
 
         let extractedSecretData = null;
@@ -225,7 +265,8 @@ export class JpegDecoder {
             }
         }
 
-        const result = this.assembleImage();
+        const [result, assembleErr] = this.assembleImage();
+        if (assembleErr) return [null, assembleErr];
 
         if (extractedSecretData) {
             if (extractedSecretData.metadata) {
@@ -239,7 +280,7 @@ export class JpegDecoder {
         result.quantizationTables = this.quantizationTables;
         result.coefficients = this.components;
 
-        return result;
+        return [result, null];
     }
 
     initializeComponents() {
@@ -252,7 +293,7 @@ export class JpegDecoder {
             const totalBlocks = blocksH * blocksV;
 
             if (totalBlocks <= 0 || totalBlocks > 1000000 || !Number.isFinite(totalBlocks)) {
-                throw new Error(`Invalid block count: ${totalBlocks} (blocksH=${blocksH}, blocksV=${blocksV})`);
+                return new Error(`Invalid block count: ${totalBlocks} (blocksH=${blocksH}, blocksV=${blocksV})`);
             }
 
             this.components[comp.id] = {
@@ -297,24 +338,26 @@ export class JpegDecoder {
                 // Align to byte boundary
                 bitReader.alignToByte();
 
-                // Read Marker
-                const ff = bitReader.readBits(8);
-                const marker = bitReader.readBits(8);
+                // Consume fill bytes (0xFF) before the actual marker
+                while (bitReader.byteOffset < bitReader.data.length && bitReader.data[bitReader.byteOffset] === 0xFF && bitReader.data[bitReader.byteOffset + 1] === 0xFF) {
+                    bitReader.byteOffset++;
+                }
+
+                if (bitReader.byteOffset + 1 >= bitReader.data.length) {
+                    return new Error("Unexpected end of data while looking for RST marker");
+                }
+
+                const ff = bitReader.data[bitReader.byteOffset];
+                const marker = bitReader.data[bitReader.byteOffset + 1];
 
                 if (ff !== 0xFF || marker !== expectedRstMarker) {
                     console.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
 
                     // Attempt to resync: Scan forward for the next RST marker
-                    // We need to look for FF D[0-7]
-
                     let foundMarker = false;
-                    const originalByteOffset = bitReader.byteOffset;
-
-                    // Limit scan to avoid hanging on massive files
                     const SEARCH_LIMIT = 512;
 
                     for (let i = 0; i < SEARCH_LIMIT; i++) {
-                        // We are already aligned, so we peek bytes
                         if (bitReader.byteOffset + i + 1 >= bitReader.data.length) break;
 
                         const b0 = bitReader.data[bitReader.byteOffset + i];
@@ -322,15 +365,10 @@ export class JpegDecoder {
 
                         if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {
                             console.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
-
-                            // Advance to AFTER this marker
                             bitReader.byteOffset += (i + 2);
                             bitReader.bitOffset = 0;
-
-                            // Update expected marker to match what we found + 1
                             expectedRstMarker = (b1 + 1);
                             if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
-
                             foundMarker = true;
                             break;
                         }
@@ -338,43 +376,37 @@ export class JpegDecoder {
 
                     if (!foundMarker) {
                         console.error('Failed to resync: No RST marker found within search limit.');
-                        // We will likely fail Huffman decoding next, but let's try to proceed
-                        // Maybe we are just 1 byte off? 
-                        // If we didn't find a marker, we consumed 2 bytes (ff, marker) in the initial read.
-                        // We might be in the middle of data.
                     }
                 } else {
-                    // Correct marker found
-                    // Update expected for next time
+                    // Correct marker found, advance the pointers manually
+                    bitReader.byteOffset += 2;
+                    bitReader.bitOffset = 0;
+
                     expectedRstMarker++;
                     if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
                 }
 
-                // Always reset predictors after a restart interval (whether we synced or not, it's safer)
+                // Always reset predictors after a restart interval
                 dcPredictors.fill(0);
-
-                // Reset counter
                 mcusSinceRestart = 0;
-
-                // Continue loop... we either synced, or we failed and will crash soon.
-                continue;
+                // DO NOT `continue` the loop, as we still need to process the current MCU index.
             }
 
             for (const scanComp of scanHeader.components) {
                 const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
 
                 if (!frameComp) {
-                    throw new Error(`Scan component ${scanComp.selector} not found in frame header`);
+                    return new Error(`Scan component ${scanComp.selector} not found in frame header`);
                 }
 
                 const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
                 const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
 
                 if (Ss === 0 && !dcTable) {
-                    throw new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
+                    return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
                 }
                 if (Se > 0 && !acTable) {
-                    throw new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
+                    return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
                 }
 
                 const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
@@ -389,7 +421,7 @@ export class JpegDecoder {
 
                     const block = this.components[scanComp.selector].blocks[blockIndex];
 
-                    const { dc } = decodeBlock(
+                    const [blockResult, blockErr] = decodeBlock(
                         bitReader,
                         dcTable,
                         acTable,
@@ -398,9 +430,10 @@ export class JpegDecoder {
                         Ss,
                         Se
                     );
+                    if (blockErr) return blockErr;
 
                     if (Ss === 0) {
-                        dcPredictors[compIndex] = dc;
+                        dcPredictors[compIndex] = blockResult.dc;
                     }
                 }
             }
@@ -423,7 +456,7 @@ export class JpegDecoder {
             const quantTable = this.quantizationTables.get(comp.quantTableId);
 
             if (!quantTable) {
-                throw new Error(`Missing quantization table ${comp.quantTableId}`);
+                return [null, new Error(`Missing quantization table ${comp.quantTableId}`)];
             }
 
             const tempDequant = new Float32Array(64);
@@ -433,11 +466,14 @@ export class JpegDecoder {
 
             const processedBlocks = compData.blocks.map(block => {
 
-                const dequantized = this.dequantizeMethod(block, quantTable, tempDequant);
+                const [dequantized, dqErr] = this.dequantizeMethod(block, quantTable, tempDequant);
+                if (dqErr) throw dqErr;
 
-                const block2D = inverseZigZag(dequantized, tempZigZag);
+                const [block2D, zigErr] = inverseZigZag(dequantized, tempZigZag);
+                if (zigErr) throw zigErr;
 
-                const spatial = this.idctMethod(block2D);
+                const [spatial, idctErr] = this.idctMethod(block2D);
+                if (idctErr) throw idctErr;
 
                 for (let i = 0; i < 64; i++) {
                     const val = spatial[i] + 128;
@@ -476,7 +512,7 @@ export class JpegDecoder {
                         cropped[dstOffset + 3] = fullImageData[srcOffset + 3];
                     }
                 }
-                return {
+                return [{
                     data: cropped,
                     width,
                     height,
@@ -488,10 +524,10 @@ export class JpegDecoder {
                         progressive: this.frameHeader.sofType === 0xC2,
                         chromaSubsampling: '4:4:4'
                     }
-                };
+                }, null];
             }
 
-            return {
+            return [{
                 data: fullImageData,
                 width: yComp.width,
                 height: yComp.height,
@@ -503,7 +539,7 @@ export class JpegDecoder {
                     progressive: this.frameHeader.sofType === 0xC2,
                     chromaSubsampling: '4:4:4'
                 }
-            };
+            }, null];
         } else {
 
             const yComp = processedComponents[components[0].id];
@@ -537,7 +573,7 @@ export class JpegDecoder {
                         cropped[dstOffset + 3] = fullImageData[srcOffset + 3];
                     }
                 }
-                return {
+                return [{
                     data: cropped,
                     width,
                     height,
@@ -549,10 +585,10 @@ export class JpegDecoder {
                         progressive: this.frameHeader.sofType === 0xC2,
                         chromaSubsampling: this.getChromaSubsamplingString(components)
                     }
-                };
+                }, null];
             }
 
-            return {
+            return [{
                 data: fullImageData,
                 width: yComp.width,
                 height: yComp.height,
@@ -565,7 +601,7 @@ export class JpegDecoder {
                     progressive: this.frameHeader.sofType === 0xC2,
                     chromaSubsampling: this.getChromaSubsamplingString(components)
                 }
-            };
+            }, null];
         }
     }
 

@@ -6,8 +6,8 @@ describe('Jsteg Container Format', () => {
         const blocks = [];
         for (let i = 0; i < count; i++) {
             const block = new Int32Array(64).fill(fillValue);
-            block[0] = 100; 
-            
+            block[0] = 100;
+
             blocks.push(block);
         }
         return blocks;
@@ -122,14 +122,14 @@ describe('Jsteg Container Format', () => {
                 if (block[i] === 0) continue;
 
                 if (byteIndex === targetByteIndex) {
-                    
+
                     const val = block[i];
                     if (Math.abs(val) === 1) {
 
                         if (Math.abs(val) === 1) {
                             block[i] = (val > 0) ? 2 : -2;
                         } else {
-                            
+
                             block[i] = (val & ~1) | ((val & 1) ^ 1);
                         }
                     } else {
@@ -169,7 +169,7 @@ describe('Jsteg Container Format', () => {
     });
 
     it('should recover from corruption when ECC is enabled', async () => {
-        
+
         const blocks = createMockBlocks(500);
         const data = new Uint8Array([10, 20, 30, 40, 50]);
         const metadata = { ecc: true, eccProfile: 'Medium' };
@@ -178,7 +178,7 @@ describe('Jsteg Container Format', () => {
 
         let byteIndex = 0;
         let bitIndex = 0;
-        const targetBytes = [100, 150, 200, 250, 300]; 
+        const targetBytes = [100, 150, 200, 250, 300];
         let corruptedCount = 0;
 
         for (const block of blocks) {
@@ -186,7 +186,7 @@ describe('Jsteg Container Format', () => {
                 if (block[i] === 0) continue;
 
                 if (targetBytes.includes(byteIndex) && bitIndex === 0) {
-                    
+
                     const val = block[i];
                     if (Math.abs(val) === 1) {
                         block[i] = (val > 0) ? 2 : -2;
@@ -253,7 +253,7 @@ describe('Jsteg Container Format', () => {
 
         let byteIndex = 0;
         let bitIndex = 0;
-        const targetByteIndex = 70;
+        const targetByteIndex = 150;
         let corrupted = false;
 
         for (const block of blocks) {

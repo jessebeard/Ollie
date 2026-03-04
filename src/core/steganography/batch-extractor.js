@@ -29,7 +29,8 @@ export class BatchExtractor {
                 const jpegBytes = new Uint8Array(arrayBuffer);
                 const decoder = new JpegDecoder();
 
-                const result = await decoder.decode(jpegBytes, { password });
+                const [result, err] = await decoder.decode(jpegBytes, { password });
+                if (err) throw err;
 
                 if (result.secretData) {
                     console.log(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
@@ -63,7 +64,7 @@ export class BatchExtractor {
         }
 
         if (chunks.length === 0) {
-            throw new Error('No valid chunks found in provided images.');
+            return [null, new Error('No valid chunks found in provided images.')];
         }
 
         const sorted = [...chunks].sort((a, b) => a.index - b.index);
@@ -79,7 +80,7 @@ export class BatchExtractor {
 
                 const msg = `Missing chunks: expected ${expectedTotal}, got ${sorted.length} chunks from ${imageFiles.length} input files. Missing indices: [${missingIndices.join(', ')}]`;
                 console.error(msg);
-                throw new Error(msg);
+                return [null, new Error(msg)];
             }
         }
 
@@ -87,12 +88,16 @@ export class BatchExtractor {
             onProgress(total, total, 'Reassembling...');
         }
 
-        const reassembled = ChunkManager.reassemble(chunks);
+        const [reassembled, reassembleErr] = ChunkManager.reassemble(chunks);
+        if (reassembleErr) {
+            console.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
+            return null;
+        }
 
-        return {
+        return [{
             data: reassembled,
             filename: firstMetadata ? firstMetadata.filename : 'unknown',
             metadata: firstMetadata
-        };
+        }, null];
     }
 }

@@ -43,7 +43,7 @@ export class ContainerFormat {
         const metadataBytes = new TextEncoder().encode(metadataJson);
 
         if (metadataBytes.length > 0xFFFF) {
-            throw new Error(`Metadata too large: ${metadataBytes.length} bytes (max 65535)`);
+            return [null, new Error(`Metadata too large: ${metadataBytes.length} bytes (max 65535)`)];
         }
 
         const headerSize = 4 + 1 + 1 + 2;
@@ -81,7 +81,7 @@ export class ContainerFormat {
         container[offset++] = (crcVal >> 8) & 0xFF;
         container[offset++] = crcVal & 0xFF;
 
-        return container;
+        return [container, null];
     }
 
     /**
@@ -94,18 +94,18 @@ export class ContainerFormat {
         let offset = 0;
 
         if (container.length < 12) {
-            throw new Error('Container too small');
+            return [null, new Error('Container too small')];
         }
 
         const magic = container.subarray(0, 4);
         if (!this.arrayEquals(magic, MAGIC_BYTES)) {
-            throw new Error('Invalid magic bytes (not a JSTG container)');
+            return [null, new Error('Invalid magic bytes (not a JSTG container)')];
         }
         offset += 4;
 
         const version = container[offset++];
         if (version !== VERSION) {
-            throw new Error(`Unsupported version: ${version} (expected ${VERSION})`);
+            return [null, new Error(`Unsupported version: ${version} (expected ${VERSION})`)];
         }
 
         const flags = container[offset++];
@@ -114,7 +114,7 @@ export class ContainerFormat {
         offset += 2;
 
         if (container.length < offset + metadataLength + 4) {
-            throw new Error('Container truncated (metadata section)');
+            return [null, new Error('Container truncated (metadata section)')];
         }
 
         const metadataBytes = container.subarray(offset, offset + metadataLength);
@@ -125,7 +125,7 @@ export class ContainerFormat {
             const metadataJson = new TextDecoder().decode(metadataBytes);
             metadata = JSON.parse(metadataJson);
         } catch (e) {
-            throw new Error(`Invalid metadata JSON: ${e.message}`);
+            return [null, new Error(`Invalid metadata JSON: ${e.message}`)];
         }
 
         const payloadLength = (
@@ -137,7 +137,7 @@ export class ContainerFormat {
         offset += 4;
 
         if (container.length < offset + payloadLength + 4) {
-            throw new Error('Container truncated (payload section)');
+            return [null, new Error('Container truncated (payload section)')];
         }
 
         const data = container.subarray(offset, offset + payloadLength);
@@ -154,15 +154,15 @@ export class ContainerFormat {
         const calculatedCrc = crc32(container.subarray(0, offset - 4));
 
         if (storedCrc !== calculatedCrc) {
-            throw new Error(`CRC mismatch (stored: 0x${storedCrc.toString(16)}, calculated: 0x${calculatedCrc.toString(16)})`);
+            return [null, new Error(`CRC mismatch (stored: 0x${storedCrc.toString(16)}, calculated: 0x${calculatedCrc.toString(16)})`)];
         }
 
-        return {
+        return [{
             data: new Uint8Array(data),
             metadata,
             flags,
             version
-        };
+        }, null];
     }
 
     /**

@@ -12,11 +12,11 @@ export const ZIGZAG_ORDER = new Int32Array([
 
 export function zigZag(block) {
     if (block.length !== 64) {
-        throw new Error(`Invalid block length: ${block.length} (expected 64)`);
+        return [null, new Error(`Invalid block length: ${block.length} (expected 64)`)];
     }
     const result = new Float32Array(64);
     for (let i = 0; i < 64; i++) {
         result[i] = block[ZIGZAG_ORDER[i]];
     }
-    return result;
+    return [result, null];
 }

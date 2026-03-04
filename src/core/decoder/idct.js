@@ -21,11 +21,11 @@ for (let i = 1; i < 8; i++) C[i] = 1;
  * Perform 2D IDCT on an 8x8 block
  * 
  * @param {Float32Array} coefficients - 64-element block of DCT coefficients
- * @returns {Float32Array} 64-element block of spatial domain values
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: 64-element block of spatial domain values, or error
  */
 export function idct(coefficients) {
     if (coefficients.length !== 64) {
-        throw new Error(`Invalid coefficient block length: ${coefficients.length} (expected 64)`);
+        return [null, new Error(`Invalid coefficient block length: ${coefficients.length} (expected 64)`)];
     }
 
     const colOutput = new Float32Array(64);
@@ -57,7 +57,7 @@ export function idct(coefficients) {
         }
     }
 
-    return result;
+    return [result, null];
 }
 
 /**
@@ -74,7 +74,7 @@ export const idctNaive = idct;
  * @returns {Float32Array} 64-element block of spatial domain values
  */
 export function idctAAN(coefficients) {
-    
+
     return idct(coefficients);
 }
 
@@ -97,7 +97,7 @@ const S = [
     1 / (4 * C7)
 ];
 
-const IS = S; 
+const IS = S;
 
 const AAN_SCALE_TABLE = new Float32Array(64);
 for (let v = 0; v < 8; v++) {
@@ -115,7 +115,7 @@ for (let v = 0; v < 8; v++) {
  * @param {number} stride - Step between elements (1 for row, 8 for col)
  */
 function aan1d(data, offset, stride) {
-    
+
     const x0 = data[offset];
     const x1 = data[offset + stride];
     const x2 = data[offset + stride * 2];
@@ -154,7 +154,7 @@ function aan1d(data, offset, stride) {
     const tmp7_ = z11 + z13;
     const tmp11_ = (z11 - z13) * 1.414213562;
 
-    const z5 = (z10 + z12) * 1.847759065; 
+    const z5 = (z10 + z12) * 1.847759065;
 
     const z5_ = (z10 + z12) * 1.847759065;
     const tmp10_ = z5_ - z12 * 1.082392200;
