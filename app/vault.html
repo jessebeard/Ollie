@@ -5,14 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ollie Vault</title>
-    <link rel="stylesheet" href="src/ui/vault/vault.css">
+    <link rel="stylesheet" href="components/vault/vault.css">
 
 <body>
     <div class="vault-app">
         <!-- Sidebar -->
         <aside class="sidebar">
             <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <img src="src/ui/assets/ollie-icon.svg" alt="Ollie Vault Logo" width="32" height="32"
+                <img src="components/assets/ollie-icon.svg" alt="Ollie Vault Logo" width="32" height="32"
                     style="border-radius: 8px;">
                 Ollie Vault
             </h2>
@@ -63,7 +63,7 @@
             <div id="vaultList">
                 <div class="empty-state">
                     <div class="empty-icon">
-                        <img src="src/ui/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120"
+                        <img src="components/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120"
                             height="120" />
                     </div>
                     <h3>Drop Vault Here</h3>
@@ -84,12 +84,12 @@
     <div id="loadingOverlay"
         style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; color: white;">
         <div style="margin-bottom: 1rem;">
-            <img src="src/ui/assets/ollie-thinking.svg" alt="Ollie Thinking" width="100" height="100">
+            <img src="components/assets/ollie-thinking.svg" alt="Ollie Thinking" width="100" height="100">
         </div>
         <p>Processing...</p>
     </div>
 
-    <script type="module" src="src/ui/vault/vault-ui.js"></script>
+    <script type="module" src="components/vault/vault-ui.js"></script>
 </body>
 
 </html>
