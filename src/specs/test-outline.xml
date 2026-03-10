@@ -61,6 +61,12 @@
                     <file name="secure-entry.test.js" description="Property-based tests for SecureEntry: structural immutability, encryption round-tripping, explicit error returns on wrong key." />
                     <file name="vault-manager.test.js" description="Property-based tests for PasswordVault: idempotent serialization, immutable accumulation, lock determinism, schema rejection (25+ iterations, up to 1250 mutations)." />
                     <file name="vault-e2e.test.js" description="Comprehensive End-to-End Steganography PBT for the Vault: simulates full save-to-files and load-from-files cycle using wild-type image fixtures to verify batch chunking, ECC, and Huffman encoding parity." />
+                    <file name="vault-e2e-crud.test.js" description="E2E survival test for Vault CRUD operations (add/update/delete) through a full JPEG steganography roundtrip." />
+                    <file name="vault-e2e-carriers.test.js" description="Ensures F5 steganography E2E roundtrips succeed across Baseline (4:4:4), Progressive, and Subsampled (4:2:0) JPEG carrier images." />
+                    <file name="vault-e2e-crypto-boundary.test.js" description="Cryptographic boundary E2E test enforcing [null, Error] tuple returns when extracting with an incorrect master password." />
+                    <file name="vault-e2e-ecc.test.js" description="Targeted AC coefficient corruption E2E test to guarantee Reed-Solomon Error Correction recovers data from a live JPEG correctly." />
+                    <file name="vault-e2e-empty.test.js" description="Boundary tests for saving/loading empty vaults and for BatchEmbedder deterministic rejection of oversized data into tiny capacity images." />
+                    <file name="vault-e2e-multigen.test.js" description="Tests multi-generation overwrites to verify the JpegTranscoder successfully overwrites previously embedded F5 steganography." />
                 </directory>
             </directory>
             <directory name="utils" description="Test infrastructure and utility classes">
