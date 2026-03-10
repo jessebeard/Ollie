@@ -67,37 +67,64 @@ export class BatchExtractor {
             return [null, new Error('No valid chunks found in provided images.')];
         }
 
-        const sorted = [...chunks].sort((a, b) => a.index - b.index);
+        // Group chunks by chunkId
+        const chunkGroups = new Map();
+        for (const chunk of chunks) {
+            if (!chunkGroups.has(chunk.chunkId)) {
+                chunkGroups.set(chunk.chunkId, []);
+            }
+            chunkGroups.get(chunk.chunkId).push(chunk);
+        }
 
-        if (sorted.length > 0) { // Only perform this check if there are chunks
+        // Find a complete group
+        let completeGroup = null;
+        let bestErrorMsg = 'No complete vault payload found across images.';
+
+        for (const [chunkId, groupChunks] of chunkGroups.entries()) {
+            const sorted = [...groupChunks].sort((a, b) => a.index - b.index);
             const expectedTotal = sorted[0].total;
+
             if (sorted.length !== expectedTotal) {
                 const presentIndices = new Set(sorted.map(c => c.index));
                 const missingIndices = [];
                 for (let i = 0; i < expectedTotal; i++) {
                     if (!presentIndices.has(i)) missingIndices.push(i);
                 }
-
-                const msg = `Missing chunks: expected ${expectedTotal}, got ${sorted.length} chunks from ${imageFiles.length} input files. Missing indices: [${missingIndices.join(', ')}]`;
-                console.error(msg);
-                return [null, new Error(msg)];
+                const msg = `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`;
+                console.warn(msg);
+                bestErrorMsg = msg;
+                continue; // Try next group
             }
+
+            // Group is complete
+            completeGroup = sorted;
+            break;
+        }
+
+        if (!completeGroup) {
+            console.error(bestErrorMsg);
+            return [null, new Error(bestErrorMsg)];
         }
 
         if (onProgress) {
             onProgress(total, total, 'Reassembling...');
         }
 
-        const [reassembled, reassembleErr] = ChunkManager.reassemble(chunks);
+        const [reassembled, reassembleErr] = ChunkManager.reassemble(completeGroup);
         if (reassembleErr) {
             console.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
-            return null;
+            return null; // or perhaps return [null, reassembleErr]
         }
+
+        firstMetadata = chunks.find(c => c.chunkId === completeGroup[0].chunkId);
+        // Find the metadata corresponding to the complete group! But wait, `firstMetadata` in the loop was tracking the very first one which might be from a corrupted group.
+        // Actually BatchExtractor returns simply { data, filename, metadata}.
+        // We can just use the chunk metadata of the successful group.
 
         return [{
             data: reassembled,
-            filename: firstMetadata ? firstMetadata.filename : 'unknown',
-            metadata: firstMetadata
+            filename: firstMetadata ? 'vault.json' : 'unknown',
+            metadata: { chunk: completeGroup[0] } // Mock or assemble metadata
         }, null];
     }
 }

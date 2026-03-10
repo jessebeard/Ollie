@@ -190,9 +190,17 @@ export const Arbitrary = {
         generate: () => {
             const len = getRandomInt(minLength, maxLength);
             let str = '';
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+ ';
+            // Including ASCII, extended Latin, common Unicode symbols, and some emojis
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+ ãñéöçµœ∑®†¥¨ˆøπ“‘—🤪🚀🔥💻';
             for (let i = 0; i < len; i++) {
-                str += chars.charAt(getRandomInt(0, chars.length));
+                // Mix in random unicode ranges occasionally to really fuzz UTF-8 boundaries
+                if (Math.random() < 0.1) {
+                    // Generate random valid unicode code point (avoiding surrogates)
+                    const codePoint = getRandomInt(0x0800, 0xD7FF);
+                    str += String.fromCodePoint(codePoint);
+                } else {
+                    str += chars.charAt(getRandomInt(0, chars.length));
+                }
             }
             return str;
         },

@@ -44,11 +44,11 @@ describe('JPEG Decoder - RST Marker Robustness (PBT)', () => {
 
                 // Decode Baseline
                 const [baseDecoded, baseErr] = await decoder.decode(baseJpeg);
-                expect(baseErr).toBeNull();
+                expect(baseErr).toEqual(null);
 
                 // Decode RST-laced JPEG
                 const [rstDecoded, rstErr] = await decoder.decode(rstJpeg);
-                expect(rstErr).toBeNull();
+                expect(rstErr).toEqual(null);
 
                 // Assert dimensions
                 expect(baseDecoded.width).toBe(rstDecoded.width);

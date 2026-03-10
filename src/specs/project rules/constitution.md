@@ -4,6 +4,8 @@ Ollie aims to allow dual use of seemingly benign jpeg libraries for of informati
 
 Ollie is not a tool for malicious purposes. It is a tool to help keep data safe and in sight.
 
+Data security is a the maximum priority of Ollie, as a tool it is designed to allow you to securely proliferate a keychain. 
+
 Ollie features error correction and detection, and robust error handling. It offers a modular design with a focus on performance and security. 
 
 It has a built in password vault, a message system, as well as the ability to be used for arbitrary data storage, and a modular design that allows for easy extension.

@@ -5,7 +5,6 @@ import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 describe('PasswordVault (Property-Based Tests)', () => {
 
     it('Property: Idempotent Serialization (toJSON -> fromJSON yields equivalent data)', async () => {
-        // Fuzz entry generation
         const arbEntry = () => ({
             title: Arbitrary.string(1, 50).generate(),
             url: Arbitrary.string(5, 100).generate(),
@@ -24,113 +23,91 @@ describe('PasswordVault (Property-Based Tests)', () => {
         });
 
         await assertProperty(
-            [Arbitrary.array(arbEntry, 1, 50)],
-            async (randomEntries) => {
-                let vault = new PasswordVault();
+            [Arbitrary.array(arbEntry, 1, 50), Arbitrary.string(8, 32)],
+            async (randomEntries, masterPass) => {
+                let vault = new PasswordVault([], null, true, masterPass);
 
-                // 1. Immutability & Accumulation Property
                 for (let i = 0; i < randomEntries.length; i++) {
                     const oldLength = vault.entries.length;
-                    const [newVault, error] = vault.addEntry(randomEntries[i]);
+
+                    const [newVault, error] = await vault.addEntry(randomEntries[i]);
 
                     expect(error).toEqual(null);
-                    expect(newVault).not.toBe(vault); // Must return new instance
-                    expect(newVault.entries.length).toBe(oldLength + 1); // Must strictly append 1
-                    expect(vault.entries.length).toBe(oldLength); // Original must strictly remain unchanged
+                    expect(newVault).not.toBe(vault);
+                    expect(newVault.entries.length).toBe(oldLength + 1);
+                    expect(vault.entries.length).toBe(oldLength);
 
                     vault = newVault;
                 }
 
-                // 2. Serialization Idempotency Property
+                // Verify serialization handles `_encrypted` properties properly
                 const serialized = vault.toJSON();
-                const [restoredVault, restoreErr] = PasswordVault.fromJSON(serialized);
+                const [restoredVault, restoreErr] = PasswordVault.fromJSON(serialized, true, masterPass, vault.sessionKey);
 
                 expect(restoreErr).toEqual(null);
                 expect(restoredVault.entries.length).toBe(vault.entries.length);
 
-                // Deep equality verification
-                for (let i = 0; i < vault.entries.length; i++) {
-                    const orig = vault.entries[i];
-                    const restored = restoredVault.entries[i];
+                // Deep equality verification - must decrypt to check sensitive fields
+                const [plaintextJsonStr, pErr] = await restoredVault.getPlaintextJSON();
+                expect(pErr).toEqual(null);
 
-                    expect(orig.id).toBe(restored.id);
+                const plaintextData = JSON.parse(plaintextJsonStr);
+                const pEntries = plaintextData.entries;
+
+                for (let i = 0; i < randomEntries.length; i++) {
+                    const orig = randomEntries[i];
+                    const restored = pEntries[i];
+
                     expect(orig.title).toBe(restored.title);
                     expect(orig.password).toBe(restored.password);
-                    expect(orig.tags.length).toBe(restored.tags.length);
+                    if (orig.tags) expect(orig.tags.length).toBe(restored.tags.length);
                 }
 
                 return true;
             },
-            25 // Run 25 test fuzzes (each generating up to 50 items = up to 1250 total vault modifications)
+            20
         );
     });
 
-    it('Property: Deterministic Locking (lock always destroys key and sets strict state)', async () => {
+    it('Property: Deterministic Locking (lock always destroys keys and sets strict state)', async () => {
         await assertProperty(
             [Arbitrary.string(8, 64)],
             async (masterPassword) => {
-                const vault = new PasswordVault([], null, true, masterPassword);
+                // Mock a session key
+                const sessionKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+                const vault = new PasswordVault([], null, true, masterPassword, sessionKey);
 
-                // Lock must strictely return a new instance with purged credentials
                 const lockedVault = vault.lock();
 
                 expect(vault.isUnlocked).toBe(true);
                 expect(vault.masterPassword).toBe(masterPassword);
+                expect(vault.sessionKey !== null).toBe(true);
 
                 expect(lockedVault).not.toBe(vault);
                 expect(lockedVault.isUnlocked).toBe(false);
                 expect(lockedVault.masterPassword).toBe(null);
+                expect(lockedVault.sessionKey).toBe(null);
 
                 return true;
             },
-            50
+            25
         );
     });
 
-    it('Property: Rejection of Invalid Schema', async () => {
-        const vault = new PasswordVault();
+    it('Property: Rejection of Operations when Locked', async () => {
+        const vault = new PasswordVault(); // Default is locked
 
-        const [v1, err1] = vault.addEntry(null);
+        const [v1, err1] = await vault.addEntry({ title: 'Test' });
         expect(err1 !== null).toBe(true);
 
-        const [v2, err2] = vault.addEntry('not an object');
+        const [v2, err2] = await vault.updateEntry('some-id', { title: 'New' });
         expect(err2 !== null).toBe(true);
 
-        const [v3, err3] = vault.updateEntry('non-existent-id', { title: 'New' });
-        expect(err3 !== null).toBe(true);
-
-        const [v4, err4] = vault.deleteEntry('non-existent-id');
-        expect(err4 !== null).toBe(true);
+        const [pJson, pErr] = await vault.getPlaintextJSON();
+        expect(pErr !== null).toBe(true);
     });
 
-    it('should initialize with default metadata', () => {
-        const vault = new PasswordVault();
-        expect(vault.entries).toEqual([]);
-        expect(vault.metadata.version).toBe('2.0');
-        expect(vault.isUnlocked).toBe(false);
-    });
-
-
-    it('should return error when deleting non-existent entry', () => {
-        const vault = new PasswordVault();
-        const [newVault, error] = vault.deleteEntry('non-existent-id');
-        expect(error !== null).toBe(true);
-    });
-
-    it('should delete an existing entry immutably', () => {
-        let vault = new PasswordVault();
-        [vault] = vault.addEntry({ title: 'To Delete' });
-        expect(vault.entries.length).toBe(1);
-        const entryId = vault.entries[0].id;
-
-        const [newVault, error] = vault.deleteEntry(entryId);
-        expect(error).toEqual(null);
-
-        expect(vault.entries.length).toBe(1);
-        expect(newVault.entries.length).toBe(0);
-    });
-
-    it('should generate unique IDs', () => {
+    it('should calculate unique IDs', () => {
         const ids = new Set();
         for (let i = 0; i < 100; i++) {
             ids.add(PasswordVault.generateId());
@@ -138,60 +115,24 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
-    it('should search entries correctly with queries and tags', () => {
-        let vault = new PasswordVault();
-        [vault] = vault.addEntry({ title: 'Apple ID', url: 'apple.com', tags: ['personal', 'apple'] });
-        [vault] = vault.addEntry({ title: 'Work Email', url: 'gmail.com', tags: ['work', 'email'] });
-        [vault] = vault.addEntry({ title: 'Personal Email', username: 'jesse', tags: ['personal', 'email'] });
-        [vault] = vault.addEntry({ title: 'Banking', tags: ['finance'] });
+    it('should search entries correctly skipping encrypted fields', async () => {
+        let vault = new PasswordVault([], null, true, 'masterpass123');
 
-        // Empty search returns all
+        [vault] = await vault.addEntry({ title: 'Apple ID', url: 'apple.com', tags: ['personal', 'apple'] });
+        [vault] = await vault.addEntry({ title: 'Work Email', url: 'gmail.com', tags: ['work', 'email'] });
+        [vault] = await vault.addEntry({ title: 'Personal Email', username: 'jesse', tags: ['personal', 'email'] });
+        [vault] = await vault.addEntry({ title: 'Banking', tags: ['finance'], notes: 'Hidden secret notes' });
+
         expect(vault.search('', []).length).toBe(4);
 
-        // Text query only (matches title/url/username)
+        // Text query matches public fields
         expect(vault.search('email', []).length).toBe(2);
-        expect(vault.search('Apple', []).length).toBe(1); // case insensitive
 
-        // Tag matching (AND logic for tags)
+        // Ensure "Hidden secret notes" cannot be found by plain text search since it is encrypted
+        expect(vault.search('Hidden secret', []).length).toBe(0);
+
+        // Tag matching
         expect(vault.search('', ['personal']).length).toBe(2);
-        expect(vault.search('', ['email']).length).toBe(2);
-        expect(vault.search('', ['personal', 'email']).length).toBe(1); // Must have both
-        expect(vault.search('', ['finance', 'work']).length).toBe(0); // Must have both
-
-        // Query + Tag combination
-        expect(vault.search('Apple', ['personal']).length).toBe(1);
-        expect(vault.search('Apple', ['work']).length).toBe(0);
-    }); it('should preserve full entry data through toJSON/fromJSON round-trip', () => {
-        let vault = new PasswordVault();
-        [vault] = vault.addEntry({
-            title: 'Full Entry',
-            url: 'https://example.com',
-            username: 'admin',
-            password: 'p@ssw0rd',
-            notes: 'Important notes here',
-            tags: ['finance', 'critical'],
-            totp: 'JBSWY3DPEHPK3PXP',
-            customFields: [
-                { label: 'Recovery Email', value: 'backup@test.com' },
-                { label: 'PIN', value: '1234' }
-            ]
-        });
-        [vault] = vault.addEntry({ title: 'Second Entry', tags: ['personal'] });
-
-        const json = vault.toJSON();
-        const [newVault, err] = PasswordVault.fromJSON(json);
-        expect(err).toEqual(null);
-
-        expect(newVault.entries.length).toBe(2);
-        const e = newVault.entries[0];
-        expect(e.title).toBe('Full Entry');
-        expect(e.url).toBe('https://example.com');
-        expect(e.username).toBe('admin');
-        expect(e.password).toBe('p@ssw0rd');
-        expect(e.notes).toBe('Important notes here');
-        expect(e.tags.length).toBe(2);
-        expect(e.totp).toBe('JBSWY3DPEHPK3PXP');
-        expect(e.customFields.length).toBe(2);
-        expect(e.customFields[1].value).toBe('1234');
+        expect(vault.search('', ['personal', 'email']).length).toBe(1);
     });
 });

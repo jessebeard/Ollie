@@ -1,0 +1,9 @@
+I would like to make the User Interface more engaging with more features.
+My roadmap right now is to:
+- add a way to export the secrets library to a file
+- comprehensive end to end testingcan
+- add some sort of size gauge that indicates how big the current directory is and how big the secrets library is.relative.
+- suport for totp secrets
+- add a way to export the secrets library to a file
+- add a way to import the secrets library from chrome, firefox and apple keychain
+- 

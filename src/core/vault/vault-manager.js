@@ -1,11 +1,12 @@
-
 import { BatchEmbedder } from '../steganography/batch-embedder.js';
 import { BatchExtractor } from '../steganography/batch-extractor.js';
+import { SecureEntry } from './secure-entry.js';
+import { KeyDerivation } from '../crypto/key-derivation.js';
 
 export class PasswordVault {
-    constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null) {
+    constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
-        this.entries = Object.freeze([...entries].map(e => Object.freeze({ ...e })));
+        this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
         this.metadata = Object.freeze(metadata ? { ...metadata } : {
             version: '2.0',
             created: new Date().toISOString(),
@@ -13,52 +14,70 @@ export class PasswordVault {
         });
         this.isUnlocked = isUnlocked;
         this.masterPassword = masterPassword;
+        this.sessionKey = sessionKey;
         Object.freeze(this);
     }
 
-    /**
-     * @returns {[PasswordVault, Error|null]} Tuple of [newVault, error]
-     */
-    addEntry(entry, explicitId = null) {
-        if (!entry || typeof entry !== 'object') return [this, new Error('Invalid entry data')];
-        const newEntry = {
-            id: explicitId || PasswordVault.generateId(),
-            title: typeof entry.title === 'string' ? entry.title : '',
-            url: typeof entry.url === 'string' ? entry.url : '',
-            username: typeof entry.username === 'string' ? entry.username : '',
-            password: typeof entry.password === 'string' ? entry.password : '',
-            notes: typeof entry.notes === 'string' ? entry.notes : '',
-            tags: Array.isArray(entry.tags) ? entry.tags : [],
-            totp: entry.totp || '',
-            customFields: Array.isArray(entry.customFields) ? entry.customFields : [],
-            created: new Date().toISOString(),
-            modified: new Date().toISOString()
-        };
-        const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
-        return [new PasswordVault([...this.entries, newEntry], newMetadata, this.isUnlocked, this.masterPassword), null];
+    async _getSessionKey() {
+        if (this.sessionKey) return [this.sessionKey, null];
+        if (!this.masterPassword) return [null, new Error('Vault is locked')];
+        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        const [key, err] = await KeyDerivation.deriveKey(this.masterPassword, salt);
+        return [key, err];
     }
 
     /**
-     * @returns {[PasswordVault, Error|null]} Tuple of [newVault, error]
+     * @returns {Promise<[PasswordVault, Error|null]>} Tuple of [newVault, error]
      */
-    updateEntry(id, updates) {
+    async addEntry(entry, explicitId = null) {
+        if (!entry || typeof entry !== 'object') return [this, new Error('Invalid entry data')];
+        if (!this.isUnlocked) return [this, new Error('Vault is locked')];
+
+        const [sessionKey, keyErr] = await this._getSessionKey();
+        if (keyErr) return [this, keyErr];
+
+        entry.id = explicitId || PasswordVault.generateId();
+
+        const [secureEntry, secErr] = await SecureEntry.create(entry, sessionKey);
+        if (secErr) return [this, secErr];
+
+        const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
+        return [new PasswordVault([...this.entries, secureEntry], newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
+    }
+
+    /**
+     * @returns {Promise<[PasswordVault, Error|null]>} Tuple of [newVault, error]
+     */
+    async updateEntry(id, updates) {
+        if (!this.isUnlocked) return [this, new Error('Vault is locked')];
+
         const index = this.entries.findIndex(e => e.id === id);
         if (index === -1) return [this, new Error('Entry not found')];
 
-        const current = this.entries[index];
-        const updatedEntry = {
-            ...current,
+        const [sessionKey, keyErr] = await this._getSessionKey();
+        if (keyErr) return [this, keyErr];
+
+        const currentEntry = this.entries[index];
+        // Decrypt current entry to merge updates
+        const [decrypted, decErr] = await currentEntry.decrypt(sessionKey);
+        if (decErr) return [this, decErr];
+
+        const mergedEntry = {
+            ...decrypted,
             ...updates,
-            tags: updates.tags ? (Array.isArray(updates.tags) ? updates.tags : []) : current.tags,
-            customFields: updates.customFields ? (Array.isArray(updates.customFields) ? updates.customFields : []) : current.customFields,
+            tags: updates.tags ? (Array.isArray(updates.tags) ? updates.tags : []) : decrypted.tags,
+            customFields: updates.customFields ? (Array.isArray(updates.customFields) ? updates.customFields : []) : decrypted.customFields,
             modified: new Date().toISOString()
         };
 
+        const [newSecureEntry, secErr] = await SecureEntry.create(mergedEntry, sessionKey);
+        if (secErr) return [this, secErr];
+
         const newEntries = [...this.entries];
-        newEntries[index] = updatedEntry;
+        newEntries[index] = newSecureEntry;
         const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
 
-        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword), null];
+        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
     }
 
     /**
@@ -72,7 +91,7 @@ export class PasswordVault {
         newEntries.splice(index, 1);
         const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
 
-        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword), null];
+        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword, this.sessionKey), null];
     }
 
     search(query, tags = []) {
@@ -82,8 +101,7 @@ export class PasswordVault {
             const matchesText = !lowerQuery || (
                 (e.title && e.title.toLowerCase().includes(lowerQuery)) ||
                 (e.url && e.url.toLowerCase().includes(lowerQuery)) ||
-                (e.username && e.username.toLowerCase().includes(lowerQuery)) ||
-                (e.notes && e.notes.toLowerCase().includes(lowerQuery))
+                (e.username && e.username.toLowerCase().includes(lowerQuery))
             );
 
             const matchesTags = tags.length === 0 || tags.every(tag => e.tags.includes(tag));
@@ -95,15 +113,40 @@ export class PasswordVault {
     toJSON() {
         return {
             metadata: this.metadata,
-            entries: this.entries
+            entries: this.entries.map(e => e.toJSON())
         };
     }
 
-    static fromJSON(data, isUnlocked = false, masterPassword = null) {
+    /**
+     * Produces a plaintext unencrypted JSON string for exporting.
+     * Requires the vault to be unlocked.
+     */
+    async getPlaintextJSON() {
+        if (!this.isUnlocked) return [null, new Error('Vault is locked')];
+        const [sessionKey, keyErr] = await this._getSessionKey();
+        if (keyErr) return [null, keyErr];
+
+        const plaintextEntries = [];
+        for (const entry of this.entries) {
+            const [decrypted, decErr] = await entry.decrypt(sessionKey);
+            if (decErr) return [null, decErr];
+            plaintextEntries.push(decrypted);
+        }
+
+        const data = {
+            metadata: this.metadata,
+            entries: plaintextEntries
+        };
+
+        return [JSON.stringify(data, null, 2), null];
+    }
+
+    static fromJSON(data, isUnlocked = false, masterPassword = null, sessionKey = null) {
         if (data.metadata.version !== '2.0') {
             return [null, new Error('Unsupported vault version: ' + data.metadata.version)];
         }
-        return [new PasswordVault(data.entries, data.metadata, isUnlocked, masterPassword), null];
+        const secureEntries = data.entries.map(e => SecureEntry.fromJSON(e));
+        return [new PasswordVault(secureEntries, data.metadata, isUnlocked, masterPassword, sessionKey), null];
     }
 
     async save(imageFiles, password, onProgress = null) {
@@ -141,7 +184,11 @@ export class PasswordVault {
             return [null, new Error('Failed to parse vault data')];
         }
 
-        return PasswordVault.fromJSON(vaultJson, true, password);
+        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        const [sessionKey, err] = await KeyDerivation.deriveKey(password, salt);
+        if (err) return [null, err];
+
+        return PasswordVault.fromJSON(vaultJson, true, password, sessionKey);
     }
 
     static generateId() {
@@ -149,6 +196,6 @@ export class PasswordVault {
     }
 
     lock() {
-        return new PasswordVault(this.entries, this.metadata, false, null);
+        return new PasswordVault(this.entries, this.metadata, false, null, null);
     }
 }

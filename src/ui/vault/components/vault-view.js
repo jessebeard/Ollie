@@ -58,19 +58,19 @@ export class VaultView {
                 ${(entry.tags || []).map(t => `<span class="tag">${this.escape(t)}</span>`).join('')}
             </div>
             <div class="card-actions">
-                <button class="btn-copy" data-val="${this.escape(entry.password)}" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
+                <button class="btn-copy" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
                 <button class="btn-launch" data-url="${this.escape(entry.url)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
             </div>
         `;
 
         div.querySelector('.more-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            this.events.emit('edit-entry', entry);
+            this.events.emit('edit-entry', entry.id);
         });
 
         div.querySelector('.btn-copy').addEventListener('click', (e) => {
             e.stopPropagation();
-            this.events.emit('copy-password', entry.password);
+            this.events.emit('copy-password', entry.id);
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {

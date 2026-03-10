@@ -173,6 +173,12 @@
                 </directory>
 
                 <directory name="vault" description="Password Vault Logic (Immutable State Machine)">
+                    <file name="secure-entry.js" description="Hardened Primitive for in-memory defense-in-depth. Encrypts sensitive fields internally and guarantees structural immutability.">
+                        <class name="SecureEntry">
+                            <method name="create" params="plaintextEntry, key" return="Promise<[SecureEntry, Error]>" description="Asynchronously encrypts the sensitive fields of a plaintext entry." />
+                            <method name="decrypt" params="key" return="Promise<[Object, Error]>" description="Asynchronously decrypts ciphertexts and reconstructs the plaintext entry." />
+                        </class>
+                    </file>
                     <file name="vault-manager.js" description="Core vault management. Immutable state machine — all mutating methods return [newVault, error] tuples.">
                         <class name="PasswordVault">
                             <method name="constructor" params="entries, metadata, isUnlocked, masterPassword" description="Initializes vault with explicit state. Defaults to empty, locked." />

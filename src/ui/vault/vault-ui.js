@@ -41,6 +41,8 @@ export class VaultUI {
         document.getElementById('createBtn').addEventListener('click', () => this.createVault());
         document.getElementById('saveBtn').addEventListener('click', () => this.saveVault());
         document.getElementById('addBtn').addEventListener('click', () => this.addEntry());
+        document.getElementById('importBtn').addEventListener('click', () => this.importData());
+        document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
         const searchInput = document.getElementById('searchInput');
         searchInput.addEventListener('input', (e) => {
@@ -141,7 +143,10 @@ export class VaultUI {
         const data = await this.modals.showForm('Add New Entry', fields);
         if (!data) return;
 
-        const [newVault, err] = this.vault.addEntry(data);
+        this.showLoading(true, 'Encrypting...');
+        const [newVault, err] = await this.vault.addEntry(data);
+        this.showLoading(false);
+
         if (err) {
             this.modals.showAlert('Error', 'Failed to add entry: ' + err.message, 'error');
             return;
@@ -152,7 +157,27 @@ export class VaultUI {
         this.modals.showAlert('Success', 'Entry added.');
     }
 
-    async editEntry(entry) {
+    async editEntry(id) {
+        if (!this.vault.isUnlocked) return;
+
+        const currentSecure = this.vault.entries.find(e => e.id === id);
+        if (!currentSecure) return;
+
+        this.showLoading(true, 'Decrypting...');
+        const [sessionKey, kErr] = await this.vault._getSessionKey();
+        if (kErr) {
+            this.showLoading(false);
+            this.modals.showAlert('Error', 'Vault lock error', 'error');
+            return;
+        }
+
+        const [decrypted, decErr] = await currentSecure.decrypt(sessionKey);
+        this.showLoading(false);
+        if (decErr) {
+            this.modals.showAlert('Error', 'Failed to decrypt entry', 'error');
+            return;
+        }
+
         const fields = [
             { name: 'title', label: 'Title', required: true },
             { name: 'username', label: 'Username' },
@@ -163,7 +188,7 @@ export class VaultUI {
         ];
 
         // Prepare initial values (join tags back to string)
-        const initial = { ...entry };
+        const initial = { ...decrypted };
         if (Array.isArray(initial.tags)) {
             initial.tags = initial.tags.join(', ');
         }
@@ -171,7 +196,10 @@ export class VaultUI {
         const data = await this.modals.showForm('Edit Entry', fields, initial);
         if (!data) return;
 
-        const [newVault, err] = this.vault.updateEntry(entry.id, data);
+        this.showLoading(true, 'Encrypting...');
+        const [newVault, err] = await this.vault.updateEntry(id, data);
+        this.showLoading(false);
+
         if (err) {
             this.modals.showAlert('Error', 'Failed to edit entry: ' + err.message, 'error');
             return;
@@ -290,16 +318,110 @@ export class VaultUI {
         }
     }
 
-    copyPassword(pass) {
-        navigator.clipboard.writeText(pass);
+    async copyPassword(id) {
+        if (!this.vault.isUnlocked) return;
+
+        const currentSecure = this.vault.entries.find(e => e.id === id);
+        if (!currentSecure) return;
+
+        const [sessionKey, kErr] = await this.vault._getSessionKey();
+        if (kErr) return;
+
+        const [decrypted, decErr] = await currentSecure.decrypt(sessionKey);
+        if (decErr) return;
+
+        navigator.clipboard.writeText(decrypted.password);
         this.modals.showAlert('Copied', 'Password copied to clipboard!');
+    }
+
+    async importData() {
+        if (!this.vault.isUnlocked) return;
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                if (!data.entries || !Array.isArray(data.entries)) {
+                    this.modals.showAlert('Error', 'Invalid import format. Expected an array of entries.', 'error');
+                    return;
+                }
+
+                this.showLoading(true, 'Importing ' + data.entries.length + ' entries...');
+
+                let currentVault = this.vault;
+                let addedCount = 0;
+                let errorCount = 0;
+
+                for (const entry of data.entries) {
+                    const [newVault, err] = await currentVault.addEntry(entry, entry.id);
+                    if (err) {
+                        console.error('Failed to import entry:', err);
+                        errorCount++;
+                    } else {
+                        currentVault = newVault;
+                        addedCount++;
+                    }
+                }
+
+                this.vault = currentVault;
+                this.updateUI();
+                this.showLoading(false);
+
+                this.modals.showAlert('Import Complete', `Successfully imported ${addedCount} entries. ${errorCount > 0 ? `Failed to import ${errorCount} entries.` : ''}`);
+
+            } catch (err) {
+                this.showLoading(false);
+                this.modals.showAlert('Error', 'Failed to read or parse import file: ' + err.message, 'error');
+            }
+        };
+
+        input.click();
+    }
+
+    async exportData() {
+        if (!this.vault.isUnlocked) return;
+
+        const warningMsg = `🔴 SECURITY WARNING: Red Flag Operation<br><br>You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.<br><br>Anyone who gains access to this file will have immediate access to all your passwords.<br><br>Are you absolutely sure you want to proceed?`;
+
+        const confirmed = await this.modals.confirm(warningMsg);
+        if (!confirmed) return;
+
+        this.showLoading(true, 'Decrypting vault...');
+        const [jsonStr, err] = await this.vault.getPlaintextJSON();
+        this.showLoading(false);
+
+        if (err) {
+            this.modals.showAlert('Error', 'Export failed: ' + err.message, 'error');
+            return;
+        }
+
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ollie-vault-export-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     updateUI() {
         const unlocked = !!this.vault.masterPassword; // Simple check
         document.body.classList.toggle('vault-unlocked', unlocked);
 
+        const importBtn = document.getElementById('importBtn');
+        const exportBtn = document.getElementById('exportBtn');
+
         if (unlocked) {
+            importBtn.style.display = 'block';
+            exportBtn.style.display = 'block';
             this.renderSidebarTags();
 
             let filteredResults = this.vault.search(this.currentQuery, Array.from(this.activeTags));

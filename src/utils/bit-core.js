@@ -89,29 +89,48 @@ export function peekBits(data, byteOffset, bitOffset, length) {
 
 export function peek16Bits(data, byteOffset, bitOffset) {
     // Fast path lookahead optimization for Huffman decoding
-    if (bitOffset === 0 && byteOffset + 1 < data.length) {
-        const b0 = data[byteOffset];
-        const b1 = data[byteOffset + 1];
+    let effectiveBOff = byteOffset;
+    if (bitOffset === 0 && effectiveBOff > 0 && data[effectiveBOff - 1] === 0xFF && data[effectiveBOff] === 0x00) {
+        effectiveBOff++;
+    }
+
+    if (bitOffset === 0 && effectiveBOff + 1 < data.length) {
+        const b0 = data[effectiveBOff];
+        const b1 = data[effectiveBOff + 1];
         if (b0 !== 0xFF && b1 !== 0xFF) return [(b0 << 8) | b1, byteOffset, bitOffset, null];
     }
 
-    if (byteOffset + 2 < data.length) {
-        const b0 = data[byteOffset];
-        const b1 = data[byteOffset + 1];
-        const b2 = data[byteOffset + 2];
+    if (effectiveBOff + 2 < data.length) {
+        const b0 = data[effectiveBOff];
+        const b1 = data[effectiveBOff + 1];
+        const b2 = data[effectiveBOff + 2];
         if (b0 !== 0xFF && b1 !== 0xFF && b2 !== 0xFF) {
             const val = (b0 << 16) | (b1 << 8) | b2;
             return [((val << bitOffset) >> 8) & 0xFFFF, byteOffset, bitOffset, null];
         }
     }
 
-    const remainingBytes = data.length - byteOffset;
-    const remainingBits = (remainingBytes * 8) - bitOffset;
-    if (remainingBits <= 0) return [0, byteOffset, bitOffset, null];
+    let value = 0;
+    let bOff = byteOffset;
+    let bitOff = bitOffset;
+    let bitsRead = 0;
 
-    const bitsToRead = Math.min(remainingBits, 16);
-    const [val, , , err] = readBits(data, byteOffset, bitOffset, bitsToRead);
-    if (err) return [0, byteOffset, bitOffset, null]; // peek16Bits traditionally swallows EOF for padding
+    for (let i = 0; i < 16; i++) {
+        const [bit, nextB, nextBit, err] = readBit(data, bOff, bitOff);
+        if (err) {
+            // EOF reached, pad remainder with 1s (standard JPEG byte-alignment padding)
+            break;
+        }
+        value = (value << 1) | bit;
+        bOff = nextB;
+        bitOff = nextBit;
+        bitsRead++;
+    }
 
-    return [(val << (16 - bitsToRead)) & 0xFFFF, byteOffset, bitOffset, null];
+    if (bitsRead < 16) {
+        const remaining = 16 - bitsRead;
+        value = (value << remaining) | ((1 << remaining) - 1);
+    }
+
+    return [value & 0xFFFF, byteOffset, bitOffset, null];
 }

@@ -159,7 +159,9 @@ async function runTests() {
         await import('./core/jpeg-transcoder.test.js');
         await import('./core/orchestrator.test.js');
 
+        await import('./core/vault/secure-entry.test.js');
         await import('./core/vault/vault-manager.test.js');
+        await import('./core/vault/vault-e2e.test.js');
 
         const stats = getStats();
 

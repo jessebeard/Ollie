@@ -58,7 +58,9 @@
                     <file name="key-derivation.test.js" description="Property-based tests for PBKDF2: deterministic derivation, salt influence, uniqueness (100+ iterations)." />
                 </directory>
                 <directory name="vault" description="Vault property-based tests">
+                    <file name="secure-entry.test.js" description="Property-based tests for SecureEntry: structural immutability, encryption round-tripping, explicit error returns on wrong key." />
                     <file name="vault-manager.test.js" description="Property-based tests for PasswordVault: idempotent serialization, immutable accumulation, lock determinism, schema rejection (25+ iterations, up to 1250 mutations)." />
+                    <file name="vault-e2e.test.js" description="Comprehensive End-to-End Steganography PBT for the Vault: simulates full save-to-files and load-from-files cycle using wild-type image fixtures to verify batch chunking, ECC, and Huffman encoding parity." />
                 </directory>
             </directory>
             <directory name="utils" description="Test infrastructure and utility classes">

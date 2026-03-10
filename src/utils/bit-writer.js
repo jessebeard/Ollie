@@ -27,13 +27,13 @@ export class BitWriter {
         }
     }
 
-    alignByte() {
+    alignByte(disableStuffing = false) {
         if (this.bitCount > 0) {
 
             const shift = 8 - this.bitCount;
             this.byte = (this.byte << shift) | ((1 << shift) - 1);
             this.bytes.push(this.byte);
-            if (this.byte === 0xFF) {
+            if (this.byte === 0xFF && !disableStuffing) {
                 this.bytes.push(0x00);
             }
             this.byte = 0;
@@ -45,7 +45,7 @@ export class BitWriter {
      * Writes a 2-byte marker (e.g. 0xFFDA) ensuring alignment and NO byte stuffing.
      */
     writeMarker(marker) {
-        this.alignByte();
+        this.alignByte(true);
         this.bytes.push((marker >> 8) & 0xFF);
         this.bytes.push(marker & 0xFF);
     }
