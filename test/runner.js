@@ -162,6 +162,12 @@ async function runTests() {
         await import('./core/vault/secure-entry.test.js');
         await import('./core/vault/vault-manager.test.js');
         await import('./core/vault/vault-e2e.test.js');
+        await import('./core/vault/vault-e2e-crud.test.js');
+        await import('./core/vault/vault-e2e-carriers.test.js');
+        await import('./core/vault/vault-e2e-crypto-boundary.test.js');
+        await import('./core/vault/vault-e2e-ecc.test.js');
+        await import('./core/vault/vault-e2e-empty.test.js');
+        await import('./core/vault/vault-e2e-multigen.test.js');
 
         const stats = getStats();
 
