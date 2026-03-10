@@ -1,7 +1,7 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { PasswordVault } from '../../../src/core/vault/vault-manager.js';
-import { JpegDecoder } from '../../../src/core/jpeg-decoder.js';
-import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
+import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
+import { JpegDecoder } from '../../../src/codec/decoder.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import fs from 'fs';
 import path from 'path';

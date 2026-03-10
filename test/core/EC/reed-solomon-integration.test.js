@@ -1,6 +1,6 @@
-import { describe, it, expect } from '../../../test/utils/test-runner.js';
-import { assertProperty, Arbitrary } from '../../../test/utils/pbt.js';
-import { ErrorCorrection } from '../../../src/core/steganography/error-correction.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { assertProperty, Arbitrary } from '../../utils/pbt.js';
+import { ErrorCorrection } from '../../../src/information-theory/error-correction/rs-interleaver.js';
 
 describe('ErrorCorrection (Reed-Solomon Integration)', () => {
 

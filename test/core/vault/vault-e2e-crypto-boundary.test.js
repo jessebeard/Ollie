@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { PasswordVault } from '../../../src/core/vault/vault-manager.js';
+import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import fs from 'fs';
 import path from 'path';

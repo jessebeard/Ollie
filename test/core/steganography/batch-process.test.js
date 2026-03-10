@@ -1,5 +1,5 @@
-import { BatchEmbedder } from '../../../src/core/steganography/batch-embedder.js';
-import { BatchExtractor } from '../../../src/core/steganography/batch-extractor.js';
+import { BatchEmbedder } from '../../../src/information-theory/steganography/batch-embedder.js';
+import { BatchExtractor } from '../../../src/information-theory/steganography/batch-extractor.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

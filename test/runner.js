@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const htmlContent = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+const htmlContent = fs.readFileSync(path.join(__dirname, '../app/index.html'), 'utf8');
 
 global.document = {
     getElementById: (id) => {
@@ -99,68 +99,68 @@ async function runTests() {
 
         resetStats();
 
-        await import('./core/encoder/colorspace.test.js');
-        await import('./core/encoder/blocks.test.js');
+        await import('./algebraic/colorspace/rgb-to-ycbcr.test.js');
+        await import('./algebraic/mappings/blocks.test.js');
         await import('./core/encoder/headers.test.js');
-        await import('./core/encoder/dct.test.js');
-        await import('./core/encoder/quantization.test.js');
-        await import('./core/encoder/zigzag.test.js');
-        await import('./core/encoder/huffman.test.js');
-        await import('./core/encoder/downsampling.test.js');
-        await import('./core/encoder/progressive-encoding.test.js');
-        await import('./core/encoder/spiff-generation.test.js');
-        await import('./core/jpeg-encoder.test.js');
+        await import('./algebraic/discrete-cosine/forward-dct.test.js');
+        await import('./algebraic/quantization/forward-quantization.test.js');
+        await import('./algebraic/mappings/forward-zigzag.test.js');
+        await import('./automata/entropy-coding/huffman-encoder-fsm.test.js');
+        await import('./algebraic/mappings/downsampling.test.js');
+        await import('./automata/parsers/progressive-encoding.test.js');
+        await import('./automata/parsers/spiff-generation.test.js');
+        await import('./codec/encoder.test.js');
         await import('./core/jpeg-encoder-quality.test.js');
         await import('./core/jpeg-encoder-420.test.js');
 
-        await import('./core/decoder/frame-parser.test.js');
-        await import('./core/decoder/scan-parser.test.js');
-        await import('./core/decoder/huffman-parser.test.js');
-        await import('./core/decoder/quantization-parser.test.js');
-        await import('./core/decoder/huffman-decoder.test.js');
-        await import('./core/decoder/inverse-zigzag.test.js');
-        await import('./core/decoder/dequantization.test.js');
-        await import('./core/decoder/idct.test.js');
-        await import('./core/decoder/idct-spec.test.js');
+        await import('./automata/parsers/sof-automaton.test.js');
+        await import('./automata/parsers/sos-automaton.test.js');
+        await import('./automata/parsers/dht-automaton.test.js');
+        await import('./automata/parsers/dqt-automaton.test.js');
+        await import('./automata/entropy-coding/huffman-decoder-fsm.test.js');
+        await import('./algebraic/mappings/inverse-zigzag.test.js');
+        await import('./algebraic/quantization/inverse-quantization.test.js');
+        await import('./algebraic/discrete-cosine/inverse-dct.test.js');
+        await import('./algebraic/discrete-cosine/inverse-dct-spec.test.js');
         await import('./core/decoder/idct-switching.test.js');
-        await import('./core/decoder/colorspace-decoder.test.js');
-        await import('./core/decoder/upsampling.test.js');
-        await import('./core/decoder/block-assembly.test.js');
-        await import('./core/decoder/progressive-decoding.test.js');
+        await import('./algebraic/colorspace/ycbcr-to-rgb.test.js');
+        await import('./algebraic/mappings/upsampling.test.js');
+        await import('./algebraic/mappings/block-assembly.test.js');
+        await import('./automata/parsers/progressive-decoding.test.js');
         await import('./core/decoder/rst-markers.test.js');
         await import('./utils/bit-reader.test.js');
         await import('./utils/marker-parser.test.js');
 
         await import('./core/steganography.test.js');
         await import('./core/steganography/container.test.js');
-        await import('./core/steganography/chunk-manager.test.js');
-        await import('./core/steganography/f5.test.js');
+        await import('./information-theory/steganography/chunk-manager.test.js');
+        await import('./information-theory/steganography/f5-syndrome.test.js');
         await import('./core/steganography/batch-process.test.js');
-        await import('./core/steganography/error-correction.test.js');
+        await import('./information-theory/error-correction/rs-interleaver.test.js');
         await import('./core/container-format.test.js');
 
-        await import('./core/crypto/encryption.test.js');
-        await import('./core/crypto/key-derivation.test.js');
+        await import('./information-theory/cryptography/aes-gcm.test.js');
+        await import('./information-theory/cryptography/pbkdf2.test.js');
 
         await import('./core/EC/reed-solomon-integration.test.js');
-        await import('./core/EC/galois-field.test.js');
-        await import('./core/EC/reed-solomon.test.js');
+        await import('./information-theory/error-correction/galois-field.test.js');
+        await import('./information-theory/error-correction/reed-solomon-codec.test.js');
         await import('./EC/reedsolomon.test.js');
 
-        await import('./core/jpeg-decoder.test.js');
+        await import('./codec/decoder.test.js');
         await import('./core/jpeg-decoder-defensive.test.js');
         await import('./integration/roundtrip.test.js');
         await import('./integration/steganography-roundtrip.test.js');
-        await import('./auto_detection_roundtrip.test.js');
-        await import('./capacity_validation.test.js');
-        await import('./format_detection.test.js');
+        await import('./scripts/auto_detection_roundtrip.test.js');
+        await import('./scripts/capacity_validation.test.js');
+        await import('./scripts/format_detection.test.js');
 
         await import('./core/jpeg-encoder-coefficients.test.js');
-        await import('./core/jpeg-transcoder.test.js');
+        await import('./codec/transcoder.test.js');
         await import('./core/orchestrator.test.js');
 
-        await import('./core/vault/secure-entry.test.js');
-        await import('./core/vault/vault-manager.test.js');
+        await import('./structures/vault/secure-record.test.js');
+        await import('./structures/vault/immutable-vault.test.js');
         await import('./core/vault/vault-e2e.test.js');
         await import('./core/vault/vault-e2e-crud.test.js');
         await import('./core/vault/vault-e2e-carriers.test.js');

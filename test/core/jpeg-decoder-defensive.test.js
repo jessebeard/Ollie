@@ -1,6 +1,6 @@
 // Defensive Validation Tests
 import { describe as suite, it as test, expect } from '../utils/test-runner.js';
-import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
+import { JpegDecoder } from '../../src/codec/decoder.js';
 
 suite('JPEG Decoder Defensive Tests', () => {
 

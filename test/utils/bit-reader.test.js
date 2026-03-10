@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { BitReader } from '../../src/utils/bit-reader.js';
+import { describe, it, expect } from './test-runner.js';
+import { BitReader } from '../../src/automata/bit-streams/bit-reader.js';
 
 describe('BitReader', () => {
     it('should read single bits correctly', () => {

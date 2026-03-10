@@ -1,11 +1,11 @@
-import { describe, it, expect } from '../utils/test-runner.js';
+import { describe, it, expect } from './test-runner.js';
 import {
     findNextMarker,
     readMarkerSegment,
     parseFileStructure,
     getMarkerName,
     MARKERS
-} from '../../src/utils/marker-parser.js';
+} from '../../src/automata/parsers/marker-scanner.js';
 
 describe('MarkerParser', () => {
     it('should identify SOI marker (0xFFD8)', () => {

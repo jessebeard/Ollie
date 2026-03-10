@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'assert';
-import * as rs from '../../src/core/EC/reedsolomon.js';
+import * as rs from '../../src/information-theory/error-correction/reedsolomon.js';
 
 var GenericGF = rs.GenericGF;
 var GenericGFPoly = rs.GenericGFPoly;

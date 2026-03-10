@@ -1,6 +1,6 @@
-import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
-import { JpegDecoder } from '../../../src/core/jpeg-decoder.js';
-import { describe, it, expect } from '../../../test/utils/test-runner.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
+import { JpegDecoder } from '../../../src/codec/decoder.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
 
 describe('SPIFF Parsing', () => {
     it('should parse a valid SPIFF APP8 marker', async () => {

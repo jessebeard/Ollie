@@ -1,5 +1,5 @@
 import { BitReaderNaive } from '../../src/utils/bit-reader-naive.js';
-import { BitReaderOptimized } from '../../src/utils/bit-reader-optimized.js';
+import { BitReaderOptimized } from '../../src/automata/bit-streams/bit-reader-optimized.js';
 
 const testData = new Uint8Array([
     0xFF, 0x00,  

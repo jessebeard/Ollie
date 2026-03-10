@@ -2,8 +2,8 @@
  * Tests for 4:2:0 chroma subsampling in JpegEncoder
  */
 import { describe, it, expect } from '../utils/test-runner.js';
-import { JpegEncoder } from '../../src/core/jpeg-encoder.js';
-import { JpegDecoder } from '../../src/core/jpeg-decoder.js';
+import { JpegEncoder } from '../../src/codec/encoder.js';
+import { JpegDecoder } from '../../src/codec/decoder.js';
 
 describe('JPEG Encoder - 4:2:0 Subsampling', () => {
     /**

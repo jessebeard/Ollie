@@ -1,5 +1,5 @@
-import { describe, it, expect } from '../../../test/utils/test-runner.js';
-import { Jsteg } from '../../../src/core/steganography/jsteg.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { Jsteg } from '../../../src/information-theory/steganography/jsteg.js';
 
 describe('Jsteg Container Format', () => {
     function createMockBlocks(count, fillValue = 10) {

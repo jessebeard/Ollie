@@ -2,10 +2,10 @@
  * Main entry point for the JPEG Encoder/Decoder application.
  * Initializes UI modules.
  */
-import { initEncoderUI } from './ui/encoder-ui.js';
-import { initDecoderUI } from './ui/decoder-ui.js';
-import { initTabs } from './ui/tabs.js';
-import { JpegEncoder } from './core/jpeg-encoder.js';
+import { initEncoderUI } from '../app/components/encoder-ui.js';
+import { initDecoderUI } from '../app/components/decoder-ui.js';
+import { initTabs } from '../app/components/tabs.js';
+import { JpegEncoder } from './codec/encoder.js';
 
 function init() {
     

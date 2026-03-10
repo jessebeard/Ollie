@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { JpegDecoder } from '../../../src/core/jpeg-decoder.js';
-import { idctNaive, idctAAN } from '../../../src/core/decoder/idct.js';
+import { JpegDecoder } from '../../../src/codec/decoder.js';
+import { idctNaive, idctAAN } from '../../../src/algebraic/discrete-cosine/inverse-dct.js';
 
 describe('IDCT Switching', () => {
     it('should allow configuring the IDCT method', () => {

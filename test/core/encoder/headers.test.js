@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
-import { JpegEncoder } from '../../../src/core/jpeg-encoder.js';
-import { getScaledQuantizationTables } from '../../../src/core/encoder/quantization.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
+import { getScaledQuantizationTables } from '../../../src/algebraic/quantization/forward-quantization.js';
 
 const [defaultQTables] = getScaledQuantizationTables(50);
 describe('JPEG Headers', () => {

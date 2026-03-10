@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Cache busting: force fresh loads -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Ollie Test Suite</title>
+    <style>
+        :root {
+            --bg-body: #0f0f13;
+            --bg-card: #1a1a22;
+            --bg-card-hover: #22222e;
+            --bg-summary: rgba(20, 20, 30, 0.85);
+            --border: #2a2a3a;
+            --text: #e0e0e8;
+            --text-dim: #8888aa;
+            --green: #4ade80;
+            --green-bg: rgba(74, 222, 128, 0.08);
+            --red: #f87171;
+            --red-bg: rgba(248, 113, 113, 0.08);
+            --yellow: #fbbf24;
+            --yellow-bg: rgba(251, 191, 36, 0.08);
+            --blue: #60a5fa;
+            --purple: #a78bfa;
+            --font: 'Inter', system-ui, -apple-system, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-body);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ─── Sticky Summary Bar ─── */
+        #summary-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg-summary);
+            backdrop-filter: blur(16px) saturate(1.5);
+            -webkit-backdrop-filter: blur(16px) saturate(1.5);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        #summary-bar h1 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            white-space: nowrap;
+        }
+
+        .stat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: var(--mono);
+        }
+
+        .stat-pill.total {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+        }
+
+        .stat-pill.passed {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .stat-pill.failed {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .stat-pill.warn {
+            background: var(--yellow-bg);
+            color: var(--yellow);
+        }
+
+        .stat-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .stat-dot.green {
+            background: var(--green);
+        }
+
+        .stat-dot.red {
+            background: var(--red);
+        }
+
+        .stat-dot.yellow {
+            background: var(--yellow);
+        }
+
+        /* ─── Filter Controls ─── */
+        .filter-group {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+
+        .filter-btn {
+            padding: 5px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-dim);
+            font-size: 12px;
+            font-family: var(--font);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text);
+        }
+
+        .filter-btn.active {
+            background: rgba(96, 165, 250, 0.12);
+            color: var(--blue);
+            border-color: var(--blue);
+        }
+
+        /* ─── Progress Bar ─── */
+        #progress-container {
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.04);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+
+        #progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--green), var(--blue));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* ─── Test Results Container ─── */
+        #test-results {
+            padding: 16px 24px 80px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ─── Suite Cards ─── */
+        .suite {
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .suite:hover {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .suite>h3 {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 14px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.015);
+            transition: background 0.15s;
+        }
+
+        .suite>h3:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .suite>h3::before {
+            content: '▸';
+            font-size: 11px;
+            color: var(--text-dim);
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+
+        .suite.expanded>h3::before {
+            transform: rotate(90deg);
+        }
+
+        .suite-badge {
+            margin-left: auto;
+            font-size: 11px;
+            font-family: var(--mono);
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .suite-badge.all-pass {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .suite-badge.has-fail {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .suite-body {
+            display: none;
+            padding: 4px 0;
+        }
+
+        .suite.expanded>.suite-body {
+            display: block;
+        }
+
+        /* Auto-expand suites with failures */
+        .suite.has-failures {
+            border-color: rgba(248, 113, 113, 0.2);
+        }
+
+        .suite.has-failures.expanded>h3 {
+            border-bottom-color: rgba(248, 113, 113, 0.15);
+        }
+
+        /* ─── Nested Suites ─── */
+        .suite .suite {
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .suite .suite>h3 {
+            padding-left: 28px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-dim);
+        }
+
+        /* ─── Test Cases ─── */
+        .test-case {
+            padding: 6px 14px 6px 28px;
+            font-size: 12.5px;
+            font-family: var(--mono);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.5;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .test-case:last-child {
+            border-bottom: none;
+        }
+
+        .test-case .test-icon {
+            flex-shrink: 0;
+            width: 16px;
+            text-align: center;
+        }
+
+        .test-case .test-name {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .test-case .test-duration {
+            flex-shrink: 0;
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .test-case.pass {
+            color: var(--green);
+        }
+
+        .test-case.pass .test-icon::after {
+            content: '✓';
+        }
+
+        .test-case.fail {
+            color: var(--red);
+            background: var(--red-bg);
+        }
+
+        .test-case.fail .test-icon::after {
+            content: '✗';
+        }
+
+        .test-case.warn {
+            color: var(--yellow);
+        }
+
+        .test-case.warn .test-icon::after {
+            content: '⚠';
+        }
+
+        .test-error {
+            display: block;
+            color: var(--text-dim);
+            font-size: 11px;
+            margin-top: 2px;
+            padding-left: 24px;
+            word-break: break-all;
+        }
+
+        /* ─── Suite Error ─── */
+        .error {
+            padding: 8px 14px;
+            color: var(--red);
+            background: var(--red-bg);
+            font-size: 12px;
+            font-family: var(--mono);
+        }
+
+        /* ─── Filter visibility ─── */
+        body.filter-fail .test-case.pass,
+        body.filter-fail .test-case.warn {
+            display: none;
+        }
+
+        body.filter-pass .test-case.fail {
+            display: none;
+        }
+
+        body.filter-fail .suite:not(.has-failures) {
+            display: none;
+        }
+
+        /* ─── Running animation ─── */
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: .5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .running {
+            animation: pulse 1.2s ease infinite;
+            color: var(--blue);
+        }
+
+        /* ─── Duration badge ─── */
+        #total-duration {
+            font-size: 11px;
+            color: var(--text-dim);
+            font-family: var(--mono);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="summary-bar">
+        <h1>🧪 Ollie Test Suite</h1>
+        <span class="stat-pill total" id="stat-total"><span class="stat-dot"></span> <span
+                id="count-total">0</span></span>
+        <span class="stat-pill passed" id="stat-passed"><span class="stat-dot green"></span> <span
+                id="count-passed">0</span></span>
+        <span class="stat-pill failed" id="stat-failed"><span class="stat-dot red"></span> <span
+                id="count-failed">0</span></span>
+        <span class="stat-pill warn" id="stat-warn"><span class="stat-dot yellow"></span> <span id="count-warn">0</span>
+            ⚠</span>
+        <span id="total-duration"></span>
+        <div class="filter-group">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="fail">Failures</button>
+            <button class="filter-btn" data-filter="pass">Passes</button>
+        </div>
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="test-results"></div>
+
+    <script type="module">
+        // ─── Filter Controls ───
+        let warnCount = 0;
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                document.body.classList.remove('filter-fail', 'filter-pass');
+                if (filter !== 'all') document.body.classList.add('filter-' + filter);
+            });
+        });
+
+        // ─── Live Stats Update ───
+        const startTime = Date.now();
+
+        import { onTestComplete, getStats } from '../test/utils/test-runner.js';
+
+        onTestComplete((result) => {
+            const s = getStats();
+            document.getElementById('count-total').textContent = s.total;
+            document.getElementById('count-passed').textContent = s.passed;
+            document.getElementById('count-failed').textContent = s.failed;
+
+            // Track warnings (0-assertion passes)
+            if (result.status === 'pass' && result.assertions === 0) {
+                warnCount++;
+                document.getElementById('count-warn').textContent = warnCount;
+            }
+
+            // Progress bar (estimate based on known test count ~464)
+            const estimated = 464;
+            const pct = Math.min(100, (s.total / estimated) * 100);
+            document.getElementById('progress-bar').style.width = pct + '%';
+
+            // Update duration
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            document.getElementById('total-duration').textContent = elapsed + 's';
+
+            // Auto-expand and update badges for suites
+            document.querySelectorAll('.suite').forEach(suite => {
+                // Find failures anywhere inside this suite (including nested suites)
+                const totalFails = suite.querySelectorAll('.test-case.fail').length;
+
+                if (totalFails > 0) {
+                    suite.classList.add('has-failures', 'expanded');
+                }
+
+                // Badge updates (only direct tests for the badge numbers, or total tree? We'll do direct tests for the suite's own badge)
+                const fails = suite.querySelectorAll(':scope > .suite-body > .test-case.fail').length;
+                const total = suite.querySelectorAll(':scope > .suite-body > .test-case').length;
+                const passed = suite.querySelectorAll(':scope > .suite-body > .test-case.pass').length;
+
+                const badge = suite.querySelector(':scope > h3 > .suite-badge');
+                if (badge) {
+                    if (fails > 0 || totalFails > 0) {
+                        badge.className = 'suite-badge has-fail';
+                        badge.textContent = `${totalFails > 0 ? totalFails : fails} ✗`;
+                    } else if (total > 0) {
+                        badge.className = 'suite-badge all-pass';
+                        badge.textContent = `${passed} ✓`;
+                    }
+                }
+            });
+        });
+
+        // ─── Suite Collapse Toggle ───
+        document.getElementById('test-results').addEventListener('click', (e) => {
+            const h3 = e.target.closest('.suite > h3');
+            if (h3) {
+                h3.parentElement.classList.toggle('expanded');
+            }
+        });
+
+        // ─── Import All Test Suites ───
+
+        // Encoder Tests
+        import '../test/algebraic/colorspace/rgb-to-ycbcr.test.js';
+        import '../test/algebraic/mappings/blocks.test.js';
+        import '../test/core/encoder/headers.test.js';
+        import '../test/algebraic/discrete-cosine/forward-dct.test.js';
+        import '../test/algebraic/quantization/forward-quantization.test.js';
+        import '../test/algebraic/mappings/forward-zigzag.test.js';
+        import '../test/automata/entropy-coding/huffman-encoder-fsm.test.js';
+        import '../test/algebraic/mappings/downsampling.test.js';
+        import '../test/automata/parsers/progressive-encoding.test.js';
+        import '../test/automata/parsers/spiff-generation.test.js';
+        import '../test/codec/encoder.test.js';
+        import '../test/core/jpeg-encoder-quality.test.js';
+        import '../test/core/jpeg-encoder-420.test.js';
+        import '../test/core/jpeg-encoder-coefficients.test.js';
+        import '../test/codec/transcoder.test.js';
+        import '../test/core/orchestrator.test.js';
+
+        // Decoder Tests
+        import '../test/automata/parsers/sof-automaton.test.js';
+        import '../test/automata/parsers/sos-automaton.test.js';
+        import '../test/automata/parsers/dht-automaton.test.js';
+        import '../test/automata/parsers/dqt-automaton.test.js';
+        import '../test/automata/entropy-coding/huffman-decoder-fsm.test.js';
+        import '../test/algebraic/mappings/inverse-zigzag.test.js';
+        import '../test/algebraic/quantization/inverse-quantization.test.js';
+        import '../test/algebraic/discrete-cosine/inverse-dct.test.js';
+        import '../test/algebraic/discrete-cosine/inverse-dct-spec.test.js';
+        import '../test/core/decoder/idct-switching.test.js';
+        import '../test/algebraic/colorspace/ycbcr-to-rgb.test.js';
+        import '../test/algebraic/mappings/upsampling.test.js';
+        import '../test/algebraic/mappings/block-assembly.test.js';
+        import '../test/automata/parsers/progressive-decoding.test.js';
+        import '../test/core/decoder/rst-markers.test.js';
+        import '../test/core/decoder/spiff-parsing.test.js';
+
+        // Utility Tests
+        import '../test/utils/bit-reader.test.js';
+        import '../test/utils/marker-parser.test.js';
+
+        // Steganography Tests
+        import '../test/core/steganography.test.js';
+        import '../test/core/steganography/container.test.js';
+        import '../test/information-theory/steganography/chunk-manager.test.js';
+        import '../test/information-theory/steganography/f5-syndrome.test.js';
+        // batch-process.test.js is Node-only (requires fs/path)
+        import '../test/information-theory/error-correction/rs-interleaver.test.js';
+        import '../test/core/container-format.test.js';
+
+        // Crypto Tests
+        import '../test/information-theory/cryptography/aes-gcm.test.js';
+        import '../test/information-theory/cryptography/pbkdf2.test.js';
+
+        // Error Correction Tests
+        import '../test/core/EC/reed-solomon-integration.test.js';
+        import '../test/information-theory/error-correction/galois-field.test.js';
+        import '../test/information-theory/error-correction/reed-solomon-codec.test.js';
+        // reedsolomon.test.js is Node-only (uses Node assert module)
+
+        // Integration Tests
+        import '../test/codec/decoder.test.js';
+        import '../test/core/jpeg-decoder-defensive.test.js';
+        import '../test/integration/roundtrip.test.js';
+        import '../test/integration/steganography-roundtrip.test.js';
+        import '../test/scripts/auto_detection_roundtrip.test.js';
+        import '../test/scripts/capacity_validation.test.js';
+        import '../test/scripts/format_detection.test.js';
+
+        // Vault Tests
+        import '../test/structures/vault/secure-record.test.js';
+        import '../test/structures/vault/immutable-vault.test.js';
+    </script>
+</body>
+
+</html>
