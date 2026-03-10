@@ -188,26 +188,32 @@ export const Arbitrary = {
 
     string: (minLength = 1, maxLength = 100) => ({
         generate: () => {
-            const len = getRandomInt(minLength, maxLength);
-            let str = '';
-            // Including ASCII, extended Latin, common Unicode symbols, and some emojis
+            const encoder = new TextEncoder();
+            const decoder = new TextDecoder();
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+ ãñéöçµœ∑®†¥¨ˆøπ“‘—🤪🚀🔥💻';
-            for (let i = 0; i < len; i++) {
-                // Mix in random unicode ranges occasionally to really fuzz UTF-8 boundaries
-                if (Math.random() < 0.1) {
-                    // Generate random valid unicode code point (avoiding surrogates 0xD800-0xDFFF)
-                    let codePoint;
-                    if (Math.random() < 0.5) {
-                        codePoint = getRandomInt(0x0800, 0xD7FF);
+
+            while (true) {
+                const len = getRandomInt(minLength, maxLength);
+                let str = '';
+
+                for (let i = 0; i < len; i++) {
+                    // Mix in random unicode ranges occasionally
+                    if (Math.random() < 0.1) {
+                        str += String.fromCodePoint(getRandomInt(0x0800, 0xFFFF));
                     } else {
-                        codePoint = getRandomInt(0xE000, 0xFFFF);
+                        str += chars.charAt(getRandomInt(0, chars.length));
                     }
-                    str += String.fromCodePoint(codePoint);
-                } else {
-                    str += chars.charAt(getRandomInt(0, chars.length));
+                }
+
+                // Validate string handles round-tripping through TextEncoder/Decoder without corruption
+                // This ensures we drop generated strings containing unpaired UTF-16 surrogate halves
+                const encoded = encoder.encode(str);
+                const decoded = decoder.decode(encoded);
+
+                if (str === decoded) {
+                    return str;
                 }
             }
-            return str;
         },
         shrink: (value) => shrinkString(value, minLength)
     }),
