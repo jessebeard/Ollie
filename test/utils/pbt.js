@@ -195,8 +195,13 @@ export const Arbitrary = {
             for (let i = 0; i < len; i++) {
                 // Mix in random unicode ranges occasionally to really fuzz UTF-8 boundaries
                 if (Math.random() < 0.1) {
-                    // Generate random valid unicode code point (avoiding surrogates)
-                    const codePoint = getRandomInt(0x0800, 0xD7FF);
+                    // Generate random valid unicode code point (avoiding surrogates 0xD800-0xDFFF)
+                    let codePoint;
+                    if (Math.random() < 0.5) {
+                        codePoint = getRandomInt(0x0800, 0xD7FF);
+                    } else {
+                        codePoint = getRandomInt(0xE000, 0xFFFF);
+                    }
                     str += String.fromCodePoint(codePoint);
                 } else {
                     str += chars.charAt(getRandomInt(0, chars.length));

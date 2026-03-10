@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '..');
 const PORT = parseInt(process.argv[2] || '8081', 10);
 
 const MIME_TYPES = {
@@ -32,12 +33,16 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${PORT}`);
-    let filePath = path.join(__dirname, decodeURIComponent(url.pathname));
+    let reqPath = decodeURIComponent(url.pathname);
 
-    // Default to index.html for directory requests
-    if (filePath.endsWith('/') || filePath === __dirname) {
-        filePath = path.join(filePath, 'index.html');
+    // Default to index.html for root requests
+    if (reqPath === '/') {
+        reqPath = '/app/index.html';
+    } else if (reqPath === '/test.html' || reqPath === '/vault.html') {
+        reqPath = '/app' + reqPath;
     }
+
+    let filePath = path.join(ROOT, reqPath);
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
