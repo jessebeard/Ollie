@@ -40,6 +40,8 @@ const server = http.createServer((req, res) => {
         reqPath = '/app/index.html';
     } else if (reqPath === '/test.html' || reqPath === '/vault.html') {
         reqPath = '/app' + reqPath;
+    } else if (reqPath.startsWith('/components/')) {
+        reqPath = '/app' + reqPath;
     }
 
     let filePath = path.join(ROOT, reqPath);
