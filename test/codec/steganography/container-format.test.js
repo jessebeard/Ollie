@@ -1,6 +1,6 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { ContainerFormat, FLAGS } from '../../src/information-theory/steganography/payload-container.js';
-import { Arbitrary, assertProperty } from '../utils/pbt.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { ContainerFormat, FLAGS } from '../../../src/information-theory/steganography/payload-container.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
 describe('ContainerFormat (Property-Based Tests)', () => {
 

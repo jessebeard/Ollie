@@ -1,9 +1,9 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { Jsteg } from '../../src/information-theory/steganography/jsteg.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { Jsteg } from '../../../src/information-theory/steganography/jsteg.js';
 
 describe('Jsteg Steganography', async () => {
     await it('should calculate capacity correctly', () => {
-        
+
         const blocks = [new Int32Array(64), new Int32Array(64)];
 
         for (let i = 1; i <= 10; i++) blocks[0][i] = 5;
@@ -19,15 +19,15 @@ describe('Jsteg Steganography', async () => {
     });
 
     await it('should embed and extract data correctly', () => {
-        const data = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]); 
-        const bitsNeeded = (data.length + 4) * 8; 
+        const data = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]);
+        const bitsNeeded = (data.length + 4) * 8;
 
         const blocks = [];
         let bitsCount = 0;
-        while (bitsCount < bitsNeeded + 10) { 
+        while (bitsCount < bitsNeeded + 10) {
             const block = new Int32Array(64);
             for (let i = 1; i < 64; i++) {
-                block[i] = (i % 2 === 0) ? 2 : -2; 
+                block[i] = (i % 2 === 0) ? 2 : -2;
             }
             blocks.push(block);
             bitsCount += 63;
@@ -45,7 +45,7 @@ describe('Jsteg Steganography', async () => {
     });
 
     await it('should handle 1s and -1s correctly (expansion)', () => {
-        const data = new Uint8Array([0xFF]); 
+        const data = new Uint8Array([0xFF]);
 
         const block = new Int32Array(64);
 

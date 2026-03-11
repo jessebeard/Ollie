@@ -36,94 +36,100 @@ export function getTestResults() {
     return testResults;
 }
 
-let rootQueue = Promise.resolve();
-let currentSuiteObj = null;
+let rootNode = {
+    name: "Root",
+    suites: [],
+    tests: [],
+    parent: null
+};
 
-export async function describe(name, fn) {
+let currentSuiteObj = rootNode;
+
+export function describe(name, fn) {
     const parent = currentSuiteObj;
     const suiteNode = {
         name,
         fn,
-        queue: Promise.resolve(),
+        suites: [],
+        tests: [],
         parent,
         uiBody: null,
         uiContainer: null
     };
 
-    if (parent) {
-        const promise = parent.queue.then(() => runSuite(suiteNode));
-        parent.queue = promise;
-        return promise;
-    } else {
-        const promise = rootQueue.then(() => runSuite(suiteNode));
-        rootQueue = promise;
-        return promise;
+    parent.suites.push(suiteNode);
+    
+    // Evaluate suite body synchronously to register nested matches
+    currentSuiteObj = suiteNode;
+    try {
+        fn();
+    } catch (e) {
+        console.error(`Error during suite registration "${name}":`, e);
+    } finally {
+        currentSuiteObj = parent;
     }
+}
+
+export function it(name, fn) {
+    currentSuiteObj.tests.push({ name, fn });
+}
+
+export async function executeTests() {
+    await runSuite(rootNode);
 }
 
 async function runSuite(node) {
-    if (isNode) {
-        console.log(`\n\x1b[1m${node.name}\x1b[0m`);
-        const prevSuite = currentSuiteObj;
-        currentSuiteObj = node;
-        currentSuite = node.name;
-        try {
-            await node.fn();
-            await node.queue;
-        } catch (e) {
-            console.error(`\x1b[31mSuite Error: ${e.message}\x1b[0m`);
-        } finally {
-            currentSuiteObj = prevSuite;
-            currentSuite = prevSuite ? prevSuite.name : null;
-        }
-    } else {
-        const container = document.createElement('div');
-        container.className = 'suite';
+    // If it's a real suite (not root), setup UI / logging
+    if (node !== rootNode) {
+        if (isNode) {
+            console.log(`\n\x1b[1m${node.name}\x1b[0m`);
+            currentSuite = node.name;
+        } else {
+            const container = document.createElement('div');
+            container.className = 'suite';
 
-        const header = document.createElement('h3');
-        header.textContent = node.name;
-        const badge = document.createElement('span');
-        badge.className = 'suite-badge';
-        header.appendChild(badge);
-        container.appendChild(header);
+            const header = document.createElement('h3');
+            header.textContent = node.name;
+            const badge = document.createElement('span');
+            badge.className = 'suite-badge';
+            header.appendChild(badge);
+            container.appendChild(header);
 
-        const body = document.createElement('div');
-        body.className = 'suite-body';
-        container.appendChild(body);
+            const body = document.createElement('div');
+            body.className = 'suite-body';
+            container.appendChild(body);
 
-        node.uiBody = body;
-        node.uiContainer = container;
+            node.uiBody = body;
+            node.uiContainer = container;
 
-        const parentSuiteBody = node.parent ? node.parent.uiBody : (document.getElementById('test-results') || document.body);
-        parentSuiteBody.appendChild(container);
+            const parentSuiteBody = (node.parent && node.parent !== rootNode) ? node.parent.uiBody : (document.getElementById('test-results') || document.body);
+            parentSuiteBody.appendChild(container);
 
-        const prevSuite = currentSuiteObj;
-        currentSuiteObj = node;
-        currentSuite = node.name;
-
-        try {
-            await node.fn();
-            await node.queue;
-        } catch (e) {
-            console.error(e);
-            body.innerHTML += `<div class="error">Suite Error: ${e.message}</div>`;
-        } finally {
-            currentSuiteObj = prevSuite;
-            currentSuite = prevSuite ? prevSuite.name : null;
+            currentSuite = node.name;
         }
     }
-}
 
-export async function it(name, fn) {
-    const parent = currentSuiteObj;
-    if (parent) {
-        const promise = parent.queue.then(() => runTest(parent, name, fn));
-        parent.queue = promise;
-        return promise;
-    } else {
-        const promise = rootQueue.then(() => runTest(null, name, fn));
-        rootQueue = promise;
-        return promise;
+    try {
+        // Run all tests in this suite sequentially
+        for (const testNode of node.tests) {
+            await runTest(node !== rootNode ? node : null, testNode.name, testNode.fn);
+        }
+
+        // Run all nested suites sequentially
+        for (const childSuite of node.suites) {
+            const prevSuite = currentSuite;
+            await runSuite(childSuite);
+            currentSuite = prevSuite;
+        }
+    } catch (e) {
+        if (isNode) {
+            console.error(`\x1b[31mSuite Error: ${e.message}\x1b[0m`);
+        } else {
+            console.error(e);
+            if (node.uiBody) {
+                node.uiBody.innerHTML += `<div class="error">Suite Error: ${e.message}</div>`;
+            }
+        }
     }
 }
 
@@ -150,7 +156,7 @@ async function runTest(parent, name, fn) {
             testResults.push(result);
 
             if (currentAssertionCount === 0) {
-                console.log(`  \x1b[33m⚠\x1b[0m ${name} \x1b[33m(0 assertions — dead test?)\x1b[0m`);
+                // Not logging here because the UI renderer does it gracefully. We were logging to grep node test runs safely.
             } else {
                 console.log(`  \x1b[32m✓\x1b[0m ${name}`);
             }

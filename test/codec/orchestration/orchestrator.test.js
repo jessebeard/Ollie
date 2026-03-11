@@ -1,7 +1,7 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { assertProperty, Arbitrary } from '../utils/pbt.js';
-import { JpegEncoder } from '../../src/codec/encoder.js';
-import { JpegDecoder } from '../../src/codec/decoder.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { assertProperty, Arbitrary } from '../../utils/pbt.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
+import { JpegDecoder } from '../../../src/codec/decoder.js';
 
 describe('Orchestrator & Transcoding Equivalency (PBT)', () => {
 

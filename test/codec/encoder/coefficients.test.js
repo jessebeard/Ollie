@@ -1,7 +1,7 @@
-import { describe, it, expect } from '../utils/test-runner.js';
-import { JpegEncoder } from '../../src/codec/encoder.js';
-import { JpegDecoder } from '../../src/codec/decoder.js';
-import { JpegTranscoder } from '../../src/codec/transcoder.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
+import { JpegDecoder } from '../../../src/codec/decoder.js';
+import { JpegTranscoder } from '../../../src/codec/transcoder.js';
 
 describe('JPEG Encoder - Coefficient Encoding', () => {
     /**

@@ -3,9 +3,9 @@
  * Verifies that the quality parameter correctly scales quantization tables
  * and affects output file size.
  */
-import { describe, it, expect } from '../utils/test-runner.js';
-import { JpegEncoder } from '../../src/codec/encoder.js';
-import { getScaledQuantizationTables } from '../../src/algebraic/quantization/forward-quantization.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import { JpegEncoder } from '../../../src/codec/encoder.js';
+import { getScaledQuantizationTables } from '../../../src/algebraic/quantization/forward-quantization.js';
 
 function createTestImage(width, height) {
     const data = new Uint8Array(width * height * 4);

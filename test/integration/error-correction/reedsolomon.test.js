@@ -1,7 +1,5 @@
-#!/usr/bin/env node
-
-import assert from 'assert';
-import * as rs from '../../src/information-theory/error-correction/reedsolomon.js';
+import { describe, it, expect } from '../../utils/test-runner.js';
+import * as rs from '../../../src/information-theory/error-correction/reedsolomon.js';
 
 var GenericGF = rs.GenericGF;
 var GenericGFPoly = rs.GenericGFPoly;
@@ -38,6 +36,10 @@ function getPseudoRandom() {
     };
 }
 
+function assert(condition, message) {
+    expect(condition).toBe(true);
+}
+
 function testEncodeDecodeRandom(field, dataSize, ecSize) {
     assert(dataSize > 0 && dataSize <= field.getSize() - 3, "Invalid data size for " + field);
     assert(ecSize > 0 && ecSize + dataSize <= field.getSize(), "Invalid ECC size for " + field);
@@ -49,15 +51,15 @@ function testEncodeDecodeRandom(field, dataSize, ecSize) {
     var random = getPseudoRandom();
     var iterations = field.getSize() > 256 ? 1 : DECODER_RANDOM_TEST_ITERATIONS;
     for (var i = 0; i < iterations; i++) {
-        
+
         for (var k = 0; k < dataSize; k++) {
             dataWords[k] = random.nextInt(field.getSize());
         }
-        
+
         System.arraycopy(dataWords, 0, message, 0, dataWords.length);
         encoder.encode(message, ecWords.length);
         System.arraycopy(message, dataSize, ecWords, 0, ecSize);
-        
+
         testDecoder(field, dataWords, ecWords);
     }
 
@@ -72,7 +74,8 @@ function testEncoder(field, dataWords, ecWords) {
     System.arraycopy(ecWords, 0, messageExpected, dataWords.length, ecWords.length);
     System.arraycopy(dataWords, 0, message, 0, dataWords.length);
     encoder.encode(message, ecWords.length);
-    assert.deepEqual(messageExpected, message, "Encode in " + field + " (" + dataWords.length + ',' + ecWords.length + ") failed");
+    
+    expect([...message]).toEqual([...messageExpected]);
 }
 
 function testDecoder(field, dataWords, ecWords) {
@@ -84,7 +87,7 @@ function testDecoder(field, dataWords, ecWords) {
     for (var j = 0; j < iterations; j++) {
         for (var i = 0; i < ecWords.length; i++) {
             if (i > 10 && i < ecWords.length / 2 - 10) {
-                
+
                 i += ecWords.length / 10;
             }
             System.arraycopy(dataWords, 0, message, 0, dataWords.length);
@@ -93,9 +96,9 @@ function testDecoder(field, dataWords, ecWords) {
             try {
                 decoder.decode(message, ecWords.length);
             } catch (e) {
-                
+
                 assert(i > maxErrors, "Decode in " + field + " (" + dataWords.length + ',' + ecWords.length + ") failed at " + i + " errors: " + e);
-                
+
                 break;
             }
             if (i < maxErrors) {
@@ -110,56 +113,55 @@ function testEncodeDecode(field, dataWords, ecWords) {
     testDecoder(field, dataWords, ecWords);
 }
 
-function dump(array) {
-    console.log(Array.prototype.join.call(array));
-}
-
 function assertDataEquals(expected, received, message) {
     for (var i = 0; i < expected.length; i++) {
         if (expected[i] != received[i]) {
-            assert.fail(received.subarray(0, expected.length), expected, message);
+            expect([...received.subarray(0, expected.length)]).toEqual([...expected]);
         }
     }
 }
 
-(function testDataMatrix() {
-    
-    testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([142, 164, 186]), new Int32Array([114, 25, 5, 88, 102]));
-    testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([
-        0x69, 0x75, 0x75, 0x71, 0x3B, 0x30, 0x30, 0x64,
-        0x70, 0x65, 0x66, 0x2F, 0x68, 0x70, 0x70, 0x68,
-        0x6D, 0x66, 0x2F, 0x64, 0x70, 0x6E, 0x30, 0x71,
-        0x30, 0x7B, 0x79, 0x6A, 0x6F, 0x68, 0x30, 0x81,
-        0xF0, 0x88, 0x1F, 0xB5]),
-        new Int32Array([
-            0x1C, 0x64, 0xEE, 0xEB, 0xD0, 0x1D, 0x00, 0x03,
-            0xF0, 0x1C, 0xF1, 0xD0, 0x6D, 0x00, 0x98, 0xDA,
-            0x80, 0x88, 0xBE, 0xFF, 0xB7, 0xFA, 0xA9, 0x95]));
-    
-    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 10, 240);
-    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 128, 127);
-    testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 220, 35);
-})();
+describe('Reed-Solomon Integration', () => {
 
-(function testQRCode() {
-    
-    testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
-        0x10, 0x20, 0x0C, 0x56, 0x61, 0x80, 0xEC, 0x11,
-        0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11]),
-        new Int32Array([
-            0xA5, 0x24, 0xD4, 0xC1, 0xED, 0x36, 0xC7, 0x87,
-            0x2C, 0x55]));
-    testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
-        0x72, 0x67, 0x2F, 0x77, 0x69, 0x6B, 0x69, 0x2F,
-        0x4D, 0x61, 0x69, 0x6E, 0x5F, 0x50, 0x61, 0x67,
-        0x65, 0x3B, 0x3B, 0x00, 0xEC, 0x11, 0xEC, 0x11,
-        0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11]),
-        new Int32Array([
-            0xD8, 0xB8, 0xEF, 0x14, 0xEC, 0xD0, 0xCC, 0x85,
-            0x73, 0x40, 0x0B, 0xB5, 0x5A, 0xB8, 0x8B, 0x2E,
-            0x08, 0x62]));
+    it('testDataMatrix', () => {
+        testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([142, 164, 186]), new Int32Array([114, 25, 5, 88, 102]));
+        testEncodeDecode(rs.GenericGF_DATA_MATRIX_FIELD_256, new Int32Array([
+            0x69, 0x75, 0x75, 0x71, 0x3B, 0x30, 0x30, 0x64,
+            0x70, 0x65, 0x66, 0x2F, 0x68, 0x70, 0x70, 0x68,
+            0x6D, 0x66, 0x2F, 0x64, 0x70, 0x6E, 0x30, 0x71,
+            0x30, 0x7B, 0x79, 0x6A, 0x6F, 0x68, 0x30, 0x81,
+            0xF0, 0x88, 0x1F, 0xB5]),
+            new Int32Array([
+                0x1C, 0x64, 0xEE, 0xEB, 0xD0, 0x1D, 0x00, 0x03,
+                0xF0, 0x1C, 0xF1, 0xD0, 0x6D, 0x00, 0x98, 0xDA,
+                0x80, 0x88, 0xBE, 0xFF, 0xB7, 0xFA, 0xA9, 0x95]));
 
-    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 10, 240);
-    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 128, 127);
-    testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 220, 35);
-})();
+        testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 10, 240);
+        testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 128, 127);
+        testEncodeDecodeRandom(rs.GenericGF_DATA_MATRIX_FIELD_256, 220, 35);
+    });
+
+    it('testQRCode', () => {
+
+        testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
+            0x10, 0x20, 0x0C, 0x56, 0x61, 0x80, 0xEC, 0x11,
+            0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11]),
+            new Int32Array([
+                0xA5, 0x24, 0xD4, 0xC1, 0xED, 0x36, 0xC7, 0x87,
+                0x2C, 0x55]));
+        testEncodeDecode(rs.GenericGF_QR_CODE_FIELD_256, new Int32Array([
+            0x72, 0x67, 0x2F, 0x77, 0x69, 0x6B, 0x69, 0x2F,
+            0x4D, 0x61, 0x69, 0x6E, 0x5F, 0x50, 0x61, 0x67,
+            0x65, 0x3B, 0x3B, 0x00, 0xEC, 0x11, 0xEC, 0x11,
+            0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11, 0xEC, 0x11]),
+            new Int32Array([
+                0xD8, 0xB8, 0xEF, 0x14, 0xEC, 0xD0, 0xCC, 0x85,
+                0x73, 0x40, 0x0B, 0xB5, 0x5A, 0xB8, 0x8B, 0x2E,
+                0x08, 0x62]));
+
+        testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 10, 240);
+        testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 128, 127);
+        testEncodeDecodeRandom(rs.GenericGF_QR_CODE_FIELD_256, 220, 35);
+    });
+});
+

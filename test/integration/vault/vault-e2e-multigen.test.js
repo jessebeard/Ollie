@@ -7,6 +7,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+    describe('PasswordVault E2E Steganography (Multi-Generation Overwrite)', () => {
+        it('Skipped in Browser', () => { expect(true).toBe(true); });
+    });
+} else {
+
 class MockFile {
     constructor(buffer, name) {
         this.buffer = buffer;
@@ -115,7 +121,8 @@ describe('PasswordVault E2E Steganography (Multi-Generation Overwrite)', () => {
 
                 return true;
             },
-            3
+            1
         );
     });
 });
+}

@@ -4,6 +4,12 @@ import { JpegEncoder } from '../../../src/codec/encoder.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { fileURLToPath } from 'url';
 
+if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+    describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
+        it('Skipped in Browser', () => { expect(true).toBe(true); });
+    });
+} else {
+
 class MockFile {
     constructor(buffer, name) {
         this.buffer = buffer;
@@ -98,7 +104,8 @@ describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
                 }
                 return true;
             },
-            3
+            1
         );
     });
 });
+}

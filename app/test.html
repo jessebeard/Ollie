@@ -426,7 +426,7 @@
         // ─── Live Stats Update ───
         const startTime = Date.now();
 
-        import { onTestComplete, getStats } from '../test/utils/test-runner.js';
+        import { onTestComplete, getStats, executeTests } from '../test/utils/test-runner.js';
 
         onTestComplete((result) => {
             const s = getStats();
@@ -489,7 +489,7 @@
         // Encoder Tests
         import '../test/algebraic/colorspace/rgb-to-ycbcr.test.js';
         import '../test/algebraic/mappings/blocks.test.js';
-        import '../test/core/encoder/headers.test.js';
+        import '../test/codec/encoder/headers.test.js';
         import '../test/algebraic/discrete-cosine/forward-dct.test.js';
         import '../test/algebraic/quantization/forward-quantization.test.js';
         import '../test/algebraic/mappings/forward-zigzag.test.js';
@@ -498,11 +498,11 @@
         import '../test/automata/parsers/progressive-encoding.test.js';
         import '../test/automata/parsers/spiff-generation.test.js';
         import '../test/codec/encoder.test.js';
-        import '../test/core/jpeg-encoder-quality.test.js';
-        import '../test/core/jpeg-encoder-420.test.js';
-        import '../test/core/jpeg-encoder-coefficients.test.js';
+        import '../test/codec/encoder/quality.test.js';
+        import '../test/codec/encoder/subsampling-420.test.js';
+        import '../test/codec/encoder/coefficients.test.js';
         import '../test/codec/transcoder.test.js';
-        import '../test/core/orchestrator.test.js';
+        import '../test/codec/orchestration/orchestrator.test.js';
 
         // Decoder Tests
         import '../test/automata/parsers/sof-automaton.test.js';
@@ -514,40 +514,41 @@
         import '../test/algebraic/quantization/inverse-quantization.test.js';
         import '../test/algebraic/discrete-cosine/inverse-dct.test.js';
         import '../test/algebraic/discrete-cosine/inverse-dct-spec.test.js';
-        import '../test/core/decoder/idct-switching.test.js';
+        import '../test/codec/decoder/idct-switching.test.js';
         import '../test/algebraic/colorspace/ycbcr-to-rgb.test.js';
         import '../test/algebraic/mappings/upsampling.test.js';
         import '../test/algebraic/mappings/block-assembly.test.js';
         import '../test/automata/parsers/progressive-decoding.test.js';
-        import '../test/core/decoder/rst-markers.test.js';
-        import '../test/core/decoder/spiff-parsing.test.js';
+        import '../test/codec/decoder/rst-markers.test.js';
+        import '../test/codec/decoder/spiff-parsing.test.js';
 
         // Utility Tests
         import '../test/utils/bit-reader.test.js';
         import '../test/utils/marker-parser.test.js';
 
         // Steganography Tests
-        import '../test/core/steganography.test.js';
-        import '../test/core/steganography/container.test.js';
+        import '../test/codec/steganography/steganography.test.js';
+        import '../test/codec/steganography/container.test.js';
         import '../test/information-theory/steganography/chunk-manager.test.js';
         import '../test/information-theory/steganography/f5-syndrome.test.js';
-// Node only: // batch-process.test.js is Node-only (requires fs/path)
+        // Node only tests that rely on fs/path will skip their inner bodies dynamically
+        // import '../test/codec/steganography/batch-process.test.js';
         import '../test/information-theory/error-correction/rs-interleaver.test.js';
-        import '../test/core/container-format.test.js';
+        import '../test/codec/steganography/container-format.test.js';
 
         // Crypto Tests
         import '../test/information-theory/cryptography/aes-gcm.test.js';
         import '../test/information-theory/cryptography/pbkdf2.test.js';
 
         // Error Correction Tests
-        import '../test/core/EC/reed-solomon-integration.test.js';
+        import '../test/integration/error-correction/reed-solomon-integration.test.js';
         import '../test/information-theory/error-correction/galois-field.test.js';
         import '../test/information-theory/error-correction/reed-solomon-codec.test.js';
-// Node only: // reedsolomon.test.js is Node-only (uses Node assert module)
+        import '../test/integration/error-correction/reedsolomon.test.js';
 
         // Integration Tests
         import '../test/codec/decoder.test.js';
-        import '../test/core/jpeg-decoder-defensive.test.js';
+        import '../test/codec/decoder/defensive.test.js';
         import '../test/integration/roundtrip.test.js';
         import '../test/integration/steganography-roundtrip.test.js';
         import '../test/scripts/auto_detection_roundtrip.test.js';
@@ -557,6 +558,18 @@
         // Vault Tests
         import '../test/structures/vault/secure-record.test.js';
         import '../test/structures/vault/immutable-vault.test.js';
+
+        // Vault Tests (skip body in browser via isNode)
+        // import '../test/integration/vault/vault-e2e.test.js';
+        // import '../test/integration/vault/vault-e2e-crud.test.js';
+        // import '../test/integration/vault/vault-e2e-carriers.test.js';
+        // import '../test/integration/vault/vault-e2e-crypto-boundary.test.js';
+        // import '../test/integration/vault/vault-e2e-ecc.test.js';
+        // import '../test/integration/vault/vault-e2e-empty.test.js';
+        // import '../test/integration/vault/vault-e2e-multigen.test.js';
+
+        // Run the registered test tree
+        await executeTests();
     </script>
 </body>
 

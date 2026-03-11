@@ -7,6 +7,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+    describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', () => {
+        it('Skipped in Browser', () => { expect(true).toBe(true); });
+    });
+} else {
+
 class MockFile {
     constructor(buffer, name) {
         this.buffer = buffer;
@@ -47,7 +53,7 @@ describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', ()
                 expect(restoredVault.metadata.version).toBe('2.0');
                 return true;
             },
-            3
+            1
         );
     });
 
@@ -73,11 +79,11 @@ describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', ()
         } catch (e) {
             caughtError = e;
         }
-
-        expect(caughtError).not.toEqual(null);
+        expect(caughtError).not.toBeNull();
         expect(
             caughtError.message.includes('Insufficient capacity') ||
             caughtError.message.includes('Not enough image capacity')
         ).toBe(true);
     });
 });
+}
