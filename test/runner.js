@@ -180,6 +180,7 @@ async function runTests() {
         await import('./automata/parsers/progressive-decoding.test.js');
         await import('./codec/decoder/rst-markers.test.js');
         await import('./utils/bit-reader.test.js');
+        await import('./automata/bit-streams/bit-core.test.js');
         await import('./utils/marker-parser.test.js');
 
         await import('./codec/steganography/steganography.test.js');
