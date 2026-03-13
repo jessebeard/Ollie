@@ -123,7 +123,7 @@ describe('Vault Capacity UI Integration', () => {
             'capacityText': capacityTextEl,
             'itemCount': { textContent: '', addEventListener: () => {} },
             'statusText': { textContent: '', addEventListener: () => {} },
-            'vaultList': { querySelectorAll: () => [], addEventListener: () => {} },
+            'vaultList': { querySelectorAll: () => [], addEventListener: () => {}, appendChild: () => {}, innerHTML: '' },
             'tagList': { innerHTML: '', addEventListener: () => {} },
             'importBtn': { style: {}, addEventListener: () => {} },
             'exportBtn': { style: {}, addEventListener: () => {} }

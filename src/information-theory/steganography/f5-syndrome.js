@@ -215,8 +215,16 @@ export class F5 {
         while (bitIdx < bits.length) {
             // Collect next k bits of message
             let chunk = 0;
+            let bitsLoaded = 0;
             for (let b = 0; b < k && bitIdx + b < bits.length; b++) {
                 chunk = (chunk << 1) | bits[bitIdx + b];
+                bitsLoaded++;
+            }
+
+            // If we have fewer than k bits, shift them to the MSB of the k-bit chunk
+            // to align with how extractRaw extracts them (from k-1 down to 0).
+            if (bitsLoaded < k) {
+                chunk <<= (k - bitsLoaded);
             }
 
             const startPermIdx = permIdx; // Save start position for shrinkage retry

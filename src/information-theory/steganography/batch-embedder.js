@@ -191,7 +191,8 @@ export class BatchEmbedder {
             )];
         }
 
-        const chunks = this.allocateDataToImages(data, imageCapacities);
+        const [chunks, allocErr] = this.allocateDataToImages(data, imageCapacities);
+        if (allocErr) return [null, allocErr];
 
         const results = [];
         const transcoder = new JpegTranscoder();
@@ -303,6 +304,6 @@ export class BatchEmbedder {
             )];
         }
 
-        return chunks;
+        return [chunks, null];
     }
 }

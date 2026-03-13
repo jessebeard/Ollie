@@ -47,14 +47,15 @@ export class BitReaderOptimized {
         if (this.bitOffset !== 0) {
             this.bitOffset = 0;
             this.byteOffset++;
+        }
 
-            // Skip stuffing zero if we landed right after an 0xFF
-            if (this.byteOffset > 0 &&
-                this.byteOffset < this.data.length &&
-                this.data[this.byteOffset - 1] === 0xFF &&
-                this.data[this.byteOffset] === 0x00) {
-                this.byteOffset++;
-            }
+        // Only skip the stuffed 0x00 byte if the previous byte was 0xFF.
+        // Do NOT use core.handleByteStuffing here as it may skip markers (like RST).
+        if (this.byteOffset > 0 && 
+            this.byteOffset < this.data.length && 
+            this.data[this.byteOffset - 1] === 0xFF && 
+            this.data[this.byteOffset] === 0x00) {
+            this.byteOffset++;
         }
     }
 

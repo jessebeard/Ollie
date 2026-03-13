@@ -174,8 +174,8 @@ describe('JPEG Transcoder (Lossless)', () => {
         await assertProperty(
             [Arbitrary.string(1, 100), Arbitrary.string(4, 20)],
             async (secretStr, password) => {
-                const width = 64;
-                const height = 64;
+                const width = 128;
+                const height = 128;
                 const data = new Uint8ClampedArray(width * height * 4);
                 // Give some entropy so coefficients exist
                 for (let y = 0; y < height; y++) {
