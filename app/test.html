@@ -440,8 +440,8 @@
                 document.getElementById('count-warn').textContent = warnCount;
             }
 
-            // Progress bar (estimate based on known test count ~464)
-            const estimated = 464;
+            // Progress bar (estimate based on known test count ~480)
+            const estimated = 480;
             const pct = Math.min(100, (s.total / estimated) * 100);
             document.getElementById('progress-bar').style.width = pct + '%';
 
@@ -522,7 +522,8 @@
         import '../test/codec/decoder/rst-markers.test.js';
         import '../test/codec/decoder/spiff-parsing.test.js';
 
-        // Utility Tests
+        // Utility & Bitstream Tests
+        import '../test/automata/bit-streams/bit-core.test.js';
         import '../test/utils/bit-reader.test.js';
         import '../test/utils/marker-parser.test.js';
 

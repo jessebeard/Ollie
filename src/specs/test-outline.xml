@@ -1,162 +1,133 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="Ollie Test Suite">
     <structure>
-        <directory name="EC">
-            <file name="reedsolomon.test.js" description="Undocumented module" />
-        </directory>
         <directory name="algebraic">
             <directory name="colorspace">
-                <file name="rgb-to-ycbcr.test.js" description="Undocumented module" />
-                <file name="ycbcr-to-rgb.test.js" description="Undocumented module" />
+                <file name="rgb-to-ycbcr.test.js" description="Validates RGB to YCbCr colorspace conversion." />
+                <file name="ycbcr-to-rgb.test.js" description="Validates YCbCr to RGB colorspace conversion." />
             </directory>
             <directory name="discrete-cosine">
-                <file name="forward-dct.test.js" description="Undocumented module" />
-                <file name="inverse-dct-spec.test.js" description="Undocumented module" />
-                <file name="inverse-dct.test.js" description="Undocumented module" />
+                <file name="forward-dct.test.js" description="Unit tests for the Forward Discrete Cosine Transform." />
+                <file name="inverse-dct-spec.test.js" description="IDCT Implementations from JPEG T.81 Specification, including pure reference, optimized reference, and fast AAN implementations." />
+                <file name="inverse-dct.test.js" description="Inverse Discrete Cosine Transform (IDCT) tests matching the encoder's pipeline." />
             </directory>
             <directory name="mappings">
-                <file name="block-assembly.test.js" description="Undocumented module" />
-                <file name="blocks.test.js" description="Undocumented module" />
-                <file name="downsampling.test.js" description="Undocumented module" />
-                <file name="forward-zigzag.test.js" description="Undocumented module" />
-                <file name="inverse-zigzag.test.js" description="Undocumented module" />
-                <file name="upsampling.test.js" description="Undocumented module" />
+                <file name="block-assembly.test.js" description="Tests for assembling 8x8 blocks into full image dimensions." />
+                <file name="blocks.test.js" description="Tests for dimension padding and MCU block creation." />
+                <file name="downsampling.test.js" description="Tests for 4:2:0 chroma downsampling." />
+                <file name="forward-zigzag.test.js" description="Tests for zigzag reordering during encoding." />
+                <file name="inverse-zigzag.test.js" description="Tests for inverse zigzag reordering during decoding." />
+                <file name="upsampling.test.js" description="Tests for chroma upsampling during decoding." />
             </directory>
             <directory name="quantization">
-                <file name="forward-quantization.test.js" description="Undocumented module" />
-                <file name="inverse-quantization.test.js" description="Undocumented module" />
+                <file name="forward-quantization.test.js" description="Tests for quantization of DCT coefficients." />
+                <file name="inverse-quantization.test.js" description="Tests for dequantization of coefficients." />
             </directory>
         </directory>
         <directory name="automata">
+            <directory name="bit-streams">
+                <file name="bit-core.test.js" description="Core bitwise operations and byte-stuffing handling for JPEG streams. Handles bit-level reading with marker detection and byte-stuffing skips." />
+            </directory>
             <directory name="entropy-coding">
-                <file name="huffman-decoder-fsm.test.js" description="Undocumented module" />
-                <file name="huffman-encoder-fsm.test.js" description="Undocumented module" />
+                <file name="huffman-decoder-fsm.test.js" description="Tests for the Huffman decoder FSM, including DC differential and AC run-length decoding." />
+                <file name="huffman-encoder-fsm.test.js" description="Tests for the Huffman encoder FSM." />
             </directory>
             <directory name="parsers">
-                <file name="dht-automaton.test.js" description="Undocumented module" />
-                <file name="dqt-automaton.test.js" description="Undocumented module" />
-                <file name="progressive-decoding.test.js" description="Undocumented module" />
-                <file name="progressive-encoding.test.js" description="Undocumented module" />
-                <file name="sof-automaton.test.js" description="Undocumented module" />
-                <file name="sos-automaton.test.js" description="Undocumented module" />
-                <file name="spiff-generation.test.js" description="Undocumented module" />
+                <file name="dht-automaton.test.js" description="Tests for DHT (Define Huffman Table) segment parsing." />
+                <file name="dqt-automaton.test.js" description="Tests for DQT (Define Quantization Table) segment parsing." />
+                <file name="progressive-decoding.test.js" description="Tests for parsing progressive JPEG scans." />
+                <file name="progressive-encoding.test.js" description="Tests for generating progressive JPEG scans." />
+                <file name="sof-automaton.test.js" description="Tests for SOF (Start of Frame) segment parsing." />
+                <file name="sos-automaton.test.js" description="Tests for SOS (Start of Scan) segment parsing." />
+                <file name="spiff-generation.test.js" description="Tests for generating SPIFF headers." />
             </directory>
         </directory>
         <directory name="codec">
-            <file name="capacity-scanner.test.js" description="Unit tests for CapacityScanner." />
-            <file name="capacity-scanner.pbt.js" description="Property-based tests for CapacityScanner." />
-            <file name="decoder.test.js" description="Undocumented module" />
-            <file name="encoder.test.js" description="Integration tests for the JpegEncoder. These tests verify that the encoder produces valid JPEG structures (SOI, EOI markers) and can handle different image sizes." />
-            <file name="transcoder.test.js" description="Test: Lossless Roundtrip - No Steganography Validates that decoding and re-encoding coefficients produces identical pixels." />
-        </directory>
-        <directory name="core">
-            <directory name="EC">
-                <file name="reed-solomon-integration.test.js" description="Undocumented module" />
-            </directory>
-            <directory name="crypto">
-            </directory>
             <directory name="decoder">
-                <file name="idct-switching.test.js" description="Undocumented module" />
-                <file name="rst-markers.test.js" description="Undocumented module" />
-                <file name="spiff-parsing.test.js" description="Undocumented module" />
+                <file name="defensive.test.js" description="Defensive parsing tests for corrupted or malicious JPEG streams." />
+                <file name="idct-switching.test.js" description="Tests for switching between different IDCT implementations." />
+                <file name="rst-markers.test.js" description="Tests for Restart (RST) marker handling in the bitstream." />
+                <file name="spiff-parsing.test.js" description="Tests for SPIFF header parsing from APP8 markers." />
             </directory>
             <directory name="encoder">
-                <file name="headers.test.js" description="Undocumented module" />
+                <file name="coefficients.test.js" description="Validates encoding from raw DCT coefficients." />
+                <file name="headers.test.js" description="Tests for generation of JPEG headers (SOI, APP, DQT, DHT, SOF)." />
+                <file name="quality.test.js" description="Tests for encoder quality levels and quantization table scaling." />
+                <file name="subsampling-420.test.js" description="Tests for 4:2:0 chroma subsampling in the encoder." />
+            </directory>
+            <directory name="orchestration">
+                <file name="orchestrator.test.js" description="Integration tests for the codec orchestrator." />
             </directory>
             <directory name="steganography">
-                <file name="batch-process.test.js" description="Undocumented module" />
-                <file name="container.test.js" description="Undocumented module" />
+                <file name="batch-process.test.js" description="Tests for batch embedding across multiple images." />
+                <file name="container-format.test.js" description="Tests for the steganographic payload container structure." />
+                <file name="container.test.js" description="Tests for container-related logic." />
+                <file name="steganography.test.js" description="Base steganography integration tests." />
             </directory>
-            <directory name="vault">
-                <file name="vault-e2e-carriers.test.js" description="Undocumented module" />
-                <file name="vault-e2e-crud.test.js" description="Undocumented module" />
-                <file name="vault-e2e-crypto-boundary.test.js" description="Undocumented module" />
-                <file name="vault-e2e-ecc.test.js" description="Undocumented module" />
-                <file name="vault-e2e-empty.test.js" description="Undocumented module" />
-                <file name="vault-e2e-multigen.test.js" description="Undocumented module" />
-                <file name="vault-e2e.test.js" description="Undocumented module" />
-            </directory>
-            <file name="container-format.test.js" description="Undocumented module" />
-            <file name="jpeg-decoder-defensive.test.js" description="Undocumented module" />
-            <file name="jpeg-encoder-420.test.js" description="Tests for 4:2:0 chroma subsampling in JpegEncoder" />
-            <file name="jpeg-encoder-coefficients.test.js" description="Test: Basic Coefficient Encoding Validates that encoding from coefficients works." />
-            <file name="jpeg-encoder-quality.test.js" description="Tests for JPEG encoder quality levels. Verifies that the quality parameter correctly scales quantization tables and affects output file size." />
-            <file name="orchestrator.test.js" description="Undocumented module" />
-            <file name="steganography.test.js" description="Undocumented module" />
+            <file name="capacity-scanner.test.js" description="Unit tests for CapacityScanner." />
+            <file name="capacity-scanner.pbt.js" description="Property-based tests for CapacityScanner." />
+            <file name="decoder.test.js" description="Main decoder integration tests." />
+            <file name="encoder.test.js" description="Integration tests for the JpegEncoder. Verifies SOI/EOI markers and handling different image dimensions." />
+            <file name="transcoder.test.js" description="Validates lossless roundtrip (decoding and re-encoding coefficients)." />
         </directory>
         <directory name="debug">
-            <file name="debug-artifacts.md" description="Undocumented module" />
+            <file name="debug-artifacts.md" description="Documentation of debug artifacts and internal state." />
         </directory>
         <directory name="fixtures">
-            <directory name="mini vault">
-            </directory>
-            <directory name="test vault">
-            </directory>
-            <file name="README.md" description="Undocumented module" />
-            <file name="generate-fixtures.js" description="Generate test JPEG fixtures for decoder testing Run with: node test/fixtures/generate-fixtures.js" />
+            <file name="generate-fixtures.js" description="Script to generate test JPEG fixtures." />
+            <file name="README.md" description="Information about test fixtures." />
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">
-                <file name="aes-gcm.test.js" description="Undocumented module" />
-                <file name="pbkdf2.test.js" description="Undocumented module" />
+                <file name="aes-gcm.test.js" description="Tests for AES-GCM encryption and decryption." />
+                <file name="pbkdf2.test.js" description="Tests for PBKDF2 key derivation." />
             </directory>
             <directory name="error-correction">
-                <file name="galois-field.test.js" description="Undocumented module" />
-                <file name="reed-solomon-codec.test.js" description="Undocumented module" />
-                <file name="rs-interleaver.test.js" description="Undocumented module" />
+                <file name="galois-field.test.js" description="Tests for Galois Field (GF(256)) arithmetic." />
+                <file name="reed-solomon-codec.test.js" description="Tests for the core Reed-Solomon encoder/decoder." />
+                <file name="rs-interleaver.test.js" description="Tests for ECC profiles and symbol interleaving." />
             </directory>
             <directory name="steganography">
-                <file name="chunk-manager.test.js" description="Undocumented module" />
-                <file name="f5-syndrome.test.js" description="F5 Steganography Tests Tests for the F5 algorithm including matrix encoding, shrinkage handling, and container format." />
+                <file name="chunk-manager.test.js" description="Tests for data chunking and reassembly." />
+                <file name="f5-syndrome.test.js" description="Tests for the F5 algorithm including matrix encoding and shrinkage handling." />
             </directory>
         </directory>
         <directory name="integration">
-            <directory name="vault">
-                <file name="vault-capacity-ui.test.js" description="UI Integration tests for vault capacity display." />
+            <directory name="error-correction">
+                <file name="reed-solomon-integration.test.js" description="End-to-end integration tests for the ECC pipeline." />
+                <file name="reedsolomon.test.js" description="Additional Reed-Solomon integration tests." />
             </directory>
-            <file name="roundtrip.test.js" description="Undocumented module" />
-            <file name="steganography-roundtrip.test.js" description="Undocumented module" />
+            <directory name="vault">
+                <file name="vault-capacity-ui.test.js" description="UI tests for vault capacity display." />
+                <file name="vault-e2e.test.js" description="Complete end-to-end vault operation tests." />
+                <file name="vault-e2e-carriers.test.js" description="Tests for vault operations with multiple carrier images." />
+                <file name="vault-e2e-crud.test.js" description="Tests for vault CRUD operations." />
+                <file name="vault-e2e-crypto-boundary.test.js" description="Tests for the cryptographic boundaries of the vault." />
+                <file name="vault-e2e-ecc.test.js" description="Tests for vault operations with ECC enabled." />
+                <file name="vault-e2e-empty.test.js" description="Tests for edge cases with empty vaults." />
+                <file name="vault-e2e-multigen.test.js" description="Tests for multi-generational vault updates (losslessness)." />
+            </directory>
+            <file name="roundtrip.test.js" description="Full JPEG encode-decode roundtrip tests." />
+            <file name="steganography-roundtrip.test.js" description="End-to-end steganographic embedding and extraction roundtrip tests." />
         </directory>
         <directory name="scripts">
-            <file name="auto_detection_roundtrip.test.js" description="Undocumented module" />
-            <file name="bench_huffman.js" description="Undocumented module" />
-            <file name="capacity_validation.test.js" description="Undocumented module" />
-            <file name="compliance-test.js" description="Undocumented module" />
-            <file name="debug-aan.js" description="Undocumented module" />
-            <file name="format_detection.test.js" description="Undocumented module" />
-            <file name="quick-test.js" description="Undocumented module" />
-            <file name="repro_f5_capacity.js" description="Undocumented module" />
-            <file name="repro_legacy_roundtrip.js" description="Undocumented module" />
-            <file name="run-compliance.js" description="Undocumented module" />
-            <file name="run-progressive-decoding-test.js" description="Undocumented module" />
-            <file name="run-progressive-test.js" description="Undocumented module" />
-            <file name="run-spiff-parsing-test.js" description="Undocumented module" />
-            <file name="run-spiff-test.js" description="Undocumented module" />
-            <file name="runner-idct.js" description="Undocumented module" />
-            <file name="test-jsteg-debug.js" description="Undocumented module" />
-            <file name="test-roundtrip-debug.js" description="Undocumented module" />
-            <file name="verify-fixes.js" description="Undocumented module" />
+            <file name="auto_detection_roundtrip.test.js" description="Tests for automatic format detection and roundtrip." />
+            <file name="capacity_validation.test.js" description="Validation tests for image capacity calculations." />
+            <file name="format_detection.test.js" description="Tests for detecting verschiedenen JPEG/SPIFF formats." />
         </directory>
         <directory name="structures">
             <directory name="vault">
-                <file name="immutable-vault.test.js" description="Undocumented module" />
-                <file name="secure-record.test.js" description="Undocumented module" />
+                <file name="immutable-vault.test.js" description="Tests for the ImmutableVault data structure." />
+                <file name="secure-record.test.js" description="Tests for the SecureRecord data structure." />
             </directory>
         </directory>
         <directory name="utils">
-            <file name="assert.js" description="Undocumented module" />
-            <file name="jpeg-fixtures.js" description="Mock JPEG data generators for testing." />
-            <file name="bit-reader.test.js" description="Undocumented module" />
-            <file name="compare-bitreaders.js" description="Undocumented module" />
-            <file name="compare-skipbits.js" description="Undocumented module" />
-            <file name="coverage.js" description="Lightweight Coverage Tracker Provides a simple, opt-in module/function-level coverage map. Source modules call `coverage.hit(&#39;module&#39;, &#39;function&#39;)` at function entry. After the full test suite runs, the tracker reports which modules/functions were exercised and which were not. This is intentionally lightweight (no AST instrumentation) to maintain environment parity between Node.js and browser. It serves as a scaffold for future mutation testing: the coverage map tells a mutation runner which tests to re-run after mutating a specific module. Usage in source modules (opt-in): import { coverage } from &#39;../test/utils/coverage.js&#39;; // At function entry: coverage.hit(&#39;container-format&#39;, &#39;encode&#39;); Usage in test runner: import { coverage } from &#39;./utils/coverage.js&#39;; // After all tests: coverage.report();" />
-            <file name="marker-parser.test.js" description="Undocumented module" />
-            <file name="pbt.js" description="Property-Based Testing (PBT) Harness with Counterexample Shrinking Generates random values and runs properties against them for a specified number of iterations. When a property fails, automatically shrinks the failing inputs to the minimal counterexample. Each Arbitrary generator returns an object: { generate(), shrink(value) } - generate(): produces a random value - shrink(value): yields progressively smaller candidate values" />
-            <file name="test-runner-browser.js" description="Undocumented module" />
-            <file name="test-runner-node.js" description="Undocumented module" />
-            <file name="test-runner.js" description="Bespoke Test Runner with Structured Reporting &amp; Assertion Counting Features: - Per-test structured results: { suite, test, status, duration_ms, assertions, error } - Assertion counter: every expect() call increments a per-test counter - Zero-assertion warnings: flags tests that pass with 0 assertions - Pluggable onTestComplete hook: for mutation testing integration - Environment parity: works identically in Node.js and browser" />
+            <file name="bit-reader.test.js" description="Unit tests for the BitReader wrapper." />
+            <file name="marker-parser.test.js" description="Unit tests for the MarkerParser utility." />
+            <file name="pbt.js" description="Framework-agnostic property-based testing harness with shrinking." />
+            <file name="test-runner.js" description="Bespoke test runner with structured reporting and assertion counting." />
         </directory>
-        <file name="runner.js" description="Undocumented module" />
-        <file name="testing_info.md" description="Undocumented module" />
+        <file name="runner.js" description="Node.js test runner execution script." />
+        <file name="testing_info.md" description="Documentation on the testing strategy and environment." />
     </structure>
 </project>
