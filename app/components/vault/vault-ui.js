@@ -4,6 +4,7 @@ import { DropZone } from './components/drop-zone.js';
 import { ModalManager } from './components/modal-manager.js';
 import { VaultView } from './components/vault-view.js';
 import { FileScanner } from '../../../src/codec/file-scanner.js';
+import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -20,6 +21,7 @@ export class VaultUI {
         this.activeTags = new Set();
         this.currentQuery = '';
         this.currentSort = 'newest';
+        this.totalCapacity = 0;
 
         this.initialize();
     }
@@ -106,6 +108,21 @@ export class VaultUI {
 
             this.vault = newVault;
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
+            
+            // Scan for capacity
+            const [scanResult, scanErr] = await CapacityScanner.scan(filesToLoad, {
+                f5Options: {
+                    format: 'container',
+                    ecc: true,
+                    eccProfile: 'Extreme',
+                    encrypted: true,
+                    metadata: { filename: 'vault.json' }
+                }
+            });
+            if (!scanErr) {
+                this.totalCapacity = scanResult.totalCapacity;
+            }
+
             this.updateUI();
 
         } catch (e) {
@@ -311,6 +328,29 @@ export class VaultUI {
             this.showLoading(false);
             this.modals.showAlert('Saved', `Vault successfully saved to ${results.length} images.`);
 
+            // Update handles and capacity if we saved to a new set
+            if (!reusedHandles) {
+                this.droppedHandles = new Map();
+                for (const result of results) {
+                    // This is a bit tricky because handles are from scanDirectory
+                }
+            }
+            
+            // Re-scan for capacity after save (since carrier images might have changed)
+            const [scanResult, scanErr] = await CapacityScanner.scan(fileObjs, {
+                f5Options: {
+                    format: 'container',
+                    ecc: true,
+                    eccProfile: 'Extreme',
+                    encrypted: true,
+                    metadata: { filename: 'vault.json' }
+                }
+            });
+            if (!scanErr) {
+                this.totalCapacity = scanResult.totalCapacity;
+            }
+            this.updateUI();
+
         } catch (e) {
             this.showLoading(false);
             console.error(e);
@@ -412,7 +452,23 @@ export class VaultUI {
         URL.revokeObjectURL(url);
     }
 
+    getVaultSize() {
+        if (!this.vault) return 0;
+        const json = JSON.stringify(this.vault.toJSON());
+        return new TextEncoder().encode(json).length;
+    }
+
     updateUI() {
+        const vaultList = document.getElementById('vaultList');
+        const itemCount = document.getElementById('itemCount');
+        const statusText = document.getElementById('statusText');
+        const capacityText = document.getElementById('capacityText');
+
+        if (!this.vault) {
+            statusText.textContent = 'Locked';
+            return;
+        }
+
         const unlocked = !!this.vault.masterPassword; // Simple check
         document.body.classList.toggle('vault-unlocked', unlocked);
 
@@ -428,10 +484,30 @@ export class VaultUI {
             filteredResults = this.sortEntries(filteredResults, this.currentSort);
 
             this.view.render(filteredResults);
-            document.getElementById('itemCount').textContent = `${filteredResults.length} Items`;
-            document.getElementById('statusText').textContent = 'Unlocked';
+            itemCount.textContent = `${filteredResults.length} Items`;
+            
+            // Update capacity display
+            if (capacityText) {
+                const usedSize = this.getVaultSize();
+                const usedStr = this.formatSize(usedSize);
+                const totalStr = this.formatSize(this.totalCapacity || 0);
+                capacityText.textContent = `Used: ${usedStr} / Total: ${totalStr}`;
+                capacityText.title = `Vault currently uses ${usedStr} of ${totalStr} available steganographic space (Extreme ECC enabled).`;
+
+                const progressEl = document.getElementById('capacityProgress');
+                if (progressEl) {
+                    const percent = this.totalCapacity > 0 ? Math.min(100, (usedSize / this.totalCapacity) * 100) : 0;
+                    progressEl.style.width = `${percent}%`;
+                    
+                    progressEl.classList.remove('warning', 'danger');
+                    if (percent > 90) progressEl.classList.add('danger');
+                    else if (percent > 75) progressEl.classList.add('warning');
+                }
+            }
+
+            statusText.textContent = 'Unlocked';
         } else {
-            document.getElementById('statusText').textContent = 'Locked';
+            statusText.textContent = 'Locked';
         }
     }
 
@@ -490,7 +566,18 @@ export class VaultUI {
             if (text) el.querySelector('p').textContent = text;
         }
     }
+
+    formatSize(bytes) {
+        if (bytes === 0) return '0 bytes';
+        const k = 1024;
+        const sizes = ['bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 }
 
 // Init
-new VaultUI();
+// Init only if we are in a browser and not in a test runner that handles it manually.
+if (typeof window !== 'undefined' && !window.__TEST_RUNNER__) {
+    new VaultUI();
+}

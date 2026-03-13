@@ -1,0 +1,32 @@
+Running Focused Tests for CapacityScanner...
+
+
+[1mCapacityScanner (Unit Tests)[0m
+  [31m✗[0m should return a success Result tuple with capacity data for a list of JPEGs
+    [90mExpected null but got Error: Unsupported JPEG: Missing SOF0 or SOF2 marker[0m
+  [31m✗[0m should handle non-JPEG files by returning an error result
+    [90mexpect(...).toContain is not a function[0m
+  [31m✗[0m should propagate progress updates via the onProgress callback
+    [90mExpected null but got Error: Unsupported JPEG: Missing SOF0 or SOF2 marker[0m
+  [32m✓[0m should return zero capacity for an empty file list
+  [32m✓[0m should truly process files in parallel
+  [31m✗[0m should aggregate results correctly when processed out of order
+    [90mExpected null but got Error: Unsupported JPEG: Missing SOF0 or SOF2 marker[0m
+  [31m✗[0m should gracefully terminate the worker pool when finished
+    [90mExpected null but got Error: Unsupported JPEG: Missing SOF0 or SOF2 marker[0m
+  [32m✓[0m should handle corrupted JPEG data gracefully
+
+[1mCapacityScanner (Property-Based Tests)[0m
+  [31m✗[0m Property: Total capacity must be invariant under file ordering
+    [90mCannot read properties of null (reading 'totalCapacity')[0m
+  [31m✗[0m Property: Total capacity must be invariant under different concurrency levels
+    [90mCannot read properties of null (reading 'totalCapacity')[0m
+  [31m✗[0m Property: Total capacity must always be >= 0
+    [90mCannot read properties of null (reading 'totalCapacity')[0m
+  [31m✗[0m Property: Image count must match the number of successfully scanned files
+    [90mCannot read properties of null (reading 'imageCount')[0m
+
+Test Summary:
+  Total:  12
+  Passed: 3
+  Failed: 9

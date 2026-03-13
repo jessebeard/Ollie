@@ -245,7 +245,7 @@ async function runTest(parent, name, fn) {
 export function expect(actual) {
     function tick() { currentAssertionCount++; }
 
-    return {
+    const matchers = {
         toBe: (expected) => {
             tick();
             if (actual !== expected) {
@@ -333,13 +333,34 @@ export function expect(actual) {
                 throw new Error('Expected function to throw an error');
             }
         },
-        not: {
-            toBe: (expected) => {
-                tick();
-                if (actual === expected) {
-                    throw new Error(`Expected ${actual} not to be ${expected}`);
-                }
+        toContain: (expected) => {
+            tick();
+            if (actual === null || actual === undefined || typeof actual.includes !== 'function') {
+                throw new Error(`Expected ${actual} to have includes method`);
             }
+            if (!actual.includes(expected)) {
+                throw new Error(`Expected ${JSON.stringify(actual)} to contain ${JSON.stringify(expected)}`);
+            }
+        }
+    };
+
+    return {
+        ...matchers,
+        get not() {
+            const inverted = {};
+            for (const key in matchers) {
+                inverted[key] = (...args) => {
+                    try {
+                        matchers[key](...args);
+                    } catch (e) {
+                        // If it threw, then the inverted check PASSED
+                        return;
+                    }
+                    // If it didn't throw, then the inverted check FAILED
+                    throw new Error(`Expected ${JSON.stringify(actual)} NOT ${key} ${args.map(a => JSON.stringify(a)).join(', ')}`);
+                };
+            }
+            return inverted;
         }
     };
 }

@@ -305,3 +305,48 @@ body {
 .copy-btn:hover {
     color: var(--text-primary);
 }
+
+/* Capacity Meter */
+.capacity-meter {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: 300px;
+    margin: 0 1.5rem;
+}
+
+.capacity-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border);
+}
+
+.capacity-progress {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+    box-shadow: 0 0 8px var(--accent);
+}
+
+.capacity-progress.warning {
+    background: #ff9f0a; /* Orange */
+    box-shadow: 0 0 8px #ff9f0a;
+}
+
+.capacity-progress.danger {
+    background: var(--error);
+    box-shadow: 0 0 8px var(--error);
+}
+
+#capacityText {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    text-align: center;
+}

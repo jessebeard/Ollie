@@ -43,6 +43,8 @@
             </directory>
         </directory>
         <directory name="codec">
+            <file name="capacity-scanner.test.js" description="Unit tests for CapacityScanner." />
+            <file name="capacity-scanner.pbt.js" description="Property-based tests for CapacityScanner." />
             <file name="decoder.test.js" description="Undocumented module" />
             <file name="encoder.test.js" description="Integration tests for the JpegEncoder. These tests verify that the encoder produces valid JPEG structures (SOI, EOI markers) and can handle different image sizes." />
             <file name="transcoder.test.js" description="Test: Lossless Roundtrip - No Steganography Validates that decoding and re-encoding coefficients produces identical pixels." />
@@ -109,6 +111,9 @@
             </directory>
         </directory>
         <directory name="integration">
+            <directory name="vault">
+                <file name="vault-capacity-ui.test.js" description="UI Integration tests for vault capacity display." />
+            </directory>
             <file name="roundtrip.test.js" description="Undocumented module" />
             <file name="steganography-roundtrip.test.js" description="Undocumented module" />
         </directory>
@@ -140,6 +145,7 @@
         </directory>
         <directory name="utils">
             <file name="assert.js" description="Undocumented module" />
+            <file name="jpeg-fixtures.js" description="Mock JPEG data generators for testing." />
             <file name="bit-reader.test.js" description="Undocumented module" />
             <file name="compare-bitreaders.js" description="Undocumented module" />
             <file name="compare-skipbits.js" description="Undocumented module" />

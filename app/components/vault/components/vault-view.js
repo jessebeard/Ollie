@@ -18,7 +18,7 @@ export class VaultView {
         this.element.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">
-                    <img src="src/ui/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120" height="120" />
+                    <img src="components/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120" height="120" />
                 </div>
                 <h3>No Items Found</h3>
                 <p>Try clearing filters or add a new password.</p>

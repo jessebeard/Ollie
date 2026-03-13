@@ -45,24 +45,11 @@
             </directory>
         </directory>
         <directory name="codec">
+            <file name="capacity-scanner.js" description="CapacityScanner - Orchestrates steganographic capacity analysis across multiple JPEGs." />
             <file name="decoder.js" description="JPEG Decoder - Main class that orchestrates the complete decoding pipeline Decodes baseline sequential DCT JPEG files with Huffman coding. Supports grayscale and color images with various chroma subsampling (4:4:4, 4:2:2, 4:2:0)." />
             <file name="encoder.js" description="JpegEncoder This class implements a basic JPEG encoder." />
             <file name="file-scanner.js" description="FileScanner - Handles directory scanning using File System Access API" />
             <file name="transcoder.js" description="JpegTranscoder Updates steganography data in JPEG files WITHOUT generation loss. Implementation: Uses direct DCT coefficient manipulation (lossless). This prevents quality degradation when updating the password vault repeatedly." />
-        </directory>
-        <directory name="core">
-            <directory name="EC">
-            </directory>
-            <directory name="crypto">
-            </directory>
-            <directory name="decoder">
-            </directory>
-            <directory name="encoder">
-            </directory>
-            <directory name="steganography">
-            </directory>
-            <directory name="vault">
-            </directory>
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">

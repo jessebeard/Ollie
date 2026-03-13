@@ -9,7 +9,7 @@
     "serve": "node scripts/dev-server.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Jesse Beard",
   "license": "ISC",
   "devDependencies": {
     "node": "^22.22.1"

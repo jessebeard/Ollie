@@ -67,21 +67,72 @@ global.document = {
 
             return element;
         }
-        return null;
+        return {
+            tagName: 'DIV',
+            style: {},
+            classList: {
+                add: () => { },
+                remove: () => { },
+                contains: () => false,
+                toggle: () => { }
+            },
+            addEventListener: () => { },
+            appendChild: () => { },
+            getAttribute: () => null,
+            setAttribute: () => { },
+            removeAttribute: () => { },
+            textContent: '',
+            innerHTML: '',
+            querySelector: function () { return this; },
+            querySelectorAll: () => [],
+            focus: () => { }
+        };
     },
     createElement: (tag) => {
-        return {
+        const element = {
+            tagName: tag.toUpperCase(),
             style: {},
+            classList: {
+                add: () => { },
+                remove: () => { },
+                contains: () => false,
+                toggle: () => { }
+            },
+            addEventListener: () => { },
             appendChild: () => { },
+            getAttribute: () => null,
+            setAttribute: () => { },
+            removeAttribute: () => { },
+            textContent: '',
+            innerHTML: '',
+            querySelector: function () { return this; },
+            querySelectorAll: () => [],
+            focus: () => { }
+        };
+        return element;
+    },
+    querySelector: () => {
+        return {
+            addEventListener: () => { },
+            style: {},
+            classList: { add: () => { }, remove: () => { }, toggle: () => { } },
             textContent: ''
         };
     },
+    querySelectorAll: () => [],
     body: {
-        appendChild: () => { }
+        appendChild: () => { },
+        classList: {
+            add: () => { },
+            remove: () => { },
+            contains: () => false,
+            toggle: () => { }
+        }
     }
 };
 
 global.window = {
+    __TEST_RUNNER__: true,
     addEventListener: (event, callback) => {
         if (event === 'DOMContentLoaded') {
 
@@ -138,6 +189,8 @@ async function runTests() {
         await import('./codec/steganography/batch-process.test.js');
         await import('./information-theory/error-correction/rs-interleaver.test.js');
         await import('./codec/steganography/container-format.test.js');
+        await import('./codec/capacity-scanner.test.js');
+        await import('./codec/capacity-scanner.pbt.js');
 
         await import('./information-theory/cryptography/aes-gcm.test.js');
         await import('./information-theory/cryptography/pbkdf2.test.js');
@@ -168,6 +221,7 @@ async function runTests() {
         await import('./integration/vault/vault-e2e-ecc.test.js');
         await import('./integration/vault/vault-e2e-empty.test.js');
         await import('./integration/vault/vault-e2e-multigen.test.js');
+        await import('./integration/vault/vault-capacity-ui.test.js');
 
         await executeTests();
         const stats = getStats();

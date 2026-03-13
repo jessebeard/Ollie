@@ -72,10 +72,17 @@
             </div>
 
             <div class="status-bar"
-                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);"
+                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-muted);"
                 role="status" aria-live="polite">
                 <span id="itemCount">0 Items</span>
-                <span>Ollie v2.0 (Secure)</span>
+                <div class="capacity-meter">
+                    <div class="capacity-bar">
+                        <div id="capacityProgress" class="capacity-progress"></div>
+                    </div>
+                    <span id="capacityText" title="Total steganographic storage capacity across loaded images">Used: 0 B
+                        / Total: 0 B</span>
+                </div>
+                <span>Ollie v0.2 (early alpha)</span>
             </div>
         </main>
     </div>

@@ -176,9 +176,9 @@ export class ModalManager {
     }
 
     showAlert(title, message, type = 'info') {
-        let iconSrc = 'src/ui/assets/ollie-happy.svg';
+        let iconSrc = 'components/assets/ollie-happy.svg';
         if (type === 'error') {
-            iconSrc = 'src/ui/assets/ollie-sad.svg';
+            iconSrc = 'components/assets/ollie-sad.svg';
         }
 
         const modal = document.createElement('div');
