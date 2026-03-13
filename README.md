@@ -1,54 +1,52 @@
-# Ollie: Secure JPEG Steganography & Password Vault
+# Ollie: Pure-JS Steganographic Password Vault
 
-**Ollie** is a secure, lightweight, and completely dependency-free application designed to manage and back up a password vault by hiding it directly inside standard JPEG images. By leveraging a custom-built JPEG codec, Ollie allows you to securely embed and extract encrypted keychain data within the frequency domain of your own photos—hiding your most sensitive information in plain sight.
-
----
-
-## 🔒 Security & Scope
-
-Ollie is built around a single, powerful premise: providing a secure and visually undetectable way to store and transmit your password vault. It is not a tool for malicious purposes; rather, it aims to let you dual-use your personal photo collection as a highly secure, distributed backup solution.
-
-### Managed Complexity
-The core strength of Ollie is that we built the **entire JPEG encoder and decoder from scratch** in pure JavaScript.
-
-Instead of relying on black-box libraries or heavyweight WebAssembly ports, Ollie manages the immense complexity of image compression internally. This gives us absolute, low-level control over the Discrete Cosine Transform (DCT) coefficients—the exact place where data needs to be hidden. This architectural choice ensures that the steganography process is deeply integrated, fast, and secure.
-
-### Current Implementation State
-Ollie is currently fully functional as a steganography-based password vault. The active features include:
-- **Password Vault Interface:** A clean, modern UI (`app/vault.html`) for managing your passwords, generating strong keys, and securely locking your vault.
-- **Batch Embedding & Extraction:** The ability to shard and distribute your encrypted vault data across multiple JPEG files seamlessly.
-- **Pure JavaScript Steganography Engine:** A robust, dependency-free codec that manipulates DCT coefficients without noticeably degrading image quality.
-- **Rigorous Test Coverage:** Ollie uses strict Test-Driven Development (TDD) principles to ensure the steganography engine is mathematically sound and reliable.
+**Ollie** is a secure, dependency-free application that securely embeds and extracts an encrypted password vault directly within the frequency domain of standard JPEG images. By hiding your keychain inside ordinary photos, Ollie provides a stealthy, decentralized, and durable backup solution.
 
 ---
 
-## ▶️ Getting Started
+## 🏗️ Technical Architecture
 
-Ollie runs entirely in your browser with zero external dependencies. The primary interface is the password vault.
+Ollie is built entirely from scratch in vanilla JavaScript to achieve absolute control over the data embedding process. Rather than wrapping black-box native libraries or WebAssembly, the project implements a complete, bespoke JPEG codec.
+
+### Core Engineering Features
+
+- **Zero-Dependency JPEG Codec:** A fully functional Baseline Sequential DCT encoder and decoder written in pure JavaScript. This custom implementation provides low-level access to the Discrete Cosine Transform (DCT) coefficients—the precise layer where data is hidden.
+- **Frequency Domain Steganography:** By mathematically manipulating quantized frequency coefficients during the encoding process, the vault data is deeply embedded. The visual impact on the resulting image is virtually undetectable to the naked eye.
+- **Batch Embedding & Sharding:** The application can seamlessly shard a large encrypted vault across multiple JPEG files, effectively turning a photo album into a distributed, hidden database.
+- **Cryptography:** Utilizes the native Web Crypto API to handle secure key generation, derivation, and payload encryption before embedding.
+- **Custom Test Infrastructure:** The project relies on a bespoke test runner and assertion library (`test/runner.js`), entirely bypassing massive testing frameworks to maintain a tiny footprint and maximize performance.
+- **Strict Test-Driven Development (TDD):** Every component—from bit-level stream readers to Huffman encoding and UI state—is rigorously tested to guarantee reliability and mathematical correctness.
+
+---
+
+## ▶️ Usage
+
+Ollie runs entirely in your browser. The primary interface is the password vault.
 
 1. Open **`app/vault.html`** in a modern web browser.
-2. Follow the UI instructions to create a new vault or unlock an existing one hidden within your uploaded JPEG images.
+2. Follow the intuitive UI to create a new vault or unlock an existing one hidden within your uploaded JPEG images.
 
 ---
 
-## 🧪 Testing and Reliability
+## 🧪 Testing
 
-Data security is the maximum priority of Ollie, and ensuring the reliability of the steganography engine is critical. We maintain a very comprehensive test suite.
+Given the complex nature of manipulating bitstreams, Huffman tables, and cryptographic payloads, Ollie maintains an incredibly robust testing suite.
 
 ### Run tests in Node.js
+Execute the custom test runner from the command line:
 ```bash
 npm test
 ```
 
 ### Run tests in the Browser
-Open **`app/test.html`** to run the complete suite with a visual test runner interface.
+Open **`app/test.html`** to execute the complete suite with a visual interface.
 
 ---
 
-## 🚀 Aspirational Goals & Roadmap
+## 🚀 Roadmap
 
-Ollie is actively evolving. While the core password vault and steganography engine are functional, our constitution outlines several advanced features and goals we are working toward:
+Ollie is actively evolving as a functional application and an engineering testbed. Future plans outlined in the project constitution include:
 
-- **Advanced Error Correction:** Implementing robust Reed-Solomon error correction to protect hidden data against corruption or minor image alterations.
-- **Broader Utility:** Expanding the steganography container format to support arbitrary data storage and a secure messaging system, not just the password vault.
-- **Rust Implementation:** Utilizing the current pure JavaScript engine as a testbed to build a highly optimized Rust implementation of the same functionality.
+- **Advanced Error Correction:** Integrating Reed-Solomon error correction to safeguard hidden payloads against corruption or minor image processing.
+- **Broader Utility:** Expanding the steganography container format to support arbitrary data storage and secure messaging.
+- **Rust Implementation:** Porting the core steganography and codec engine to Rust, utilizing the current pure-JS implementation as a functional reference architecture.
