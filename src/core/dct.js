@@ -1,13 +1,13 @@
 
 /**
  * Discrete Cosine Transform (DCT)
- * 
+ *
  * The DCT is the heart of JPEG compression. It converts a block of spatial data (pixels)
  * into the frequency domain.
- * 
+ *
  * - Low frequencies (large features, background) end up in the top-left corner.
  * - High frequencies (fine details, noise) end up in the bottom-right corner.
- * 
+ *
  * This allows us to later discard (quantize) the high-frequency data which the human eye
  * is less sensitive to, achieving compression.
  */
@@ -27,10 +27,7 @@ const C = new Float32Array(8);
 C[0] = 1 / Math.sqrt(2);
 for (let i = 1; i < 8; i++) C[i] = 1;
 
-export function forwardDCT(block) {
-    const rowOutput = new Float32Array(64);
-    const result = new Float32Array(64);
-
+export function forwardDCT(block, result = new Float32Array(64), rowOutput = new Float32Array(64)) {
     // 1. DCT on rows
     for (let y = 0; y < 8; y++) {
         for (let u = 0; u < 8; u++) {
@@ -41,7 +38,7 @@ export function forwardDCT(block) {
                 sum += pixel * cosVal;
             }
             const cu = C[u];
-            // Multiply by C(u)/2. 
+            // Multiply by C(u)/2.
             // We'll do the 0.25 scaling at the end or split it.
             // Formula: F(u) = C(u)/2 * sum...
             rowOutput[y * 8 + u] = sum * cu * 0.5;

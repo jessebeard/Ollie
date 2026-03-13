@@ -8,7 +8,7 @@ import { BitWriter } from './utils/bit-writer.js';
 
 /**
  * JpegEncoder
- * 
+ *
  * This class implements a basic JPEG encoder.
  * The JPEG compression process involves several steps:
  * 1. Color Space Conversion: RGB -> YCbCr (Luminance, Blue-difference, Red-difference)
@@ -22,6 +22,14 @@ import { BitWriter } from './utils/bit-writer.js';
 export class JpegEncoder {
     constructor(quality = 50) {
         this.quality = quality;
+        // Pre-allocate buffers to avoid allocations in hot loop
+        this.Y = new Float32Array(64);
+        this.Cb = new Float32Array(64);
+        this.Cr = new Float32Array(64);
+        this.dctBuffer = new Float32Array(64);
+        this.rowOutputBuffer = new Float32Array(64);
+        this.quantizedBuffer = new Int32Array(64);
+        this.zigzaggedBuffer = new Int32Array(64);
     }
 
     /**
@@ -30,7 +38,6 @@ export class JpegEncoder {
      * @returns {Uint8Array} The raw JPEG file bytes.
      */
     encode(imageData) {
-        console.log('JpegEncoder.encode called');
         const width = imageData.width;
         const height = imageData.height;
         const data = imageData.data;
@@ -51,11 +58,10 @@ export class JpegEncoder {
         for (let y = 0; y < padded.height; y += 8) {
             for (let x = 0; x < padded.width; x += 8) {
                 blockCount++;
-                if (blockCount % 10 === 0) console.log('Processing block ' + blockCount);
 
-                const Y = new Float32Array(64);
-                const Cb = new Float32Array(64);
-                const Cr = new Float32Array(64);
+                const Y = this.Y;
+                const Cb = this.Cb;
+                const Cr = this.Cr;
 
                 for (let row = 0; row < 8; row++) {
                     for (let col = 0; col < 8; col++) {
@@ -85,25 +91,22 @@ export class JpegEncoder {
             }
         }
 
-        console.log('Finished processing blocks, flushing writer');
         const body = writer.flush();
-        console.log('Writer flushed, assembling file');
         return this.assembleFile(body);
     }
 
     processBlock(blockData, prevDC, qTable, writer, dcTable, acTable) {
         // 1. Forward DCT: Convert 8x8 pixel block to frequency domain
-        const dct = forwardDCT(blockData);
+        const dct = forwardDCT(blockData, this.dctBuffer, this.rowOutputBuffer);
         // 2. Quantization: Divide by quantization table to reduce precision (compression happens here)
-        const quantized = quantize(dct, qTable);
+        const quantized = quantize(dct, qTable, this.quantizedBuffer);
         // 3. ZigZag: Reorder 2D block to 1D array to group zeros at the end
-        const zigzagged = zigZag(quantized);
+        const zigzagged = zigZag(quantized, this.zigzaggedBuffer);
         // 4. Huffman Encode: Compress the resulting coefficients
         return encodeBlock(zigzagged, prevDC, writer, dcTable, acTable);
     }
 
     writeHeaders(writer, width, height) {
-        console.log('Writing headers...');
         this.headers = [];
 
         const writeByte = (b) => this.headers.push(b);
@@ -133,13 +136,13 @@ export class JpegEncoder {
         writeWord(0xFFDB);
         writeWord(2 + 1 + 64);
         writeByte(0);
-        const lumaZigZag = zigZag(QUANTIZATION_TABLE_LUMA);
+        const lumaZigZag = zigZag(QUANTIZATION_TABLE_LUMA, this.zigzaggedBuffer);
         for (let i = 0; i < 64; i++) writeByte(lumaZigZag[i]);
 
         writeWord(0xFFDB);
         writeWord(2 + 1 + 64);
         writeByte(1);
-        const chromaZigZag = zigZag(QUANTIZATION_TABLE_CHROMA);
+        const chromaZigZag = zigZag(QUANTIZATION_TABLE_CHROMA, this.zigzaggedBuffer);
         for (let i = 0; i < 64; i++) writeByte(chromaZigZag[i]);
 
         // SOF0 (Start of Frame, Baseline DCT)
@@ -188,7 +191,7 @@ export class JpegEncoder {
     writeDHT(writeByte, writeWord, writeArray, id, type, tableObj) {
         writeWord(0xFFC4);
 
-        // DC has 17 elements [0-16], AC has 16 elements [1-16]  
+        // DC has 17 elements [0-16], AC has 16 elements [1-16]
         const dcCounts = type === 0 ?
             [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0] :
             [0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d];
@@ -220,7 +223,6 @@ export class JpegEncoder {
             ];
 
         let totalLen = 2 + 1 + 16 + dcValues.length;
-        console.log('writeDHT: type=' + type + ', id=' + id + ', totalLen=' + totalLen);
         writeWord(totalLen);
         writeByte((type << 4) | id);
         // DC array has index 0 that should be skipped, AC array starts at index for length 1
@@ -239,9 +241,6 @@ export class JpegEncoder {
         file[totalLength - 2] = 0xFF;
         file[totalLength - 1] = 0xD9;
 
-        console.log('Headers length:', headers.length);
-        console.log('Scan data length:', scanData.length);
-        console.log('Total JPEG file size:', totalLength, 'bytes');
 
         return file;
     }

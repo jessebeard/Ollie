@@ -10,8 +10,7 @@ export const ZIGZAG_ORDER = new Int32Array([
     53, 60, 61, 54, 47, 55, 62, 63
 ]);
 
-export function zigZag(block) {
-    const result = new Int32Array(64);
+export function zigZag(block, result = new Int32Array(64)) {
     for (let i = 0; i < 64; i++) {
         result[i] = block[ZIGZAG_ORDER[i]];
     }

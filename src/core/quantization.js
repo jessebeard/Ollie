@@ -21,8 +21,7 @@ export const QUANTIZATION_TABLE_CHROMA = new Int32Array([
     99, 99, 99, 99, 99, 99, 99, 99
 ]);
 
-export function quantize(block, table) {
-    const result = new Int32Array(64);
+export function quantize(block, table, result = new Int32Array(64)) {
     for (let i = 0; i < 64; i++) {
         result[i] = Math.round(block[i] / table[i]);
     }
