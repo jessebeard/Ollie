@@ -1,0 +1,3 @@
+## 2024-06-25 - Uint8ClampedArray Optimization
+**Learning:** `Uint8ClampedArray` assignment in JS automatically handles clamping values to the [0, 255] range and rounds floats to the nearest integer natively. Manually calling `Math.max(0, Math.min(255, Math.round(val)))` before assignment inside hot loops (like processing image pixel data) creates massive overhead due to millions of redundant function calls.
+**Action:** When writing data into `Uint8ClampedArray` (common in canvas ImageData operations), rely on its native clamping and rounding semantics instead of performing explicit JS `Math` operations.
