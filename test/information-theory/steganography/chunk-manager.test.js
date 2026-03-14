@@ -117,13 +117,15 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
-    it('Property: Secure ID Generation (should output strict UUIDv4 format)', async () => {
-        const id = ChunkManager.generateId();
+    it('Property: Secure ID Generation (should output strict UUIDv4 format and be unique)', async () => {
+        const id1 = ChunkManager.generateId();
+        const id2 = ChunkManager.generateId();
 
         // Ensure ID is formatted strictly as UUID Version 4
         // Example: 123e4567-e89b-12d3-a456-426614174000
         const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-        expect(uuidV4Regex.test(id)).toBe(true);
+        expect(uuidV4Regex.test(id1)).toBe(true);
+        expect(id1 === id2).toBe(false);
     });
 });
