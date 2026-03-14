@@ -280,10 +280,7 @@ export const Arbitrary = {
             }
 
             if (Math.random() < 0.02) {
-                // Generate a random valid non-surrogate code point
-                // (0xD800 - 0xDFFF are surrogates and must be paired or avoided for well-formedness)
-                const codePoint = Math.random() < 0.5 ? randInt(0x0000, 0xD7FF) : randInt(0xE000, 0x10FFFF);
-                result += String.fromCodePoint(codePoint);
+                result += String.fromCharCode(randInt(0xD800, 0xDFFF));
             }
 
             return result;
