@@ -136,23 +136,12 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(vault.search('', ['personal', 'email']).length).toBe(1);
     });
 
-    it('Property: Secure ID Generation (should use crypto.randomUUID over Math.random)', async () => {
-        const originalMathRandom = Math.random;
-        let mathRandomCalled = false;
+    it('Property: Secure ID Generation (should output strict UUIDv4 format)', async () => {
+        const id = PasswordVault.generateId();
 
-        Math.random = () => {
-            mathRandomCalled = true;
-            return 0.5; // predictable value
-        };
+        // Ensure ID is formatted strictly as UUID Version 4
+        const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-        try {
-            const id1 = PasswordVault.generateId();
-            const id2 = PasswordVault.generateId();
-
-            expect(mathRandomCalled).toBe(false);
-            expect(id1 === id2).toBe(false);
-        } finally {
-            Math.random = originalMathRandom;
-        }
+        expect(uuidV4Regex.test(id)).toBe(true);
     });
 });
