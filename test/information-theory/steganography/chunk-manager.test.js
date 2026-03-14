@@ -116,4 +116,24 @@ describe('ChunkManager (Property-Based Tests)', () => {
             50
         );
     });
+
+    it('Property: Secure ID Generation (should use crypto.randomUUID over Math.random)', async () => {
+        const originalMathRandom = Math.random;
+        let mathRandomCalled = false;
+
+        Math.random = () => {
+            mathRandomCalled = true;
+            return 0.5; // predictable value
+        };
+
+        try {
+            const id1 = ChunkManager.generateId();
+            const id2 = ChunkManager.generateId();
+
+            expect(mathRandomCalled).toBe(false);
+            expect(id1 === id2).toBe(false);
+        } finally {
+            Math.random = originalMathRandom;
+        }
+    });
 });
