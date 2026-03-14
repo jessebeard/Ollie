@@ -172,8 +172,8 @@ describe('JPEG Transcoder (Lossless)', () => {
     it('Property: Transcoder Fuzzing Payload Integrity', async () => {
         // Assert that arbitrary payload dimensions and capacities decode perfectly back out
         await assertProperty(
-            [Arbitrary.string(1, 100), Arbitrary.string(4, 20)],
-            async (secretStr, password) => {
+            [Arbitrary.byteArray(1, 1024), Arbitrary.string(4, 20)],
+            async (payload, password) => {
                 const width = 128;
                 const height = 128;
                 const data = new Uint8ClampedArray(width * height * 4);
@@ -181,9 +181,10 @@ describe('JPEG Transcoder (Lossless)', () => {
                 for (let y = 0; y < height; y++) {
                     for (let x = 0; x < width; x++) {
                         const idx = (y * width + x) * 4;
-                        data[idx] = Math.floor(Math.random() * 255);
-                        data[idx + 1] = Math.floor(Math.random() * 255);
-                        data[idx + 2] = Math.floor(Math.random() * 255);
+                        const v = (x ^ y) % 255;
+                        data[idx] = v;
+                        data[idx + 1] = v;
+                        data[idx + 2] = v;
                         data[idx + 3] = 255;
                     }
                 }
@@ -191,9 +192,7 @@ describe('JPEG Transcoder (Lossless)', () => {
                 const encoder = new JpegEncoder(90);
                 const originalJpeg = await encoder.encode({ width, height, data });
 
-                const payload = new TextEncoder().encode(secretStr);
                 const transcoder = new JpegTranscoder();
-
                 const [stegoJpeg, transErr] = await transcoder.updateSecret(originalJpeg, payload, { password });
 
                 // If it couldn't fit the payload, just ignore this fuzz cycle
@@ -203,12 +202,16 @@ describe('JPEG Transcoder (Lossless)', () => {
                 const [decoded, decErr] = await decoder.decode(stegoJpeg, { password });
 
                 expect(decErr).toBeNull();
-                const extractedText = new TextDecoder().decode(decoded.secretData);
-                expect(extractedText).toBe(secretStr);
+                
+                // Compare byte arrays directly
+                expect(decoded.secretData.length).toBe(payload.length);
+                for (let i = 0; i < payload.length; i++) {
+                    expect(decoded.secretData[i]).toBe(payload[i]);
+                }
 
                 return true;
             },
-            10
+            20
         );
     });
 
