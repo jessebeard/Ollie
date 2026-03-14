@@ -135,4 +135,16 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(vault.search('', ['personal']).length).toBe(2);
         expect(vault.search('', ['personal', 'email']).length).toBe(1);
     });
+
+    it('should have unique session salts for every new vault', () => {
+        const v1 = new PasswordVault();
+        const v2 = new PasswordVault();
+        
+        expect(v1.metadata.sessionSalt).toBeDefined();
+        expect(v2.metadata.sessionSalt).toBeDefined();
+        expect(v1.metadata.sessionSalt).not.toBe(v2.metadata.sessionSalt);
+    });
 });
+
+import { executeTests } from '../../utils/test-runner.js';
+executeTests();

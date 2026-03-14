@@ -7,11 +7,26 @@ export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
-        this.metadata = Object.freeze(metadata ? { ...metadata } : {
-            version: '2.0',
-            created: new Date().toISOString(),
-            modified: new Date().toISOString()
-        });
+        
+        if (!metadata) {
+            const salt = new Uint8Array(16);
+            if (typeof crypto !== 'undefined') {
+                crypto.getRandomValues(salt);
+            } else {
+                // Fallback for Node.js if needed, or environment without crypto
+                for (let i = 0; i < 16; i++) salt[i] = Math.floor(Math.random() * 256);
+            }
+            const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            metadata = {
+                version: '2.0',
+                sessionSalt: saltHex,
+                created: new Date().toISOString(),
+                modified: new Date().toISOString()
+            };
+        }
+
+        this.metadata = Object.freeze({ ...metadata });
         this.isUnlocked = isUnlocked;
         this.masterPassword = masterPassword;
         this.sessionKey = sessionKey;
@@ -21,7 +36,12 @@ export class PasswordVault {
     async _getSessionKey() {
         if (this.sessionKey) return [this.sessionKey, null];
         if (!this.masterPassword) return [null, new Error('Vault is locked')];
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        
+        if (!this.metadata.sessionSalt) return [null, new Error('Vault metadata missing session salt')];
+        
+        const saltHex = this.metadata.sessionSalt;
+        const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        
         const [key, err] = await KeyDerivation.deriveKey(this.masterPassword, salt);
         return [key, err];
     }
@@ -184,7 +204,13 @@ export class PasswordVault {
             return [null, new Error('Failed to parse vault data')];
         }
 
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        if (!vaultJson.metadata || !vaultJson.metadata.sessionSalt) {
+            return [null, new Error('Vault metadata missing session salt')];
+        }
+
+        const saltHex = vaultJson.metadata.sessionSalt;
+        const salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        
         const [sessionKey, err] = await KeyDerivation.deriveKey(password, salt);
         if (err) return [null, err];
 
