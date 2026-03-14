@@ -115,6 +115,24 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Property: Secure ID Generation (should generate distinct IDs even if Math.random is hijacked)', () => {
+        // Hijack Math.random to return a static predictable value
+        const originalRandom = Math.random;
+        Math.random = () => 0.42;
+
+        try {
+            const id1 = PasswordVault.generateId();
+            const id2 = PasswordVault.generateId();
+
+            // Under the old implementation, these might be the same if called in the same millisecond,
+            // or very similar. Using crypto.randomUUID() guarantees uniqueness regardless of Math.random.
+            expect(id1).not.toBe(id2);
+        } finally {
+            // Restore Math.random
+            Math.random = originalRandom;
+        }
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
