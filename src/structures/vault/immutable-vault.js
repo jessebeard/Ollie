@@ -192,7 +192,7 @@ export class PasswordVault {
     }
 
     static generateId() {
-        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        return crypto.randomUUID();
     }
 
     lock() {
