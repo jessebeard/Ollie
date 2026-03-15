@@ -107,12 +107,29 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(pErr !== null).toBe(true);
     });
 
-    it('should calculate unique IDs', () => {
-        const ids = new Set();
-        for (let i = 0; i < 100; i++) {
-            ids.add(PasswordVault.generateId());
+    it('should calculate unique IDs securely without Math.random', () => {
+        const originalMathRandom = Math.random;
+        try {
+            // Predictable mock to prove Math.random is not used
+            Math.random = () => 0.5;
+
+            const id1 = PasswordVault.generateId();
+            const id2 = PasswordVault.generateId();
+
+            expect(id1).not.toBe(id2);
+
+            // Should be a valid UUID format
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(uuidRegex.test(id1)).toBe(true);
+
+            const ids = new Set();
+            for (let i = 0; i < 100; i++) {
+                ids.add(PasswordVault.generateId());
+            }
+            expect(ids.size).toBe(100);
+        } finally {
+            Math.random = originalMathRandom;
         }
-        expect(ids.size).toBe(100);
     });
 
     it('should search entries correctly skipping encrypted fields', async () => {
