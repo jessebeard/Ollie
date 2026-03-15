@@ -92,6 +92,23 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('Secure ID Generation (should predictably fail if using Math.random)', () => {
+        // We mock Math.random to return a predictable sequence.
+        // Under the old implementation using Math.random(), this would cause ID collisions.
+        // Under the new implementation using crypto.randomUUID(), it ignores Math.random() entirely.
+        const originalRandom = Math.random;
+        Math.random = () => 0.42;
+
+        try {
+            const id1 = ChunkManager.generateId();
+            const id2 = ChunkManager.generateId();
+
+            expect(id1 !== id2).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],

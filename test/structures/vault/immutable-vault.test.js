@@ -115,6 +115,27 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Secure ID Generation (should predictably fail if using Math.random)', () => {
+        // We mock Math.random to return a predictable sequence.
+        // Under the old implementation using Date.now() + Math.random(),
+        // if called in a fast loop where Date.now() is the same, this would cause ID collisions.
+        // Under the new implementation using crypto.randomUUID(), it ignores Math.random() entirely.
+        const originalRandom = Math.random;
+        const originalNow = Date.now;
+        Math.random = () => 0.42;
+        Date.now = () => 1700000000000;
+
+        try {
+            const id1 = PasswordVault.generateId();
+            const id2 = PasswordVault.generateId();
+
+            expect(id1 !== id2).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+            Date.now = originalNow;
+        }
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
