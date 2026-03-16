@@ -92,6 +92,20 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('should generate unique cryptographically secure UUIDs', () => {
+        const ids = new Set();
+        const iterations = 1000;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+        for (let i = 0; i < iterations; i++) {
+            const id = ChunkManager.generateId();
+            expect(uuidRegex.test(id)).toBe(true);
+            ids.add(id);
+        }
+
+        expect(ids.size).toBe(iterations);
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],
