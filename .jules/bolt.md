@@ -1,0 +1,3 @@
+## 2024-05-24 - DropZone processQueue bottleneck
+**Learning:** Using sequential `for await` loops for reading files from system handles when traversing directories recursively is a major performance bottleneck for drag-and-drop operations, severely limiting throughput.
+**Action:** When performing recursive directory traversal or processing queues of I/O bound tasks, map the tasks to Promises and use `Promise.all()` to process them concurrently.
