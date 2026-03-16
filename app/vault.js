@@ -1,5 +1,6 @@
 import { BatchEmbedder } from '../src/information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../src/information-theory/steganography/batch-extractor.js';
+import { cryptoInstance } from "../src/information-theory/cryptography/crypto-compat.js";
 import { FileScanner } from '../src/codec/file-scanner.js';
 
 /**
@@ -144,7 +145,8 @@ class PasswordVault {
      * Generate unique ID
      */
     generateId() {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // 🛡️ Sentinel: Mitigate unpredictable ID generation vulnerabilities by using cryptographically secure random values
+        return cryptoInstance.randomUUID();
     }
 
     /**

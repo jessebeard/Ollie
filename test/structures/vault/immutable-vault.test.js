@@ -115,6 +115,35 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Property: Generates unique, valid UUIDs (Secure ID invariant)', async () => {
+        // Mock Math.random to a constant to ensure we are not relying on it
+        const originalRandom = Math.random;
+        Math.random = () => 0.42;
+
+        await assertProperty(
+            [Arbitrary.positiveInteger(100)],
+            async (count) => {
+                const iterations = Math.max(10, count % 100);
+                const ids = new Set();
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+                for (let i = 0; i < iterations; i++) {
+                    const id = PasswordVault.generateId();
+                    ids.add(id);
+                    // Ensure the generated ID is actually a UUID and not a pseudo-random string
+                    if (!uuidRegex.test(id)) {
+                        Math.random = originalRandom;
+                        return false;
+                    }
+                }
+
+                Math.random = originalRandom;
+                return ids.size === iterations;
+            },
+            20
+        );
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
