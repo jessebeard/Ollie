@@ -85,12 +85,9 @@ export class ChunkManager {
      * @returns {string} UUID-like string
      */
     static generateId() {
-
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        // SECURITY RISK MITIGATION: Replaced insecure Math.random() with cryptographically secure crypto.randomUUID()
+        // to prevent predictable chunk IDs and potential enumeration or collision attacks.
+        return crypto.randomUUID();
     }
 
     /**

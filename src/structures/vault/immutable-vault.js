@@ -192,7 +192,9 @@ export class PasswordVault {
     }
 
     static generateId() {
-        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        // SECURITY RISK MITIGATION: Replaced insecure Math.random() with cryptographically secure crypto.randomUUID()
+        // to prevent predictable vault entry IDs and potential enumeration or collision attacks.
+        return crypto.randomUUID();
     }
 
     lock() {
