@@ -65,36 +65,39 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
-        while (queue.length > 0) {
-            const item = queue.shift();
+        // ⚡ Bolt: process queue items in parallel batches to improve throughput without unbounded concurrency
+        const CONCURRENCY_LIMIT = 5;
 
-            // Handle Logic (Modern)
-            if (item.kind === 'file' && item.getFile) {
-                // It's a FileSystemFileHandle
-                if (this.isJpeg(item.name)) {
-                    // Attach the File object to the Handle for convenience, or return Handle
-                    // We return the HANDLE. The consumer must call getFile().
-                    // But to be backward compatible/easy, let's attach the file?
-                    // No, cleaner to return Handle. VaultUI must adapt.
-                    files.push(item);
+        while (queue.length > 0) {
+            const batch = queue.splice(0, CONCURRENCY_LIMIT);
+
+            await Promise.all(batch.map(async (item) => {
+                // Handle Logic (Modern)
+                if (item.kind === 'file' && item.getFile) {
+                    // It's a FileSystemFileHandle
+                    if (this.isJpeg(item.name)) {
+                        files.push(item);
+                    }
+                } else if (item.kind === 'directory' && item.values) {
+                    // It's a FileSystemDirectoryHandle (Modern)
+                    const subQueue = [];
+                    for await (const entry of item.values()) {
+                        subQueue.push(entry);
+                    }
+                    await this.processQueue(subQueue, files);
                 }
-            } else if (item.kind === 'directory' && item.values) {
-                // It's a FileSystemDirectoryHandle (Modern)
-                for await (const entry of item.values()) {
-                    queue.push(entry);
+                // Entry Logic (Legacy)
+                else if (item.isFile) {
+                    if (this.isJpeg(item.name)) {
+                        const file = await this.getFileFromEntry(item);
+                        files.push(file);
+                    }
+                } else if (item.isDirectory) {
+                    const reader = item.createReader();
+                    const entries = await this.readEntriesPromise(reader);
+                    await this.processQueue([...entries], files);
                 }
-            }
-            // Entry Logic (Legacy)
-            else if (item.isFile) {
-                if (this.isJpeg(item.name)) {
-                    const file = await this.getFileFromEntry(item);
-                    files.push(file);
-                }
-            } else if (item.isDirectory) {
-                const reader = item.createReader();
-                const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
-            }
+            }));
         }
     }
 
