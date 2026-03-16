@@ -1,0 +1,3 @@
+## 2024-05-24 - Parallelize Async Iteration over System Files
+**Learning:** In `DropZone.processQueue` and `FileScanner.scanDirectory`, sequential `for await` loops block execution for each file/directory processing. Directory traversal from `dirHandle.values()` yields file entries over an async iterable which is inherently sequential, but the process mapping (e.g., getting files, recursive traversal) can be pushed to `Promise.all` to significantly improve throughput during file scanning.
+**Action:** When working with the modern File System Access API handles (or drag-and-drop handles) always fetch the entries first via `for await` sequentially and then map them into a `Promise.all` for parallel operations, especially when recursively processing directories.
