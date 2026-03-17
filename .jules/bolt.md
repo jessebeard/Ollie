@@ -1,0 +1,3 @@
+## 2024-05-24 - Avoid Sequential Directory Traversal in Drop Zone
+**Learning:** Sequential `for await` loops for reading files from system handles block other asynchronous operations and cause poor performance, especially when dropping folders.
+**Action:** When handling directories via drag-and-drop, map the queues to asynchronous operations and use `Promise.all` alongside recursive processing to parallelize directory traversal and file processing for significantly better throughput.
