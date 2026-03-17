@@ -115,6 +115,39 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Security Property: ID Generation uses CSPRNG instead of Math.random()', () => {
+        const originalRandom = Math.random;
+        let mathRandomCalled = false;
+
+        // Mock Math.random to always return a static predictable value
+        Math.random = () => {
+            mathRandomCalled = true;
+            return 0.42;
+        };
+
+        const ids = new Set();
+        const iterations = 100;
+
+        for (let i = 0; i < iterations; i++) {
+            ids.add(PasswordVault.generateId());
+        }
+
+        // Restore immediately
+        Math.random = originalRandom;
+
+        // If Math.random() was used under the hood, the IDs would collide because Date.now()
+        // would likely be the same in a tight loop + static Math.random().
+        // With crypto.randomUUID(), it should generate 100 unique UUIDs regardless.
+        expect(ids.size).toBe(iterations);
+        expect(mathRandomCalled).toBe(false);
+
+        // Sanity check format
+        const sampleId = Array.from(ids)[0];
+        expect(sampleId.length).toBe(36); // UUID length
+        expect(sampleId.split('-').length).toBe(5); // UUID segments
+    });
+
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
