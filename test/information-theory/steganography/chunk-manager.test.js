@@ -116,4 +116,22 @@ describe('ChunkManager (Property-Based Tests)', () => {
             50
         );
     });
+    it('Property: ID format matches v4 UUID', async () => {
+        await assertProperty(
+            [Arbitrary.positiveInteger(100)],
+            async (numGenerations) => {
+                const count = Math.max(1, numGenerations % 100);
+                const ids = new Set();
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                for (let i = 0; i < count; i++) {
+                    const id = ChunkManager.generateId();
+                    expect(uuidRegex.test(id)).toBe(true);
+                    ids.add(id);
+                }
+                expect(ids.size).toBe(count);
+                return true;
+            },
+            20
+        );
+    });
 });
