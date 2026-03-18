@@ -116,4 +116,18 @@ describe('ChunkManager (Property-Based Tests)', () => {
             50
         );
     });
+    it('Property: Secure and Unique Chunk ID Generation (UUIDv4 format)', async () => {
+        const ids = new Set();
+        const iterations = 1000;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+        for (let i = 0; i < iterations; i++) {
+            const id = ChunkManager.generateId();
+            expect(uuidRegex.test(id)).toBe(true);
+            ids.add(id);
+        }
+
+        // Assert no collisions
+        expect(ids.size).toBe(iterations);
+    });
 });
