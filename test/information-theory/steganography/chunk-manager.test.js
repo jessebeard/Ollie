@@ -92,6 +92,28 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('Property: Secure ID Generation (Resilience to Math.random predictability)', () => {
+        const originalMathRandom = Math.random;
+        try {
+            // Stub Math.random to a predictable value. Under the old implementation, this would cause duplicate IDs
+            // because the pseudo-random logic purely relied on Math.random.
+            Math.random = () => 0.5;
+
+            const id1 = ChunkManager.generateId();
+            const id2 = ChunkManager.generateId();
+
+            // Under the old implementation this would produce identical IDs.
+            // Under crypto.randomUUID(), it uses CSPRNG.
+            expect(id1).not.toBe(id2);
+
+            // Verify format is UUID v4
+            const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(uuidV4Regex.test(id1)).toBe(true);
+        } finally {
+            Math.random = originalMathRandom;
+        }
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],

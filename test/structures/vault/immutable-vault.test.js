@@ -115,6 +115,34 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Property: Secure ID Generation (Resilience to Math.random predictability)', () => {
+        const originalMathRandom = Math.random;
+        try {
+            // Stub Math.random to a predictable value. Under the old implementation, this would cause duplicate IDs
+            // because the time between generations is extremely short.
+            Math.random = () => 0.5;
+
+            const id1 = PasswordVault.generateId();
+
+            // Artificial delay to ensure Date.now() doesn't happen in the same ms if it was used
+            // In modern JS, execution might be faster than 1ms.
+            const start = Date.now();
+            while (Date.now() === start) {}
+
+            const id2 = PasswordVault.generateId();
+
+            // Under the old implementation `Date.now() + Math.random().toString(...)` would produce identical random parts.
+            // Under crypto.randomUUID(), it uses CSPRNG.
+            expect(id1).not.toBe(id2);
+
+            // Verify format is UUID v4
+            const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(uuidV4Regex.test(id1)).toBe(true);
+        } finally {
+            Math.random = originalMathRandom;
+        }
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
