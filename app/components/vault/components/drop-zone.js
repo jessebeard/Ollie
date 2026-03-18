@@ -65,37 +65,67 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
-        while (queue.length > 0) {
-            const item = queue.shift();
+        // Bolt: Optimize directory traversal and file processing by parallelizing operations.
+        // We use a concurrency limit (max 10 active operations) to avoid hitting browser file-handle limits
+        // or causing out-of-memory crashes when a massive folder is dropped.
+        const CONCURRENCY_LIMIT = 10;
+        let activePromises = 0;
+        const waitingQueue = [];
 
-            // Handle Logic (Modern)
-            if (item.kind === 'file' && item.getFile) {
-                // It's a FileSystemFileHandle
-                if (this.isJpeg(item.name)) {
-                    // Attach the File object to the Handle for convenience, or return Handle
-                    // We return the HANDLE. The consumer must call getFile().
-                    // But to be backward compatible/easy, let's attach the file?
-                    // No, cleaner to return Handle. VaultUI must adapt.
-                    files.push(item);
-                }
-            } else if (item.kind === 'directory' && item.values) {
-                // It's a FileSystemDirectoryHandle (Modern)
-                for await (const entry of item.values()) {
-                    queue.push(entry);
-                }
+        const acquireToken = async () => {
+            if (activePromises >= CONCURRENCY_LIMIT) {
+                await new Promise(resolve => waitingQueue.push(resolve));
             }
-            // Entry Logic (Legacy)
-            else if (item.isFile) {
-                if (this.isJpeg(item.name)) {
-                    const file = await this.getFileFromEntry(item);
-                    files.push(file);
-                }
-            } else if (item.isDirectory) {
-                const reader = item.createReader();
-                const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
+            activePromises++;
+        };
+
+        const releaseToken = () => {
+            activePromises--;
+            if (waitingQueue.length > 0) {
+                const resolve = waitingQueue.shift();
+                resolve();
             }
-        }
+        };
+
+        const processItem = async (item) => {
+            await acquireToken();
+            try {
+                // Handle Logic (Modern)
+                if (item.kind === 'file' && item.getFile) {
+                    // It's a FileSystemFileHandle
+                    if (this.isJpeg(item.name)) {
+                        // Attach the File object to the Handle for convenience, or return Handle
+                        // We return the HANDLE. The consumer must call getFile().
+                        // But to be backward compatible/easy, let's attach the file?
+                        // No, cleaner to return Handle. VaultUI must adapt.
+                        files.push(item);
+                    }
+                } else if (item.kind === 'directory' && item.values) {
+                    // It's a FileSystemDirectoryHandle (Modern)
+                    const promises = [];
+                    for await (const entry of item.values()) {
+                        promises.push(processItem(entry));
+                    }
+                    await Promise.all(promises);
+                }
+                // Entry Logic (Legacy)
+                else if (item.isFile) {
+                    if (this.isJpeg(item.name)) {
+                        const file = await this.getFileFromEntry(item);
+                        files.push(file);
+                    }
+                } else if (item.isDirectory) {
+                    const reader = item.createReader();
+                    const entries = await this.readEntriesPromise(reader);
+                    await Promise.all(entries.map(processItem));
+                }
+            } finally {
+                releaseToken();
+            }
+        };
+
+        await Promise.all(queue.map(processItem));
+        queue.length = 0; // Clear the queue after processing
     }
 
     readEntriesPromise(reader) {
