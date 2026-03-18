@@ -107,12 +107,19 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(pErr !== null).toBe(true);
     });
 
-    it('should calculate unique IDs', () => {
+    it('Property: Secure and Unique ID Generation (UUIDv4 format)', async () => {
         const ids = new Set();
-        for (let i = 0; i < 100; i++) {
-            ids.add(PasswordVault.generateId());
+        const iterations = 1000;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+        for (let i = 0; i < iterations; i++) {
+            const id = PasswordVault.generateId();
+            expect(uuidRegex.test(id)).toBe(true);
+            ids.add(id);
         }
-        expect(ids.size).toBe(100);
+
+        // Assert no collisions
+        expect(ids.size).toBe(iterations);
     });
 
     it('should search entries correctly skipping encrypted fields', async () => {
