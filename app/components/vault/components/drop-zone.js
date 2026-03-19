@@ -65,24 +65,22 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
-        while (queue.length > 0) {
-            const item = queue.shift();
-
+        // Optimize drag-and-drop file processing using Promise.all
+        // This avoids sequential for await loops over File System APIs
+        await Promise.all(queue.map(async (item) => {
             // Handle Logic (Modern)
             if (item.kind === 'file' && item.getFile) {
                 // It's a FileSystemFileHandle
                 if (this.isJpeg(item.name)) {
-                    // Attach the File object to the Handle for convenience, or return Handle
-                    // We return the HANDLE. The consumer must call getFile().
-                    // But to be backward compatible/easy, let's attach the file?
-                    // No, cleaner to return Handle. VaultUI must adapt.
                     files.push(item);
                 }
             } else if (item.kind === 'directory' && item.values) {
                 // It's a FileSystemDirectoryHandle (Modern)
+                const subQueue = [];
                 for await (const entry of item.values()) {
-                    queue.push(entry);
+                    subQueue.push(entry);
                 }
+                await this.processQueue(subQueue, files);
             }
             // Entry Logic (Legacy)
             else if (item.isFile) {
@@ -93,9 +91,9 @@ export class DropZone {
             } else if (item.isDirectory) {
                 const reader = item.createReader();
                 const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
+                await this.processQueue(entries, files);
             }
-        }
+        }));
     }
 
     readEntriesPromise(reader) {
