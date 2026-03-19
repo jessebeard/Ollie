@@ -92,6 +92,20 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('Security Property: generateId should not use insecure Math.random', () => {
+        const originalRandom = Math.random;
+        Math.random = () => {
+            throw new Error('Math.random is insecure and should not be used for ID generation');
+        };
+        try {
+            const id = ChunkManager.generateId();
+            expect(typeof id).toBe('string');
+            expect(id.length > 10).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],
