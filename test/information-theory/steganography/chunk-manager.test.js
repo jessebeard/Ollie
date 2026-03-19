@@ -92,6 +92,27 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('Security Property: generateId uses cryptographically secure randomness, not Math.random', () => {
+        const originalRandom = Math.random;
+        let mathRandomCalled = false;
+        Math.random = () => {
+            mathRandomCalled = true;
+            return 0.5; // predictable value
+        };
+
+        try {
+            const id1 = ChunkManager.generateId();
+            const id2 = ChunkManager.generateId();
+
+            expect(mathRandomCalled).toBe(false);
+            expect(id1).not.toBe(id2);
+            // check UUID v4 format
+            expect(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id1)).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],
