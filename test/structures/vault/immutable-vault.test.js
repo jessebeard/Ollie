@@ -115,6 +115,27 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Security Property: generateId uses cryptographically secure randomness, not Math.random', () => {
+        const originalRandom = Math.random;
+        let mathRandomCalled = false;
+        Math.random = () => {
+            mathRandomCalled = true;
+            return 0.5; // predictable value
+        };
+
+        try {
+            const id1 = PasswordVault.generateId();
+            const id2 = PasswordVault.generateId();
+
+            expect(mathRandomCalled).toBe(false);
+            expect(id1).not.toBe(id2);
+            // simple UUID format check
+            expect(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id1)).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
