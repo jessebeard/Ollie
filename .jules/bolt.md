@@ -1,0 +1,3 @@
+## 2024-03-19 - Parallelize File System Traversal Anti-Pattern
+**Learning:** In DropZone.processQueue, using sequential `for await` loops or `queue.shift()` with `await` for recursively reading files from system handles (e.g., from drag-and-drop actions) is a performance anti-pattern. This process is highly synchronous and limits drag-and-drop processing throughput, especially for directories with many files.
+**Action:** Replace `while` loop containing `queue.shift()` and `for await` traversal with a recursive parallelized mapping using `Promise.all()` to vastly improve directory traversal and handle parsing performance.
