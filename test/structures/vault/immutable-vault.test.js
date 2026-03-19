@@ -115,6 +115,20 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Security Property: generateId should not use insecure Math.random', () => {
+        const originalRandom = Math.random;
+        Math.random = () => {
+            throw new Error('Math.random is insecure and should not be used for ID generation');
+        };
+        try {
+            const id = PasswordVault.generateId();
+            expect(typeof id).toBe('string');
+            expect(id.length > 10).toBe(true);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
