@@ -4,6 +4,17 @@ import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
 describe('ChunkManager (Property-Based Tests)', () => {
 
+    it('should calculate valid UUIDs', () => {
+        const ids = new Set();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        for (let i = 0; i < 100; i++) {
+            const id = ChunkManager.generateId();
+            expect(uuidRegex.test(id)).toBe(true);
+            ids.add(id);
+        }
+        expect(ids.size).toBe(100);
+    });
+
     it('Property: Reassembly Symmetry (split then reassemble yields original data)', async () => {
         // Fuzz byte arrays of varying lengths and random chunk sizes
         await assertProperty(
