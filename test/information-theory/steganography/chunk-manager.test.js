@@ -92,6 +92,18 @@ describe('ChunkManager (Property-Based Tests)', () => {
         );
     });
 
+    it('Property: ID Generation is Secure and avoids Math.random', () => {
+        const originalRandom = Math.random;
+        Math.random = () => 0.5;
+        try {
+            const id1 = ChunkManager.generateId();
+            const id2 = ChunkManager.generateId();
+            expect(id1).not.toBe(id2);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('Property: ID Mismatch Rejection (mixing datasets fails)', async () => {
         await assertProperty(
             [Arbitrary.byteArray(10, 1000), Arbitrary.byteArray(10, 1000), Arbitrary.positiveInteger(100)],
