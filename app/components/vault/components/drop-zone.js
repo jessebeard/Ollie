@@ -65,9 +65,7 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
-        while (queue.length > 0) {
-            const item = queue.shift();
-
+        const processItem = async (item) => {
             // Handle Logic (Modern)
             if (item.kind === 'file' && item.getFile) {
                 // It's a FileSystemFileHandle
@@ -80,9 +78,11 @@ export class DropZone {
                 }
             } else if (item.kind === 'directory' && item.values) {
                 // It's a FileSystemDirectoryHandle (Modern)
+                const promises = [];
                 for await (const entry of item.values()) {
-                    queue.push(entry);
+                    promises.push(processItem(entry));
                 }
+                await Promise.all(promises);
             }
             // Entry Logic (Legacy)
             else if (item.isFile) {
@@ -93,9 +93,12 @@ export class DropZone {
             } else if (item.isDirectory) {
                 const reader = item.createReader();
                 const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
+                await Promise.all(entries.map(processItem));
             }
-        }
+        };
+
+        // Process initial queue in parallel
+        await Promise.all(queue.map(processItem));
     }
 
     readEntriesPromise(reader) {
