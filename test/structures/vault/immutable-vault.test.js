@@ -115,6 +115,22 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(ids.size).toBe(100);
     });
 
+    it('Property: ID Generation is Secure and avoids Math.random', () => {
+        const originalRandom = Math.random;
+        const originalNow = Date.now;
+        Math.random = () => 0.5;
+        Date.now = () => 1000000000;
+        try {
+            const id1 = PasswordVault.generateId();
+            const id2 = PasswordVault.generateId();
+            expect(id1).not.toBe(id2);
+        } finally {
+            Math.random = originalRandom;
+            Date.now = originalNow;
+        }
+
+    });
+
     it('should search entries correctly skipping encrypted fields', async () => {
         let vault = new PasswordVault([], null, true, 'masterpass123');
 
