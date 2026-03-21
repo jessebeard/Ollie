@@ -15,7 +15,25 @@ export class PasswordVault {
         this.isUnlocked = isUnlocked;
         this.masterPassword = masterPassword;
         this.sessionKey = sessionKey;
+
+        // O(1) Lookup optimization
+        this._entryMap = new Map();
+        for (let i = 0; i < this.entries.length; i++) {
+            this._entryMap.set(this.entries[i].id, i);
+        }
+
         Object.freeze(this);
+    }
+
+    /**
+     * O(1) lookup for vault entries
+     * @param {string} id
+     * @returns {SecureEntry|null}
+     */
+    getEntry(id) {
+        const index = this._entryMap.get(id);
+        if (index === undefined) return null;
+        return this.entries[index];
     }
 
     async _getSessionKey() {
@@ -51,8 +69,8 @@ export class PasswordVault {
     async updateEntry(id, updates) {
         if (!this.isUnlocked) return [this, new Error('Vault is locked')];
 
-        const index = this.entries.findIndex(e => e.id === id);
-        if (index === -1) return [this, new Error('Entry not found')];
+        const index = this._entryMap.get(id);
+        if (index === undefined) return [this, new Error('Entry not found')];
 
         const [sessionKey, keyErr] = await this._getSessionKey();
         if (keyErr) return [this, keyErr];
@@ -84,8 +102,8 @@ export class PasswordVault {
      * @returns {[PasswordVault, Error|null]} Tuple of [newVault, error]
      */
     deleteEntry(id) {
-        const index = this.entries.findIndex(e => e.id === id);
-        if (index === -1) return [this, new Error('Entry not found')];
+        const index = this._entryMap.get(id);
+        if (index === undefined) return [this, new Error('Entry not found')];
 
         const newEntries = [...this.entries];
         newEntries.splice(index, 1);
