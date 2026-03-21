@@ -1,0 +1,3 @@
+## 2024-05-18 - Internal ID Lookup Map in Immutable Data Structures
+ **Learning:** In a vault containing many entries, iterating the entire array to look up an entry by ID (using `.findIndex(e => e.id === id)`) scales at O(N) complexity for both reads and writes. Initializing an internal map referencing entry indexes on instantiation allows subsequent lookups for updates and deletions to be O(1) in the current context. Since this is an immutable class, the internal array indices and the map stay synchronised for the life of that object.
+ **Action:** Prioritize initializing an index `Map` during constructor execution for immutable classes dealing with large arrays of structured objects to guarantee constant time lookups later in the object lifecycle.
