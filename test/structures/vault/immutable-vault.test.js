@@ -107,6 +107,34 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(pErr !== null).toBe(true);
     });
 
+
+
+    it('Property: Secure ID Generation invariants (uniqueness and format)', async () => {
+        await assertProperty(
+            [Arbitrary.positiveInteger(500)], // Generate lots of IDs to test collision
+            async (iterations) => {
+                const count = Math.max(10, iterations % 2000); // 10 to 2000
+                const ids = new Set();
+
+                for (let i = 0; i < count; i++) {
+                    const id = PasswordVault.generateId();
+
+                    // Format assertion: <timestamp>-<uuid>
+                    // timestamp: 13 digits (until 2286)
+                    // uuid: 8-4-4-4-12 hex string
+                    const regex = /^[0-9]{13}-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+                    if (!regex.test(id)) return false;
+
+                    ids.add(id);
+                }
+
+                // Assert all IDs are strictly unique
+                return ids.size === count;
+            },
+            50 // number of test rounds
+        );
+    });
+
     it('should calculate unique IDs', () => {
         const ids = new Set();
         for (let i = 0; i < 100; i++) {
