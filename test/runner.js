@@ -223,6 +223,8 @@ async function runTests() {
         await import('./integration/vault/vault-e2e-empty.test.js');
         await import('./integration/vault/vault-e2e-multigen.test.js');
         await import('./integration/vault/vault-capacity-ui.test.js');
+        await import('./security/immutable-vault-id.test.js');
+        await import('./security/chunk-manager-id.test.js');
 
         await executeTests();
         const stats = getStats();
