@@ -7,6 +7,13 @@ export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
+
+        // ⚡ Bolt: Maintain an internal index map for O(1) entry lookups by ID
+        this._entryMap = new Map();
+        for (let i = 0; i < this.entries.length; i++) {
+            this._entryMap.set(this.entries[i].id, i);
+        }
+
         this.metadata = Object.freeze(metadata ? { ...metadata } : {
             version: '2.0',
             created: new Date().toISOString(),
@@ -16,6 +23,14 @@ export class PasswordVault {
         this.masterPassword = masterPassword;
         this.sessionKey = sessionKey;
         Object.freeze(this);
+    }
+
+    /**
+     * @returns {SecureEntry|undefined} The entry, or undefined if not found
+     */
+    getEntry(id) {
+        const index = this._entryMap.get(id);
+        return index !== undefined ? this.entries[index] : undefined;
     }
 
     async _getSessionKey() {
@@ -51,7 +66,8 @@ export class PasswordVault {
     async updateEntry(id, updates) {
         if (!this.isUnlocked) return [this, new Error('Vault is locked')];
 
-        const index = this.entries.findIndex(e => e.id === id);
+        const idx = this._entryMap.get(id);
+        const index = idx !== undefined ? idx : -1;
         if (index === -1) return [this, new Error('Entry not found')];
 
         const [sessionKey, keyErr] = await this._getSessionKey();
@@ -84,7 +100,8 @@ export class PasswordVault {
      * @returns {[PasswordVault, Error|null]} Tuple of [newVault, error]
      */
     deleteEntry(id) {
-        const index = this.entries.findIndex(e => e.id === id);
+        const idx = this._entryMap.get(id);
+        const index = idx !== undefined ? idx : -1;
         if (index === -1) return [this, new Error('Entry not found')];
 
         const newEntries = [...this.entries];
