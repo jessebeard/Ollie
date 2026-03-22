@@ -1,4 +1,3 @@
-
 export class DropZone {
     constructor(element, onFilesDropped) {
         this.element = element;
@@ -65,6 +64,10 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
+        // Optimize: Use an array of promises to process the queue in parallel,
+        // avoiding sequential I/O blocking for large directory trees.
+        const promises = [];
+
         while (queue.length > 0) {
             const item = queue.shift();
 
@@ -76,26 +79,38 @@ export class DropZone {
                     // We return the HANDLE. The consumer must call getFile().
                     // But to be backward compatible/easy, let's attach the file?
                     // No, cleaner to return Handle. VaultUI must adapt.
-                    files.push(item);
+                    promises.push((async () => {
+                        files.push(item);
+                    })());
                 }
             } else if (item.kind === 'directory' && item.values) {
                 // It's a FileSystemDirectoryHandle (Modern)
-                for await (const entry of item.values()) {
-                    queue.push(entry);
-                }
+                promises.push((async () => {
+                    const subQueue = [];
+                    for await (const entry of item.values()) {
+                        subQueue.push(entry);
+                    }
+                    await this.processQueue(subQueue, files);
+                })());
             }
             // Entry Logic (Legacy)
             else if (item.isFile) {
                 if (this.isJpeg(item.name)) {
-                    const file = await this.getFileFromEntry(item);
-                    files.push(file);
+                    promises.push((async () => {
+                        const file = await this.getFileFromEntry(item);
+                        files.push(file);
+                    })());
                 }
             } else if (item.isDirectory) {
-                const reader = item.createReader();
-                const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
+                promises.push((async () => {
+                    const reader = item.createReader();
+                    const entries = await this.readEntriesPromise(reader);
+                    await this.processQueue(entries, files);
+                })());
             }
         }
+
+        await Promise.all(promises);
     }
 
     readEntriesPromise(reader) {
