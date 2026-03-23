@@ -2,6 +2,7 @@ import { BatchEmbedder } from '../../information-theory/steganography/batch-embe
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
+import { generateSecureId } from '../../information-theory/cryptography/crypto-compat.js';
 
 export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
@@ -192,7 +193,7 @@ export class PasswordVault {
     }
 
     static generateId() {
-        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        return generateSecureId(true);
     }
 
     lock() {
