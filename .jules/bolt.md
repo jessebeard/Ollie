@@ -1,0 +1,3 @@
+## 2024-05-24 - FileSystem Access API processing Anti-pattern
+**Learning:** Using a sequential `while` loop with `await` and recursive `for await` loops to process queue items sequentially when resolving directories in `DropZone` is a performance anti-pattern. This blocks on I/O operations causing significant slow-downs when drag-and-dropping many files.
+**Action:** Use `Promise.all` with `queue.map(async (item) => ...)` to parallelize file handling and directory traversal for improving throughput.
