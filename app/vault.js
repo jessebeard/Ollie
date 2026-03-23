@@ -218,11 +218,8 @@ class VaultUI {
             }
 
             // Convert FileSystemFileHandle to File objects
-            const fileObjects = [];
-            for (const handle of files) {
-                const file = await handle.getFile();
-                fileObjects.push(file);
-            }
+            // OPTIMIZATION: Use Promise.all to fetch file objects from handles concurrently
+            const fileObjects = await Promise.all(files.map(handle => handle.getFile()));
 
             await this.vault.load(fileObjects, password);
             this.updateUI();
@@ -274,11 +271,8 @@ class VaultUI {
             }
 
             // Convert FileSystemFileHandle to File objects
-            const fileObjects = [];
-            for (const handle of files) {
-                const file = await handle.getFile();
-                fileObjects.push(file);
-            }
+            // OPTIMIZATION: Use Promise.all to fetch file objects from handles concurrently
+            const fileObjects = await Promise.all(files.map(handle => handle.getFile()));
 
             // Show progress
             const progressMsg = document.createElement('div');
