@@ -1,0 +1,6 @@
+## 2024-05-18 - Avoid O(N) Maps in Immutable Structures; Parallelize Async Loops
+**Learning 1 (Anti-pattern):** When optimizing lookups in immutable Javascript structures (like `PasswordVault` with a frozen `.entries` array), initializing an index `Map` in the constructor is a severe performance regression. Because immutable structures create a brand new instance on every mutation, the O(N) cost to build the map runs every time an item is added, updated, or deleted. Since the instance is typically only used for a single operation before being discarded, replacing a zero-allocation `findIndex` with an expensive Map allocation makes the app significantly slower and more memory-intensive.
+**Action 1:** Do not use `Map` initialization in constructors of frequently mutating immutable objects.
+
+**Learning 2 (Pattern):** In Javascript, sequential `for...of` loops using `await` (e.g., `for (const handle of files) { await handle.getFile() }`) prevent parallel I/O, leading to slower execution times when processing multiple files.
+**Action 2:** Always map the iterable to an array of promises and use `Promise.all` (e.g., `await Promise.all(files.map(handle => handle.getFile()))`) to fetch files concurrently.
