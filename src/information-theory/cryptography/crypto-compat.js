@@ -18,3 +18,16 @@ if (typeof crypto !== 'undefined') {
         cryptoInstance = m.webcrypto;
     });
 }
+
+/**
+ * Generates a cryptographically secure unique identifier.
+ * @param {boolean} prefixWithTimestamp - Whether to prepend the current timestamp.
+ * @returns {string} Secure ID
+ */
+export function generateSecureId(prefixWithTimestamp = false) {
+    if (!cryptoInstance) {
+        throw new Error('cryptoInstance is not initialized yet');
+    }
+    const uuid = cryptoInstance.randomUUID();
+    return prefixWithTimestamp ? `${Date.now()}-${uuid}` : uuid;
+}
