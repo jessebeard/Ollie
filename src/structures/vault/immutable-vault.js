@@ -2,16 +2,30 @@ import { BatchEmbedder } from '../../information-theory/steganography/batch-embe
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
+import { cryptoInstance } from '../../information-theory/cryptography/crypto-compat.js';
 
 export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
-        this.metadata = Object.freeze(metadata ? { ...metadata } : {
+
+        let newMetadata = metadata ? { ...metadata } : {
             version: '2.0',
             created: new Date().toISOString(),
             modified: new Date().toISOString()
-        });
+        };
+
+        if (!newMetadata.salt) {
+            if (entries && entries.length > 0) {
+                newMetadata.salt = Array.from(new TextEncoder().encode('ollie-session-salt-1234'));
+            } else {
+                const saltArray = new Uint8Array(16);
+                cryptoInstance.getRandomValues(saltArray);
+                newMetadata.salt = Array.from(saltArray);
+            }
+        }
+
+        this.metadata = Object.freeze(newMetadata);
         this.isUnlocked = isUnlocked;
         this.masterPassword = masterPassword;
         this.sessionKey = sessionKey;
@@ -21,7 +35,7 @@ export class PasswordVault {
     async _getSessionKey() {
         if (this.sessionKey) return [this.sessionKey, null];
         if (!this.masterPassword) return [null, new Error('Vault is locked')];
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        const salt = new Uint8Array(this.metadata.salt);
         const [key, err] = await KeyDerivation.deriveKey(this.masterPassword, salt);
         return [key, err];
     }
@@ -184,7 +198,9 @@ export class PasswordVault {
             return [null, new Error('Failed to parse vault data')];
         }
 
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
+        const salt = vaultJson.metadata.salt
+            ? new Uint8Array(vaultJson.metadata.salt)
+            : new TextEncoder().encode('ollie-session-salt-1234');
         const [sessionKey, err] = await KeyDerivation.deriveKey(password, salt);
         if (err) return [null, err];
 
@@ -192,7 +208,7 @@ export class PasswordVault {
     }
 
     static generateId() {
-        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        return `${Date.now()}-${cryptoInstance.randomUUID()}`;
     }
 
     lock() {
