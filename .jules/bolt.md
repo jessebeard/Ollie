@@ -1,0 +1,1 @@
+## 2024-05-15 - DropZone queue processing bottleneck\n**Learning:** Sequential processing of directory entries and file fetching in drag-and-drop operations causes significant throughput bottlenecks.\n**Action:** Parallelize recursive processing using Promise.all to improve throughput.

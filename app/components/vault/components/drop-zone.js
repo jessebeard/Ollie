@@ -65,9 +65,12 @@ export class DropZone {
     }
 
     async processQueue(queue, files) {
-        while (queue.length > 0) {
-            const item = queue.shift();
-
+        // ⚡ Bolt Optimization:
+        // By replacing the sequential `while (queue.length > 0)` loop with a `map`
+        // to an array of Promises and `Promise.all`, we parallelize the recursive
+        // directory traversal and file fetching. This significantly improves throughput
+        // when dropping folders with many items.
+        const promises = queue.map(async (item) => {
             // Handle Logic (Modern)
             if (item.kind === 'file' && item.getFile) {
                 // It's a FileSystemFileHandle
@@ -80,9 +83,11 @@ export class DropZone {
                 }
             } else if (item.kind === 'directory' && item.values) {
                 // It's a FileSystemDirectoryHandle (Modern)
+                const subQueue = [];
                 for await (const entry of item.values()) {
-                    queue.push(entry);
+                    subQueue.push(entry);
                 }
+                await this.processQueue(subQueue, files);
             }
             // Entry Logic (Legacy)
             else if (item.isFile) {
@@ -93,9 +98,11 @@ export class DropZone {
             } else if (item.isDirectory) {
                 const reader = item.createReader();
                 const entries = await this.readEntriesPromise(reader);
-                queue.push(...entries);
+                await this.processQueue(entries, files);
             }
-        }
+        });
+
+        await Promise.all(promises);
     }
 
     readEntriesPromise(reader) {
