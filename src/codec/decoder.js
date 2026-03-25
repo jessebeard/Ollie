@@ -410,9 +410,8 @@ export class JpegDecoder {
                 }
 
                 const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
+                const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
                 for (let i = 0; i < blocksInMCU; i++) {
-                    const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-
                     const mcuRow = Math.floor(mcuIndex / mcuCols);
                     const mcuCol = mcuIndex % mcuCols;
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
