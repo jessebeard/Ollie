@@ -331,6 +331,38 @@ export class JpegDecoder {
         let mcusSinceRestart = 0;
         let expectedRstMarker = 0xD0; // Start with RST0
 
+        // Bolt optimization: Precompute frame/scan component mappings to avoid inner loop lookups
+        const precomputedScanComps = [];
+        for (const scanComp of scanHeader.components) {
+            const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
+            const frameComp = this.frameHeader.components[compIndex];
+
+            if (!frameComp) {
+                return new Error(`Scan component ${scanComp.selector} not found in frame header`);
+            }
+
+            const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
+            const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
+
+            if (Ss === 0 && !dcTable) {
+                return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
+            }
+            if (Se > 0 && !acTable) {
+                return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
+            }
+
+            precomputedScanComps.push({
+                dcTable,
+                acTable,
+                compIndex,
+                blocksInMCU: frameComp.hSampling * frameComp.vSampling,
+                hSampling: frameComp.hSampling,
+                vSampling: frameComp.vSampling,
+                blocksH: this.components[scanComp.selector].blocksH,
+                blocks: this.components[scanComp.selector].blocks
+            });
+        }
+
         for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
 
             // Handle Restart Interval
@@ -392,34 +424,18 @@ export class JpegDecoder {
                 // DO NOT `continue` the loop, as we still need to process the current MCU index.
             }
 
-            for (const scanComp of scanHeader.components) {
-                const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
+            const mcuRow = Math.floor(mcuIndex / mcuCols);
+            const mcuCol = mcuIndex % mcuCols;
 
-                if (!frameComp) {
-                    return new Error(`Scan component ${scanComp.selector} not found in frame header`);
-                }
+            for (const scanComp of precomputedScanComps) {
+                const { dcTable, acTable, blocksInMCU, compIndex, hSampling, vSampling, blocksH, blocks } = scanComp;
 
-                const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
-                const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
-
-                if (Ss === 0 && !dcTable) {
-                    return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
-                }
-                if (Se > 0 && !acTable) {
-                    return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
-                }
-
-                const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
                 for (let i = 0; i < blocksInMCU; i++) {
-                    const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
+                    const blockRow = mcuRow * vSampling + Math.floor(i / hSampling);
+                    const blockCol = mcuCol * hSampling + (i % hSampling);
+                    const blockIndex = blockRow * blocksH + blockCol;
 
-                    const mcuRow = Math.floor(mcuIndex / mcuCols);
-                    const mcuCol = mcuIndex % mcuCols;
-                    const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
-                    const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
-                    const blockIndex = blockRow * this.components[scanComp.selector].blocksH + blockCol;
-
-                    const block = this.components[scanComp.selector].blocks[blockIndex];
+                    const block = blocks[blockIndex];
 
                     const [blockResult, blockErr] = decodeBlock(
                         bitReader,
