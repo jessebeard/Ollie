@@ -1,0 +1,3 @@
+## 2025-02-14 - Inner Loop Component Lookups in Image Decoding
+**Learning:** Initializing array lookups using \`findIndex()\` and \`Map.get()\` inside the innermost loops of an image decoder (e.g., pixel processing or block decoding over MCUs) introduces severe performance penalties due to redundant computations executing hundreds of thousands of times.
+**Action:** When working on block-based decoders, proactively review the inner loop structures. Precompute index resolutions, Map lookups, and static dimension calculations outside the inner loop to minimize operations executed per block/pixel.
