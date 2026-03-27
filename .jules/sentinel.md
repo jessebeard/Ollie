@@ -1,0 +1,4 @@
+## 2024-05-24 - [Insecure Randomness in ID Generation]
+**Vulnerability:** Use of `Math.random()` to generate IDs in `PasswordVault` and `ChunkManager`. `Math.random()` is not cryptographically secure, leading to predictable IDs which can be a security vulnerability, especially in a cryptographic vault context.
+**Learning:** Developers sometimes fall back to simple built-in PRNGs (`Math.random()`) for UUID generation instead of utilizing available Crypto API features, often because of ease of use or lack of awareness of the security implications in the specific context.
+**Prevention:** Always use `crypto.randomUUID()` or `crypto.getRandomValues()` for generating unique identifiers, tokens, or any random values in security-sensitive contexts. Build linters or PR checks to flag `Math.random()` usage outside of explicitly safe contexts (like UI animations).
