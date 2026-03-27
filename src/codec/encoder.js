@@ -32,10 +32,17 @@ export class JpegEncoder {
      * Flattens Y, Cb, Cr blocks into a single array for steganography.
      */
     flattenBlocks(blocks) {
-        const allBlocks = [];
-        for (let i = 0; i < blocks.Y.length; i++) allBlocks.push(blocks.Y[i]);
-        for (let i = 0; i < blocks.Cb.length; i++) allBlocks.push(blocks.Cb[i]);
-        for (let i = 0; i < blocks.Cr.length; i++) allBlocks.push(blocks.Cr[i]);
+        // Optimization: Pre-allocate array size to avoid memory reallocation during push
+        const yLen = blocks.Y.length;
+        const cbLen = blocks.Cb.length;
+        const crLen = blocks.Cr.length;
+        const allBlocks = new Array(yLen + cbLen + crLen);
+
+        let offset = 0;
+        for (let i = 0; i < yLen; i++) allBlocks[offset++] = blocks.Y[i];
+        for (let i = 0; i < cbLen; i++) allBlocks[offset++] = blocks.Cb[i];
+        for (let i = 0; i < crLen; i++) allBlocks[offset++] = blocks.Cr[i];
+
         return allBlocks;
     }
 
