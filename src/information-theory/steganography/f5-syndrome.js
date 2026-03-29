@@ -49,15 +49,32 @@ export class F5 {
             state = seed || 1;
         }
 
-        // LCG constants (same as Java's Random)
-        const a = 25214903917n;
-        const c = 11n;
-        const m = 1n << 48n;
-        let current = BigInt(state);
+        // LCG constants (same as Java's Random): a = 25214903917 (0x5DEECE66D), c = 11
+        // Avoid BigInt performance overhead in tight loops by emulating 48-bit math
+        // using 24-bit chunks (JS Number is safe up to 53 bits: 2^24 * 2^24 < 2^53).
+        const a0 = 0xECE66D; // Lower 24 bits
+        const a1 = 0x5DE;    // Upper 24 bits
+        const c0 = 11;
+
+        let sLo = state & 0xFFFFFF;
+        // The state can be up to 32 bits from seed parsing, but Math.abs makes it positive,
+        // so standard safe integer division yields the correct upper bits.
+        let sHi = Math.floor(state / 0x1000000);
 
         return function () {
-            current = (a * current + c) % m;
-            return Number(current >> 17n) >>> 0;
+            const p0 = sLo * a0 + c0;
+            const nextLo = p0 & 0xFFFFFF;
+            const carry = Math.floor(p0 / 0x1000000);
+
+            // Mask upper part to 24 bits to keep total state at 48 bits
+            const nextHi = (sHi * a0 + sLo * a1 + carry) & 0xFFFFFF;
+
+            sLo = nextLo;
+            sHi = nextHi;
+
+            // Equivalent to (state >> 17):
+            // The top 7 bits of sLo (sLo >>> 17) combine with sHi shifted left by 7 (24 - 17).
+            return ((sHi << 7) | (sLo >>> 17)) >>> 0;
         };
     }
 

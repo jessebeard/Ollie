@@ -1,0 +1,3 @@
+## 2024-05-28 - BigInt performance overhead in tight loops
+**Learning:** `BigInt` instantiation and operations carry significant performance overhead in JavaScript. Using `BigInt` inside a very hot loop (like a PRNG called hundreds of thousands of times during image encoding) will severely bottleneck execution.
+**Action:** Emulate up to 48-bit integer math using standard JS `Number` (which has 53 bits of safe integer precision) by breaking calculations into 24-bit chunks (since `2^24 * 2^24 = 2^48 < 2^53`). This avoids `BigInt` allocation completely and yields massive speedups while maintaining mathematical correctness.
