@@ -1,6 +1,7 @@
 import { BatchEmbedder } from '../src/information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../src/information-theory/steganography/batch-extractor.js';
 import { FileScanner } from '../src/codec/file-scanner.js';
+import { cryptoInstance } from '../src/information-theory/cryptography/crypto-compat.js';
 
 /**
  * PasswordVault
@@ -144,6 +145,22 @@ class PasswordVault {
      * Generate unique ID
      */
     generateId() {
+        if (cryptoInstance && typeof cryptoInstance.randomUUID === 'function') {
+            return cryptoInstance.randomUUID();
+        }
+
+        if (cryptoInstance && typeof cryptoInstance.getRandomValues === 'function') {
+            const arr = new Uint8Array(16);
+            cryptoInstance.getRandomValues(arr);
+            arr[6] = (arr[6] & 0x0f) | 0x40;
+            arr[8] = (arr[8] & 0x3f) | 0x80;
+            return [...arr].map((b, i) => {
+                const hex = b.toString(16).padStart(2, '0');
+                if (i === 4 || i === 6 || i === 8 || i === 10) return '-' + hex;
+                return hex;
+            }).join('');
+        }
+
         return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 
