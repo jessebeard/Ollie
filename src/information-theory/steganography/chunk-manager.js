@@ -1,3 +1,5 @@
+import { cryptoInstance } from '../cryptography/crypto-compat.js';
+
 /**
  * ChunkManager - Handles splitting large data into chunks and reassembling them
  */
@@ -85,7 +87,24 @@ export class ChunkManager {
      * @returns {string} UUID-like string
      */
     static generateId() {
+        if (cryptoInstance && typeof cryptoInstance.randomUUID === 'function') {
+            return cryptoInstance.randomUUID();
+        }
 
+        // Fallback using crypto.getRandomValues if randomUUID is somehow not available
+        if (cryptoInstance && typeof cryptoInstance.getRandomValues === 'function') {
+            const arr = new Uint8Array(16);
+            cryptoInstance.getRandomValues(arr);
+            arr[6] = (arr[6] & 0x0f) | 0x40;
+            arr[8] = (arr[8] & 0x3f) | 0x80;
+            return [...arr].map((b, i) => {
+                const hex = b.toString(16).padStart(2, '0');
+                if (i === 4 || i === 6 || i === 8 || i === 10) return '-' + hex;
+                return hex;
+            }).join('');
+        }
+
+        // Extremely insecure fallback if WebCrypto is completely missing
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
             const r = Math.random() * 16 | 0;
             const v = c === 'x' ? r : (r & 0x3 | 0x8);

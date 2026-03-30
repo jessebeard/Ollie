@@ -2,6 +2,7 @@ import { BatchEmbedder } from '../../information-theory/steganography/batch-embe
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
+import { cryptoInstance } from '../../information-theory/cryptography/crypto-compat.js';
 
 export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
@@ -192,6 +193,24 @@ export class PasswordVault {
     }
 
     static generateId() {
+        if (cryptoInstance && typeof cryptoInstance.randomUUID === 'function') {
+            return cryptoInstance.randomUUID();
+        }
+
+        // Fallback using crypto.getRandomValues
+        if (cryptoInstance && typeof cryptoInstance.getRandomValues === 'function') {
+            const arr = new Uint8Array(16);
+            cryptoInstance.getRandomValues(arr);
+            arr[6] = (arr[6] & 0x0f) | 0x40;
+            arr[8] = (arr[8] & 0x3f) | 0x80;
+            return [...arr].map((b, i) => {
+                const hex = b.toString(16).padStart(2, '0');
+                if (i === 4 || i === 6 || i === 8 || i === 10) return '-' + hex;
+                return hex;
+            }).join('');
+        }
+
+        // Extremely insecure fallback if WebCrypto is completely missing
         return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     }
 
