@@ -772,18 +772,24 @@ export class F5 {
      * @returns {number}
      */
     static calculateCapacity(blocks, options = {}) {
-        const usable = this.collectUsableCoefficients(blocks);
-        const usableCount = usable.length;
-
-        if (usableCount === 0) return 0;
-
-        // Account for shrinkage: coefficients with |val|=1 may shrink
+        let usableCount = 0;
         let onesCount = 0;
-        for (const entry of usable) {
-            if (Math.abs(entry.block[entry.coeffIdx]) === 1) {
-                onesCount++;
+
+        // Calculate directly instead of calling collectUsableCoefficients to avoid massive allocations
+        for (let blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+            const block = blocks[blockIdx];
+            for (let coeffIdx = 1; coeffIdx < 64; coeffIdx++) {
+                const val = block[coeffIdx];
+                if (val !== 0) {
+                    usableCount++;
+                    if (val === 1 || val === -1) {
+                        onesCount++;
+                    }
+                }
             }
         }
+
+        if (usableCount === 0) return 0;
 
         // Try different k values and use the one that gives best capacity
         // Higher k = more bits per group but fewer changes

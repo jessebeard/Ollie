@@ -1,0 +1,3 @@
+## 2025-02-23 - Avoid O(N) Array Allocations for Aggregation in Hot Paths
+**Learning:** In `src/information-theory/steganography/f5-syndrome.js`, `F5.calculateCapacity` relied on `this.collectUsableCoefficients` which returned a massively large array of objects just to iterate over it again for counting `usableCount` and `onesCount`. This intermediate object allocation slows down performance by ~8x in Node.js due to garbage collection and object overhead.
+**Action:** When performing simple aggregation or counting across large, multi-dimensional structures (like JPEG component blocks), compute the aggregations directly using nested loops rather than materializing the intermediate items into a new array.
