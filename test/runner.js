@@ -192,6 +192,7 @@ async function runTests() {
         await import('./codec/steganography/container-format.test.js');
         await import('./codec/capacity-scanner.test.js');
         await import('./codec/capacity-scanner.pbt.js');
+        await import('./security/id-generation.test.js');
 
         await import('./information-theory/cryptography/aes-gcm.test.js');
         await import('./information-theory/cryptography/pbkdf2.test.js');

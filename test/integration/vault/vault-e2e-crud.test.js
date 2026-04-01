@@ -90,7 +90,7 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
                 for (let entry of currentEntries) {
                     const rand = Math.random();
                     if (rand < 0.20) { // Delete
-                        const [newVault, err] = await vault.deleteEntry(entry.id);
+                        const [newVault, err] = vault.deleteEntry(entry.id);
                         expect(err).toEqual(null);
                         vault = newVault;
                         expectedCount--;
