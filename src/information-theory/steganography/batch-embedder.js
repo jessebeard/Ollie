@@ -105,27 +105,38 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            let totalLen = 0;
+            let dataSource = null;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
+                        totalLen += compData.blocks.length;
+                        dataSource = decoded.coefficients;
                     }
                 }
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (totalLen === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
+                        totalLen += compData.blocks.length;
+                        dataSource = decoder.components;
+                    }
+                }
+            }
 
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+            const allBlocks = new Array(totalLen);
+            if (totalLen > 0 && dataSource) {
+                let offset = 0;
+                for (const compId in dataSource) {
+                    const compData = dataSource[compId];
+                    if (compData && compData.blocks) {
+                        const blocks = compData.blocks;
+                        for (let k = 0; k < blocks.length; k++) {
+                            allBlocks[offset++] = blocks[k];
                         }
                     }
                 }
