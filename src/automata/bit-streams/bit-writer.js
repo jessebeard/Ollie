@@ -7,9 +7,28 @@ export class BitWriter {
     }
 
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        // Optimize writing multiple bits by batching them into byte-aligned operations.
+        // This avoids function call overhead of calling writeBit inside a loop and
+        // handles stuffing efficiently.
+        while (length > 0) {
+            const space = 8 - this.bitCount;
+            if (length >= space) {
+                const shift = length - space;
+                const chunk = (data >> shift) & ((1 << space) - 1);
+                this.byte = (this.byte << space) | chunk;
+                this.bytes.push(this.byte);
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+                length -= space;
+            } else {
+                const chunk = data & ((1 << length) - 1);
+                this.byte = (this.byte << length) | chunk;
+                this.bitCount += length;
+                length = 0;
+            }
         }
     }
 
