@@ -224,6 +224,9 @@ async function runTests() {
         await import('./integration/vault/vault-e2e-multigen.test.js');
         await import('./integration/vault/vault-capacity-ui.test.js');
 
+        // Security
+        await import('./security/id-generation.test.js');
+
         await executeTests();
         const stats = getStats();
 
