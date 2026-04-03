@@ -6,10 +6,32 @@ export class BitWriter {
         this.bitCount = 0;
     }
 
+    _pushByte() {
+        this.bytes.push(this.byte);
+        if (this.byte === 0xFF) {
+            this.bytes.push(0x00);
+        }
+        this.byte = 0;
+        this.bitCount = 0;
+    }
+
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        // Fast path: batch bitwise operations to reduce function call overhead
+        while (length > 0) {
+            const bitsToNextByte = 8 - this.bitCount;
+            const bitsToWrite = length > bitsToNextByte ? bitsToNextByte : length;
+
+            const shift = length - bitsToWrite;
+            const extracted = (data >> shift) & ((1 << bitsToWrite) - 1);
+
+            this.byte = (this.byte << bitsToWrite) | extracted;
+            this.bitCount += bitsToWrite;
+
+            if (this.bitCount === 8) {
+                this._pushByte();
+            }
+
+            length -= bitsToWrite;
         }
     }
 
@@ -17,13 +39,7 @@ export class BitWriter {
         this.byte = (this.byte << 1) | bit;
         this.bitCount++;
         if (this.bitCount === 8) {
-            this.bytes.push(this.byte);
-
-            if (this.byte === 0xFF) {
-                this.bytes.push(0x00);
-            }
-            this.byte = 0;
-            this.bitCount = 0;
+            this._pushByte();
         }
     }
 
