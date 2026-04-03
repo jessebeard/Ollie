@@ -331,6 +331,43 @@ export class JpegDecoder {
         let mcusSinceRestart = 0;
         let expectedRstMarker = 0xD0; // Start with RST0
 
+        // Hoist lookups: map scan components to their required data before the MCU loop
+        const scanComponentMeta = [];
+        for (const scanComp of scanHeader.components) {
+            const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
+            if (!frameComp) {
+                return new Error(`Scan component ${scanComp.selector} not found in frame header`);
+            }
+
+            const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
+            const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
+
+            if (Ss === 0 && !dcTable) {
+                return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
+            }
+            if (Se > 0 && !acTable) {
+                return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
+            }
+
+            const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
+            const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
+            const blocksArray = this.components[scanComp.selector].blocks;
+            const blocksH = this.components[scanComp.selector].blocksH;
+
+            scanComponentMeta.push({
+                selector: scanComp.selector,
+                frameComp,
+                dcTable,
+                acTable,
+                compIndex,
+                blocksInMCU,
+                blocksArray,
+                blocksH,
+                vSampling: frameComp.vSampling,
+                hSampling: frameComp.hSampling
+            });
+        }
+
         for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
 
             // Handle Restart Interval
@@ -392,40 +429,21 @@ export class JpegDecoder {
                 // DO NOT `continue` the loop, as we still need to process the current MCU index.
             }
 
-            for (const scanComp of scanHeader.components) {
-                const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
-
-                if (!frameComp) {
-                    return new Error(`Scan component ${scanComp.selector} not found in frame header`);
-                }
-
-                const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
-                const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
-
-                if (Ss === 0 && !dcTable) {
-                    return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
-                }
-                if (Se > 0 && !acTable) {
-                    return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
-                }
-
-                const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
-                for (let i = 0; i < blocksInMCU; i++) {
-                    const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-
+            for (const meta of scanComponentMeta) {
+                for (let i = 0; i < meta.blocksInMCU; i++) {
                     const mcuRow = Math.floor(mcuIndex / mcuCols);
                     const mcuCol = mcuIndex % mcuCols;
-                    const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
-                    const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
-                    const blockIndex = blockRow * this.components[scanComp.selector].blocksH + blockCol;
+                    const blockRow = mcuRow * meta.vSampling + Math.floor(i / meta.hSampling);
+                    const blockCol = mcuCol * meta.hSampling + (i % meta.hSampling);
+                    const blockIndex = blockRow * meta.blocksH + blockCol;
 
-                    const block = this.components[scanComp.selector].blocks[blockIndex];
+                    const block = meta.blocksArray[blockIndex];
 
                     const [blockResult, blockErr] = decodeBlock(
                         bitReader,
-                        dcTable,
-                        acTable,
-                        dcPredictors[compIndex],
+                        meta.dcTable,
+                        meta.acTable,
+                        dcPredictors[meta.compIndex],
                         block,
                         Ss,
                         Se
@@ -433,7 +451,7 @@ export class JpegDecoder {
                     if (blockErr) return blockErr;
 
                     if (Ss === 0) {
-                        dcPredictors[compIndex] = blockResult.dc;
+                        dcPredictors[meta.compIndex] = blockResult.dc;
                     }
                 }
             }
