@@ -1,6 +1,7 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
+import { cryptoInstance } from '../../../src/information-theory/cryptography/crypto-compat.js';
 
 describe('PasswordVault (Property-Based Tests)', () => {
 
@@ -107,12 +108,24 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(pErr !== null).toBe(true);
     });
 
-    it('should calculate unique IDs', () => {
+    it('should calculate unique cryptographically secure IDs', () => {
+        const originalRandom = Math.random;
+        let randomCalled = false;
+        Math.random = () => {
+            randomCalled = true;
+            return originalRandom();
+        };
+
         const ids = new Set();
         for (let i = 0; i < 100; i++) {
-            ids.add(PasswordVault.generateId());
+            const id = PasswordVault.generateId();
+            ids.add(id);
+            expect(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)).toBe(true);
         }
         expect(ids.size).toBe(100);
+        expect(randomCalled).toBe(false);
+
+        Math.random = originalRandom;
     });
 
     it('should search entries correctly skipping encrypted fields', async () => {
