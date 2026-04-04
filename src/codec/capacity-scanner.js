@@ -32,11 +32,22 @@ export class CapacityScanner {
                 const [info, err] = await decoder.decode(bytes, { coefficientsOnly: true });
                 if (err) return [null, err];
 
-                const allBlocks = [];
+                // Optimization: Pre-allocate target array size to avoid garbage
+                // collection and memory reallocation overhead during large pushes.
+                let totalBlocks = 0;
+                for (const compId in info.coefficients) {
+                    totalBlocks += info.coefficients[compId].blocks.length;
+                }
+
+                const allBlocks = new Array(totalBlocks);
+                let blockIdx = 0;
+
                 for (const compId in info.coefficients) {
                     const comp = info.coefficients[compId];
-                    for (let i = 0; i < comp.blocks.length; i++) {
-                        allBlocks.push(comp.blocks[i]);
+                    const blocks = comp.blocks;
+                    const len = blocks.length;
+                    for (let i = 0; i < len; i++) {
+                        allBlocks[blockIdx++] = blocks[i];
                     }
                 }
 
