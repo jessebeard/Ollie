@@ -4,6 +4,23 @@ import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
 describe('ChunkManager (Property-Based Tests)', () => {
 
+    it('should generate secure UUID v4', () => {
+        const originalRandom = Math.random;
+        let randomCalled = false;
+        Math.random = () => {
+            randomCalled = true;
+            return 0.5;
+        };
+
+        try {
+            const id = ChunkManager.generateId();
+            expect(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)).toBe(true);
+            expect(randomCalled).toBe(false);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
+
     it('Property: Reassembly Symmetry (split then reassemble yields original data)', async () => {
         // Fuzz byte arrays of varying lengths and random chunk sizes
         await assertProperty(
