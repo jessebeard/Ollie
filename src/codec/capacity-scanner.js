@@ -32,11 +32,19 @@ export class CapacityScanner {
                 const [info, err] = await decoder.decode(bytes, { coefficientsOnly: true });
                 if (err) return [null, err];
 
-                const allBlocks = [];
+                let totalBlocksCount = 0;
                 for (const compId in info.coefficients) {
                     const comp = info.coefficients[compId];
-                    for (let i = 0; i < comp.blocks.length; i++) {
-                        allBlocks.push(comp.blocks[i]);
+                    totalBlocksCount += comp.blocks.length;
+                }
+
+                const allBlocks = new Array(totalBlocksCount);
+                let blockIdx = 0;
+                for (const compId in info.coefficients) {
+                    const comp = info.coefficients[compId];
+                    const len = comp.blocks.length;
+                    for (let i = 0; i < len; i++) {
+                        allBlocks[blockIdx++] = comp.blocks[i];
                     }
                 }
 
