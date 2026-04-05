@@ -333,6 +333,12 @@ export function expect(actual) {
                 throw new Error('Expected function to throw an error');
             }
         },
+                toMatchRegex: (regex) => {
+            tick();
+            if (!regex.test(actual)) {
+                throw new Error(`Expected ${actual} to match ${regex}`);
+            }
+        },
         toContain: (expected) => {
             tick();
             if (actual === null || actual === undefined || typeof actual.includes !== 'function') {
