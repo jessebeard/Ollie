@@ -7,9 +7,27 @@ export class BitWriter {
     }
 
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        // Optimization: Batch bitwise operations instead of writing individual bits
+        // to reduce function call overhead and speed up stream encoding.
+        while (length > 0) {
+            const bitsToFill = 8 - this.bitCount;
+            const bitsToWrite = length > bitsToFill ? bitsToFill : length;
+            const shift = length - bitsToWrite;
+            const extractedBits = (data >> shift) & ((1 << bitsToWrite) - 1);
+
+            this.byte = (this.byte << bitsToWrite) | extractedBits;
+            this.bitCount += bitsToWrite;
+            length -= bitsToWrite;
+
+            if (this.bitCount === 8) {
+                this.bytes.push(this.byte);
+                // Keep domain-specific encoding rule intact
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+            }
         }
     }
 
