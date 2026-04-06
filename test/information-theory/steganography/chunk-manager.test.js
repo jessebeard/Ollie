@@ -116,4 +116,30 @@ describe('ChunkManager (Property-Based Tests)', () => {
             50
         );
     });
+
+    it('should generate secure UUID v4 IDs', () => {
+        // Mock Math.random to verify it is not called
+        const originalRandom = Math.random;
+        let randomCalled = false;
+        Math.random = () => {
+            randomCalled = true;
+            return 0.5;
+        };
+
+        try {
+            const ids = new Set();
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+            for (let i = 0; i < 100; i++) {
+                const id = ChunkManager.generateId();
+                expect(uuidRegex.test(id)).toBe(true);
+                ids.add(id);
+            }
+
+            expect(ids.size).toBe(100);
+            expect(randomCalled).toBe(false);
+        } finally {
+            Math.random = originalRandom;
+        }
+    });
 });
