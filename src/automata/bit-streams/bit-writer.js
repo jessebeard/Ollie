@@ -6,10 +6,31 @@ export class BitWriter {
         this.bitCount = 0;
     }
 
-    writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+writeBits(data, length) {
+        let remaining = length;
+        while (remaining > 0) {
+            const space = 8 - this.bitCount;
+            if (remaining <= space) {
+                // Fits entirely in current byte
+                this.byte = (this.byte << remaining) | (data & ((1 << remaining) - 1));
+                this.bitCount += remaining;
+                remaining = 0;
+            } else {
+                // Fill up the current byte
+                const take = space;
+                remaining -= take;
+                this.byte = (this.byte << take) | ((data >> remaining) & ((1 << take) - 1));
+                this.bitCount += take;
+            }
+
+            if (this.bitCount === 8) {
+                this.bytes.push(this.byte);
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+            }
         }
     }
 

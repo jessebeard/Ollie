@@ -38,13 +38,13 @@ export class F5 {
             for (let i = 0; i < seed.length; i++) {
                 state = ((state << 5) - state + seed.charCodeAt(i)) | 0;
             }
-            state = Math.abs(state) || 1;
+            state = (state < 0 ? -state : state) || 1;
         } else if (seed instanceof Uint8Array) {
             state = 0;
             for (let i = 0; i < Math.min(seed.length, 8); i++) {
                 state = (state << 8) | seed[i];
             }
-            state = Math.abs(state) || 1;
+            state = (state < 0 ? -state : state) || 1;
         } else {
             state = seed || 1;
         }
@@ -185,7 +185,7 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -250,7 +250,7 @@ export class F5 {
             // Compute current hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) === 1) {
                     hash ^= (j + 1);
                 }
             }
@@ -329,7 +329,7 @@ export class F5 {
                     const val = blocks[b][c];
                     if (val !== 0) {
                         nonZeroCount++;
-                        if (Math.abs(val) === 1) onesCount++;
+                        if (val === 1 || val === -1) onesCount++;
                     }
                 }
             }
@@ -363,7 +363,7 @@ export class F5 {
             // Compute hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) === 1) {
                     hash ^= (j + 1);
                 }
             }
@@ -492,7 +492,7 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -780,7 +780,8 @@ export class F5 {
         // Account for shrinkage: coefficients with |val|=1 may shrink
         let onesCount = 0;
         for (const entry of usable) {
-            if (Math.abs(entry.block[entry.coeffIdx]) === 1) {
+            const coeff = entry.block[entry.coeffIdx];
+            if (coeff === 1 || coeff === -1) {
                 onesCount++;
             }
         }

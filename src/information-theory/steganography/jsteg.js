@@ -78,7 +78,7 @@ export class Jsteg {
                 }
 
                 const val = block[i];
-                const absVal = Math.abs(val);
+                const absVal = val < 0 ? -val : val;
 
                 if (val === 0) continue;
 
@@ -107,14 +107,14 @@ export class Jsteg {
                     if (val > 0) {
                         block[i] = (val & ~1) | bit;
                     } else {
-                        block[i] = -(Math.abs(val & ~1) | bit);
+                        block[i] = -((val < 0 ? -(val & ~1) : (val & ~1)) | bit);
                     }
                 } else {
 
                     if (val > 0) {
                         block[i] = (val & ~1) | bit;
                     } else {
-                        block[i] = -(Math.abs(val & ~1) | bit);
+                        block[i] = -((val < 0 ? -(val & ~1) : (val & ~1)) | bit);
                     }
                 }
 
@@ -479,7 +479,7 @@ export class Jsteg {
         for (const block of blocks) {
             for (let i = 1; i < 64; i++) {
                 const val = block[i];
-                const absVal = Math.abs(val);
+                const absVal = val < 0 ? -val : val;
 
                 if (val === 0) continue;
 
