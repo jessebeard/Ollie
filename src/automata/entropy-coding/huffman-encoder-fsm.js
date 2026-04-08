@@ -25,19 +25,16 @@ export const DC_LUMA_TABLE = generateHuffmanTable(STD_DC_LUMINANCE_NRCODES, STD_
 
 export function computeCategory(val) {
     if (val === 0) return 0;
-    val = Math.abs(val);
-    let cat = 0;
-    while (val > 0) {
-        val >>= 1;
-        cat++;
-    }
-    return cat;
+    // O(1) bit-length calculation using hardware instructions
+    return 32 - Math.clz32(Math.abs(val));
 }
 
 export function getBitRepresentation(val) {
     if (val > 0) return val;
+    if (val === 0) return 0;
 
-    const cat = computeCategory(val);
+    // Use -val instead of Math.abs() to avoid function call overhead for negative numbers
+    const cat = 32 - Math.clz32(-val);
     return val + (1 << cat) - 1;
 }
 
