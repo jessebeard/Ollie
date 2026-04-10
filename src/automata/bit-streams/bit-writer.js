@@ -7,9 +7,34 @@ export class BitWriter {
     }
 
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        let remaining = length;
+        while (remaining > 0) {
+            const space = 8 - this.bitCount;
+            if (remaining <= space) {
+                this.byte = (this.byte << remaining) | (data & ((1 << remaining) - 1));
+                this.bitCount += remaining;
+                remaining = 0;
+
+                if (this.bitCount === 8) {
+                    this.bytes.push(this.byte);
+                    if (this.byte === 0xFF) {
+                        this.bytes.push(0x00);
+                    }
+                    this.byte = 0;
+                    this.bitCount = 0;
+                }
+            } else {
+                const shift = remaining - space;
+                const chunk = (data >> shift) & ((1 << space) - 1);
+                this.byte = (this.byte << space) | chunk;
+                this.bytes.push(this.byte);
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+                remaining -= space;
+            }
         }
     }
 
