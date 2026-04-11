@@ -105,27 +105,41 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            let totalBlocks = 0;
+            if (decoded.coefficients) {
+                for (const compId in decoded.coefficients) {
+                    if (decoded.coefficients[compId] && decoded.coefficients[compId].blocks) {
+                        totalBlocks += decoded.coefficients[compId].blocks.length;
+                    }
+                }
+            } else if (decoder.components) {
+                for (const compId in decoder.components) {
+                    if (decoder.components[compId] && decoder.components[compId].blocks) {
+                        totalBlocks += decoder.components[compId].blocks.length;
+                    }
+                }
+            }
+
+            const allBlocks = new Array(totalBlocks);
+            let idx = 0;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
-
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[idx++] = compData.blocks[k];
                         }
                     }
                 }
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (idx === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
-
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[idx++] = compData.blocks[k];
                         }
                     }
                 }
