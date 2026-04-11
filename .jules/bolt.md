@@ -1,0 +1,3 @@
+## 2024-05-18 - Optimize Huffman bit category loop
+**Learning:** In hot paths like Huffman encoder bit category calculations, replacing O(log N) bitwise `while` loops with hardware-accelerated integer instructions (like `32 - Math.clz32(Math.abs(val))`) yields massive performance gains. Further, `Math.abs()` can be avoided in branching logic when the mathematical sign of a value is already known, by computing directly on `-val` instead.
+**Action:** Next time you spot iterative bit-length calculations (especially in media codecs or compression logic), switch to `Math.clz32()` to make it an O(1) operation.
