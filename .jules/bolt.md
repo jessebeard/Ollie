@@ -1,0 +1,3 @@
+## 2024-04-13 - O(1) bit-length computation using Math.clz32
+**Learning:** In hot paths like entropy/Huffman coding, replacing O(log N) bitwise `while` loops for category/bit-length computation with `32 - Math.clz32(val)` transforms it into an O(1) operation leveraging hardware instructions, yielding significant performance gains.
+**Action:** When calculating bit-length or identifying the highest set bit, use `Math.clz32()` instead of loop-based counting. Additionally, when calculating bit-length on numbers already known to be negative (e.g., after an `if (val > 0)` check), use `-val` directly rather than `Math.abs(val)` or a ternary operator to eliminate branching overhead in hot paths.
