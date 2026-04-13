@@ -1,0 +1,3284 @@
+
+> Ollie@0.2.0 test /app
+> node test/runner.js
+
+[1mRunning Tests...[0m
+
+Starting Batch Processing Test...
+Embedding...
+Normalizing images...
+image1.jpg: Using original JPEG bytes (lossless path)
+Processed image1.jpg
+image2.jpg: Using original JPEG bytes (lossless path)
+Processed image2.jpg
+Analyzing image capacities...
+Analyzed image1.jpg: 5575 bytes
+Analyzed image2.jpg: 5575 bytes
+Total capacity: 11150 bytes, Data: 2000 bytes
+Embedding into image1.jpg...
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 5352 bytes, Data: 2000 bytes (ECC: true)
+F5: Embedding 19992 bits with k=3, n=7, nonZero=89975, totalAC=3096576
+F5: Embedded 19992 bits successfully with k=3
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 104457
+Total JPEG file size: 104852 bytes
+Done
+Embedded into 1 files.
+Extracting...
+Extracting from steg_0_image1.jpg...
+Extracted secret data (container): 2000 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Medium',
+  filename: 'secret.bin',
+  chunk: { id: '4f47df07-20d4-4861-8bd6-4cc3a28ce048', index: 0, total: 1 },
+  checksum: 249700,
+  originalLength: 2000,
+  blockCount: 9
+}
+File steg_0_image1.jpg: Found secret data. Metadata: {
+  ecc: true,
+  eccProfile: 'Medium',
+  filename: 'secret.bin',
+  chunk: { id: '4f47df07-20d4-4861-8bd6-4cc3a28ce048', index: 0, total: 1 },
+  checksum: 249700,
+  originalLength: 2000,
+  blockCount: 9
+}
+File steg_0_image1.jpg: Valid chunk found. Index 0/1
+Reassembling...
+Extraction complete.
+Filename: vault.json
+Data length: 2000
+Test Passed!
+  [32m✓[0m should embed and extract data correctly
+  [32m✓[0m should handle 1s and -1s correctly (expansion)
+
+[1mColor Space Conversion[0m
+  [32m✓[0m converts black correctly
+  [32m✓[0m converts white correctly
+  [32m✓[0m converts red correctly
+  [32m✓[0m converts blue correctly
+  [32m✓[0m handles grayscale values (R=G=B)
+  [32m✓[0m clamps output to valid range
+  [32m✓[0m ycbcrToRgb converts known values
+  [32m✓[0m should roundtrip RGB -> YCbCr -> RGB (specific)
+  [32m✓[0m Property: RGB -> YCbCr -> RGB roundtrip within ±2
+  [32m✓[0m Property: grayscale inputs always produce Cb≈128, Cr≈128
+  [32m✓[0m Property: Y output is always in [0, 255]
+
+[1mBlock Processing[0m
+
+[1mpadDimensions[0m
+  [32m✓[0m should return same dimensions if already multiple of 8
+  [32m✓[0m should pad width to next multiple of 8
+  [32m✓[0m should pad height to next multiple of 8
+  [32m✓[0m should pad both dimensions
+  [32m✓[0m should handle 1x1 image
+  [32m✓[0m Property: padded dimensions are always >= input and divisible by 8
+
+[1mpadDimensions420[0m
+  [32m✓[0m should return same dimensions if already multiple of 16
+  [32m✓[0m should pad to next multiple of 16
+  [32m✓[0m should handle 1x1 image
+  [32m✓[0m Property: padded dimensions always >= input and divisible by 16
+
+[1mextractBlock[0m
+  [32m✓[0m should extract a full 8x8 block from center
+  [32m✓[0m should pad right edge by clamping
+  [32m✓[0m should pad bottom edge by clamping
+  [32m✓[0m should handle 1x1 image padding
+  [32m✓[0m should always produce 64-element blocks
+
+[1mJPEG Headers[0m
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write correct SOI marker
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write correct APP0 (JFIF) marker
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write DQT markers
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write correct SOF0 marker
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+  [32m✓[0m should write DHT markers
+
+[1mDiscrete Cosine Transform[0m
+
+[1mforwardDCT (default/naive)[0m
+  [32m✓[0m transforms a zero block to all zeros
+  [32m✓[0m transforms a flat block (DC only)
+  [32m✓[0m is linear: DCT(A + B) = DCT(A) + DCT(B)
+  [32m✓[0m scales linearly: DCT(k * A) = k * DCT(A)
+  [32m✓[0m handles impulse response (single pixel set)
+  [32m✓[0m handles negative input values
+  [32m✓[0m should return error on invalid block length
+  [32m✓[0m should roundtrip with inverse DCT (IDCT)
+  [32m✓[0m Property: DCT/IDCT roundtrip within tolerance for random blocks
+
+[1mforwardDCTAAN[0m
+  [32m✓[0m transforms zero block to all zeros
+  [32m✓[0m transforms flat block (DC only)
+  [32m✓[0m should return error on invalid block length
+  [32m✓[0m Property: AAN matches Naive within tolerance
+
+[1mQuantization[0m
+
+[1mquantize[0m
+  [32m✓[0m quantizes a block correctly with luma table
+  [32m✓[0m quantizes a zero block to all zeros
+  [32m✓[0m handles rounding correctly
+  [32m✓[0m handles negative values
+  [32m✓[0m uses different quantization values per coefficient
+  [32m✓[0m should roundtrip with dequantize (approximate)
+  [32m✓[0m Property: quantize(zero_block, any_table) = zero_block
+  [32m✓[0m Property: sign of quantized matches sign of input
+
+[1mgetScaledQuantizationTables[0m
+  [32m✓[0m should return luma and chroma tables
+  [32m✓[0m should clamp quality to [1, 100]
+  [32m✓[0m should return all values in [1, 255]
+  [32m✓[0m quality=100 should produce smallest quantization values
+  [32m✓[0m Property: all table values in [1, 255] for any quality
+  [32m✓[0m should cache results for same quality
+
+[1mStandard Tables[0m
+  [32m✓[0m QUANTIZATION_TABLE_LUMA has 64 elements
+  [32m✓[0m QUANTIZATION_TABLE_CHROMA has 64 elements
+  [32m✓[0m Standard tables have values in valid range
+
+[1mZigZag Reordering[0m
+  [32m✓[0m reorders a block correctly (sequential input)
+  [32m✓[0m should roundtrip with inverseZigZag (exact equality)
+  [32m✓[0m Property: zigzag/inverseZigzag roundtrip for random blocks
+  [32m✓[0m ZIGZAG_ORDER is a valid permutation (bijection over 0-63)
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should return error on invalid array length
+  [32m✓[0m should handle Float32Array input
+  [32m✓[0m should preserve negative coefficients
+
+[1mHuffman Coding[0m
+
+[1mcomputeCategory[0m
+  [32m✓[0m category of 0 is 0
+  [32m✓[0m categories for small values
+  [32m✓[0m categories for large values
+  [32m✓[0m Property: category increases with magnitude
+  [32m✓[0m Property: positive and negative same magnitude have same category
+
+[1mgetBitRepresentation[0m
+  [32m✓[0m positive values return themselves
+  [32m✓[0m negative values use ones complement encoding
+  [32m✓[0m Property: bit representation fits in category bits
+
+[1mStandard Tables[0m
+  [32m✓[0m DC_LUMA_TABLE has entries for categories 0-11
+  [32m✓[0m AC_LUMA_TABLE has EOB (0x00) entry
+  [32m✓[0m AC_LUMA_TABLE has ZRL (0xF0) entry
+
+[1mBitWriter integration[0m
+  [32m✓[0m writes bits correctly
+  [32m✓[0m performs byte stuffing (0xFF -> 0xFF 0x00)
+  [32m✓[0m expands buffer dynamically
+
+[1mencodeBlock[0m
+  [32m✓[0m encodes a DC-only block (all AC = 0)
+  [32m✓[0m encodes a block with AC coefficients
+  [32m✓[0m tracks DC differential correctly
+  [32m✓[0m handles all-zero block
+  [32m✓[0m Property: encodeBlock always returns DC value from block[0]
+
+[1mChroma Downsampling[0m
+
+[1mdownsampleBlock420[0m
+  [32m✓[0m should produce 64-element output from 16x16 region
+  [32m✓[0m should average 2x2 regions correctly
+  [32m✓[0m should handle uniform input (all same value)
+  [32m✓[0m Property: uniform input → uniform output
+  [32m✓[0m should clamp at image boundaries
+
+[1mextractLumaBlocks420[0m
+  [32m✓[0m should return exactly 4 blocks
+  [32m✓[0m each block should be 64 elements
+  [32m✓[0m should extract correct quadrants
+  [32m✓[0m should handle edge clamping
+  [32m✓[0m Property: uniform input produces 4 identical uniform blocks
+
+[1mProgressive Encoding[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 37
+Total JPEG file size: 432 bytes
+  [32m✓[0m should generate multiple SOS markers when progressive mode is enabled
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 32
+Total JPEG file size: 427 bytes
+  [32m✓[0m should generate SOF2 (Progressive DCT) instead of SOF0 (Baseline DCT)
+
+[1mSPIFF Generation[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 427
+Scan data length: 23
+Total JPEG file size: 452 bytes
+  [32m✓[0m should generate a valid SPIFF APP8 marker when enabled
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 18
+Total JPEG file size: 413 bytes
+  [32m✓[0m should not generate SPIFF marker by default
+
+[1mJpegEncoder Integration[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 18
+Total JPEG file size: 413 bytes
+  [32m✓[0m encodes a small 8x8 white block without errors
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 86
+Total JPEG file size: 481 bytes
+  [32m✓[0m encodes a 16x16 image (multiple blocks)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 23
+Total JPEG file size: 418 bytes
+  [32m✓[0m encodes an image with odd dimensions (padding check)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 19
+Total JPEG file size: 414 bytes
+  [32m✓[0m encodes a 1x1 image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 29
+Total JPEG file size: 424 bytes
+  [32m✓[0m encodes a rectangular image (non-square)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 18
+Total JPEG file size: 413 bytes
+  [32m✓[0m produces valid headers
+
+[1mJpegEncoder Quality Levels[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 892
+Total JPEG file size: 1287 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3537
+Total JPEG file size: 3932 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 7119
+Total JPEG file size: 7514 bytes
+Q10: 1287 bytes, Q50: 3932 bytes, Q90: 7514 bytes
+  [32m✓[0m produces smaller files at lower quality
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 47
+Total JPEG file size: 442 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 129
+Total JPEG file size: 524 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 228
+Total JPEG file size: 623 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 321
+Total JPEG file size: 716 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1076
+Total JPEG file size: 1471 bytes
+  [32m✓[0m produces valid JPEG at all quality levels
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 67
+Total JPEG file size: 462 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 25
+Total JPEG file size: 420 bytes
+  [32m✓[0m writes correct DQT values based on quality
+  [32m✓[0m caches quantization tables for same quality
+  [32m✓[0m clamps quality to valid range
+
+[1mJPEG Encoder - 4:2:0 Subsampling[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1813
+Total JPEG file size: 2208 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=64
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1004
+Total JPEG file size: 1399 bytes
+4:4:4 size: 2208, 4:2:0 size: 1399
+  [32m✓[0m 4:2:0 produces smaller files than 4:4:4
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=16
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 86
+Total JPEG file size: 481 bytes
+  [32m✓[0m 4:2:0 SOF has correct sampling factors
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=16
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 90
+Total JPEG file size: 485 bytes
+  [32m✓[0m 4:2:0 roundtrip - encodes and decodes correctly
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=16
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 86
+Total JPEG file size: 481 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:2:0 subsampling (preserving)
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (row-major): numMCUs=16, blocksH=8, mcuCols=4
+Flushing writer...
+Headers length: 393
+Scan data length: 86
+Total JPEG file size: 481 bytes
+  [32m✓[0m 4:2:0 lossless transcoding preserves subsampling
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=12
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 70
+Total JPEG file size: 465 bytes
+  [32m✓[0m 4:2:0 with odd dimensions works correctly
+
+[1mFrameHeaderParser[0m
+  [32m✓[0m should parse image width (X)
+  [32m✓[0m should parse image height (Y)
+  [32m✓[0m should parse sample precision (P, typically 8)
+  [32m✓[0m should parse number of components (Nf: 1=grayscale, 3=color)
+  [32m✓[0m should parse component IDs (C)
+  [32m✓[0m should parse sampling factors (H and V)
+  [32m✓[0m should parse quantization table selectors (Tq)
+  [32m✓[0m should calculate MCU dimensions from max sampling factors
+  [32m✓[0m should validate baseline constraints (P=8)
+  [32m✓[0m should validate image dimensions
+  [32m✓[0m should validate number of components
+  [32m✓[0m should throw error on incomplete data
+  [32m✓[0m should calculate MCU counts correctly
+
+[1mScanHeaderParser[0m
+  [32m✓[0m should parse number of components in scan (Ns)
+  [32m✓[0m should parse component selectors (Cs)
+  [32m✓[0m should parse DC table selectors (Td)
+  [32m✓[0m should parse AC table selectors (Ta)
+  [32m✓[0m should parse spectral selection (Ss, Se)
+  [32m✓[0m should parse successive approximation (Ah, Al)
+  [32m✓[0m should parse progressive parameters correctly
+  [32m✓[0m should validate DC table ID range
+  [32m✓[0m should validate AC table ID range
+  [32m✓[0m should validate number of components range
+  [32m✓[0m should throw error on incomplete data
+  [32m✓[0m should map components to Huffman tables correctly
+
+[1mHuffmanTableParser[0m
+  [32m✓[0m should parse DC table (Tc=0)
+  [32m✓[0m should parse AC table (Tc=1)
+  [32m✓[0m should extract table destination ID (0-3)
+  [32m✓[0m should parse BITS array (16 bytes)
+  [32m✓[0m should parse HUFFVAL array (variable length)
+  [32m✓[0m should validate BITS sum <= 256
+  [32m✓[0m should build lookup table for fast decoding
+  [32m✓[0m should handle multiple tables in one DHT segment
+  [32m✓[0m should validate table class
+  [32m✓[0m should validate table ID range
+  [32m✓[0m should throw error on incomplete BITS array
+  [32m✓[0m should throw error on incomplete HUFFVAL array
+  [32m✓[0m should decode simple Huffman codes
+  [32m✓[0m should parse tables from multiple DHT segments
+
+[1mQuantizationTableParser[0m
+  [32m✓[0m should parse 8-bit precision table (Pq=0)
+  [32m✓[0m should parse 16-bit precision table (Pq=1)
+  [32m✓[0m should extract table destination ID (0-3)
+  [32m✓[0m should parse 64 elements
+  [32m✓[0m should handle multiple tables in one DQT segment
+  [32m✓[0m should validate table ID range
+  [32m✓[0m should validate precision value
+  [32m✓[0m should throw error on incomplete table data
+  [32m✓[0m should parse tables from multiple DQT segments
+  [32m✓[0m should handle table override in multiple segments
+  [32m✓[0m should parse offset parameter correctly
+
+[1mHuffmanDecoder[0m
+  [32m✓[0m should decode DC coefficient category (SSSS)
+  [32m✓[0m should decode DC coefficient value from additional bits
+  [32m✓[0m should handle negative DC values (magnitude encoding)
+  [32m✓[0m should decode AC coefficient run/size symbols
+  [32m✓[0m should handle ZRL (0xF0) - 16 zeros
+  [32m✓[0m should handle EOB (0x00) - end of block
+  [32m✓[0m should decode AC coefficient values from additional bits
+  [32m✓[0m should maintain DC predictor per component
+  [32m✓[0m should decode a complete 8x8 block
+  [32m✓[0m should handle run-length encoding correctly
+  [32m✓[0m should handle magnitude encoding for various categories
+
+[1mInverseZigZag[0m
+  [32m✓[0m should convert 64-element array to 8×8 block
+  [32m✓[0m should use correct inverse zigzag order
+  [32m✓[0m should match encoder zigzag pattern
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should preserve coefficient values
+  [32m✓[0m should return error on invalid array length
+  [32m✓[0m should handle Float32Array input
+  [32m✓[0m should verify complete zigzag pattern
+  [32m✓[0m Property: inverseZigZag is a bijection (all 64 positions mapped)
+  [32m✓[0m should correctly reorder specific test pattern
+  [32m✓[0m should handle negative coefficients
+
+[1mDequantization[0m
+  [32m✓[0m should multiply coefficients by quantization table values
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+  [32m✓[0m should preserve negative coefficients
+  [32m✓[0m should work with Float32Array input
+  [32m✓[0m should return error on invalid block length
+  [32m✓[0m should return error on invalid quantization table length
+  [32m✓[0m should handle typical JPEG quantization table
+  [32m✓[0m should process all 64 coefficients
+
+[1mNaive IDCT[0m
+  [32m✓[0m should validate coefficient block length
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+  [32m✓[0m should roundtrip with forward DCT for constant block
+  [32m✓[0m should roundtrip with forward DCT for gradient block
+  [32m✓[0m should roundtrip with forward DCT for checkerboard pattern
+  [32m✓[0m should roundtrip with forward DCT for random block
+
+[1mAAN IDCT[0m
+  [32m✓[0m should validate coefficient block length
+  [32m✓[0m should handle all-zero blocks
+  [32m✓[0m should handle DC-only blocks
+  [32m✓[0m should roundtrip with forward DCT for constant block
+  [32m✓[0m should roundtrip with forward DCT for gradient block
+  [32m✓[0m should roundtrip with forward DCT for checkerboard pattern
+  [32m✓[0m should roundtrip with forward DCT for random block
+
+[1mIDCT Spec Implementations[0m
+  [32m✓[0m should handle DC-only block (constant value)
+  [32m✓[0m should match optimized and pure ref for DC-only
+  [32m✓[0m should validate coefficient block length
+
+[1mIDCT Switching[0m
+  [32m✓[0m should allow configuring the IDCT method
+  [32m✓[0m should use the configured IDCT method during decoding
+
+[1mYCbCr to RGB Conversion[0m
+  [32m✓[0m should convert black correctly
+  [32m✓[0m should convert white correctly
+  [32m✓[0m should convert pure red correctly
+  [32m✓[0m should convert pure green correctly
+  [32m✓[0m should convert pure blue correctly
+  [32m✓[0m should clamp RGB values to 0-255 range
+  [32m✓[0m should handle grayscale values
+  [32m✓[0m should roundtrip with RGB to YCbCr
+  [32m✓[0m should use JFIF standard formulas
+  [32m✓[0m should handle edge case with Cb=0, Cr=0
+  [32m✓[0m should handle edge case with Cb=255, Cr=255
+
+[1mChroma Upsampling[0m
+  [32m✓[0m should upsample 2x2 to 4x4 using nearest neighbor
+  [32m✓[0m should upsample 2x2 to 4x4 using bilinear interpolation
+  [32m✓[0m should handle 4:2:0 upsampling (2x horizontal, 2x vertical)
+  [32m✓[0m should handle 4:2:2 upsampling (2x horizontal only)
+  [32m✓[0m should handle 4:4:4 (no upsampling needed)
+  [32m✓[0m should handle edge pixels correctly in bilinear
+  [32m✓[0m should upsample with upsampleChroma for 4:2:0
+  [32m✓[0m should not upsample Y component
+  [32m✓[0m should handle 4:2:2 with upsampleChroma
+  [32m✓[0m should preserve values in nearest neighbor upsampling
+  [32m✓[0m should create smooth gradients with bilinear interpolation
+
+[1mBlock Assembly[0m
+  [32m✓[0m should assemble single 8x8 block
+  [32m✓[0m should assemble multiple blocks horizontally
+  [32m✓[0m should assemble multiple blocks vertically
+  [32m✓[0m should handle partial blocks at edges
+  [32m✓[0m should assemble 2x2 grid of blocks
+  [32m✓[0m should convert YCbCr components to RGBA ImageData
+  [32m✓[0m should set alpha channel to 255
+  [32m✓[0m should convert grayscale to RGBA ImageData
+  [32m✓[0m should clamp RGB values in componentsToImageData
+  [32m✓[0m should crop image data correctly
+  [32m✓[0m should not crop if dimensions match
+  [32m✓[0m should handle non-multiple-of-8 dimensions
+
+[1mProgressive Decoding[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 40
+Total JPEG file size: 435 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should decode a progressive JPEG correctly
+
+[1mJPEG Decoder - RST Marker Robustness (PBT)[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 6591
+Total JPEG file size: 6986 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 6649
+Total JPEG file size: 7050 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 8167
+Total JPEG file size: 8562 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 8250
+Total JPEG file size: 8651 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 8414
+Total JPEG file size: 8809 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 8656
+Total JPEG file size: 9057 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 6549
+Total JPEG file size: 6944 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 6598
+Total JPEG file size: 6999 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 11255
+Total JPEG file size: 11650 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 11301
+Total JPEG file size: 11702 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 9386
+Total JPEG file size: 9781 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 9510
+Total JPEG file size: 9911 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1933
+Total JPEG file size: 2328 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 1959
+Total JPEG file size: 2360 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 5075
+Total JPEG file size: 5470 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 5092
+Total JPEG file size: 5493 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 7006
+Total JPEG file size: 7401 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 7028
+Total JPEG file size: 7429 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 14143
+Total JPEG file size: 14538 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 399
+Scan data length: 14271
+Total JPEG file size: 14672 bytes
+  [32m✓[0m Should correctly decode streams with arbitrary Restart Intervals
+
+[1mBitReader[0m
+  [32m✓[0m should read single bits correctly
+  [32m✓[0m should read multi-bit sequences (1-16 bits)
+  [32m✓[0m should handle byte boundaries correctly
+  [32m✓[0m should handle byte stuffing (0xFF 0x00 -> 0xFF)
+  [32m✓[0m should detect restart markers (0xFFD0-0xFFD7)
+  [32m✓[0m should throw error on unexpected markers
+  [32m✓[0m should track bit position accurately
+  [32m✓[0m should peek bits without consuming them
+  [32m✓[0m should align to byte boundary
+  [32m✓[0m should detect end of file
+  [32m✓[0m should throw error when reading past end
+  [32m✓[0m should handle reading across multiple bytes
+  [32m✓[0m should validate bit length parameter
+
+[1mBitCore[0m
+
+[1mhandleByteStuffing[0m
+  [32m✓[0m should handle normal bytes without stuffing
+  [32m✓[0m should skip stuffed zero byte following 0xFF
+  [32m✓[0m should return RESTART marker for 0xFFD0-0xFFD7
+  [32m✓[0m should return error for unexpected 0xFF markers
+  [32m✓[0m should handle end of data
+
+[1mreadBit[0m
+  [32m✓[0m should read bits from a byte
+  [32m✓[0m should read across byte boundaries
+  [32m✓[0m should handle byte stuffing during bit reads
+  [32m✓[0m should handle RESTART marker during bit reads
+  [32m✓[0m should return error at end of data
+
+[1mreadBits[0m
+  [32m✓[0m should read multiple bits
+  [32m✓[0m should return error for invalid length
+
+[1mpeekBits[0m
+  [32m✓[0m should peek bits without advancing offset
+
+[1mpeek16Bits[0m
+  [32m✓[0m should use fast path for no stuffing
+  [32m✓[0m should handle stuffing in peek16Bits
+  [32m✓[0m should handle EOF with padding 1s
+
+[1mMarkerParser[0m
+  [32m✓[0m should identify SOI marker (0xFFD8)
+  [32m✓[0m should identify EOI marker (0xFFD9)
+  [32m✓[0m should skip 0xFF 0x00 (byte stuffing)
+  [32m✓[0m should skip 0xFF 0xFF (padding)
+  [32m✓[0m should parse segment length correctly (big-endian)
+  [32m✓[0m should extract DQT segment data
+  [32m✓[0m should extract DHT segment data
+  [32m✓[0m should handle standalone markers (no length)
+  [32m✓[0m should validate marker sequence (SOI must be first)
+  [32m✓[0m should handle multiple DQT segments
+  [32m✓[0m should get marker names correctly
+  [32m✓[0m should handle APP markers
+  [32m✓[0m should handle RST markers
+  [32m✓[0m should parse minimal valid JPEG
+  [32m✓[0m should throw error on invalid segment length
+  [32m✓[0m should throw error on incomplete segment
+
+[1mJsteg Steganography[0m
+  [32m✓[0m should calculate capacity correctly
+
+[1mJsteg Container Format[0m
+  [32m✓[0m should embed data with JSTG magic bytes
+  [32m✓[0m should embed version and flags
+  [32m✓[0m should embed metadata
+  [32m✓[0m should extract container with metadata and payload
+  [32m✓[0m should verify CRC32 integrity
+  [32m✓[0m should embed with ECC when flag is set
+CRC mismatch, attempting ECC recovery...
+  [32m✓[0m should recover from corruption when ECC is enabled
+  [32m✓[0m should encrypt and decrypt data with password
+Decryption failed: DOMException [OperationError]: The operation failed for an operation-specific reason
+    at AESCipherJob.onDone (node:internal/crypto/util:453:19) {
+  [cause]: [Error: Cipher job failed]
+}
+  [32m✓[0m should fail to decrypt with wrong password
+CRC mismatch, attempting ECC recovery...
+TEST RESULT: {
+  data: Uint8Array(3) [ 10, 20, 30 ],
+  metadata: {
+    encrypted: true,
+    ecc: true,
+    eccProfile: 'Medium',
+    originalLength: 47,
+    blockCount: 1
+  }
+}
+  [32m✓[0m should combine encryption and ECC
+
+[1mChunkManager (Property-Based Tests)[0m
+  [32m✓[0m Property: Reassembly Symmetry (split then reassemble yields original data)
+  [32m✓[0m Property: Shuffle Recovery (reassemble out-of-order chunks yields original data)
+  [32m✓[0m Property: Incomplete Payload Rejection
+  [32m✓[0m Property: ID Mismatch Rejection (mixing datasets fails)
+
+[1mF5 Steganography[0m
+
+[1mPRNG[0m
+  [32m✓[0m should produce consistent results with same seed
+  [32m✓[0m should produce different results with different seeds
+
+[1mXOR Hash[0m
+  [32m✓[0m should correctly hash coefficient groups
+  [32m✓[0m should return 0 when all LSBs are 0
+
+[1mK Selection[0m
+  [32m✓[0m should select higher k for more capacity
+  [32m✓[0m should fall back to k=1 when capacity is tight
+
+[1mRaw Embedding and Extraction[0m
+F5: Embedding 40 bits with k=4, n=15, nonZero=630, totalAC=630
+F5: Embedded 40 bits successfully with k=4
+  [32m✓[0m should embed and extract raw data correctly
+F5: Embedding 24 bits with k=4, n=15, nonZero=1260, totalAC=1260
+F5: Embedded 24 bits successfully with k=4
+  [32m✓[0m should handle shrinkage correctly
+
+[1mLegacy Format[0m
+F5: Embedding 56 bits with k=4, n=15, nonZero=630, totalAC=630
+F5: Embedded 56 bits successfully with k=4
+  [32m✓[0m should embed and extract with length header
+
+[1mContainer Format[0m
+F5: Embedding 456 bits with k=4, n=15, nonZero=3150, totalAC=3150
+F5: Embedded 456 bits successfully with k=4
+  [32m✓[0m should embed and extract container without encryption
+
+[1mCapacity Calculation[0m
+  [32m✓[0m should calculate capacity correctly
+  [32m✓[0m should account for container overhead
+
+[1mCRC32[0m
+  [32m✓[0m should match known CRC32 value
+
+[1mSpec Validation Tests[0m
+  [32m✓[0m Test 1: Syndrome correctness - should compute correct XOR hash
+F5: Embedding 8 bits with k=4, n=15, nonZero=630, totalAC=630
+F5: Embedded 8 bits successfully with k=4
+  [32m✓[0m Test 2: No-modification case - when S == M, no change
+F5: Embedding 8 bits with k=4, n=15, nonZero=1200, totalAC=1260
+F5: Embedded 8 bits successfully with k=4
+  [32m✓[0m Test 3: Modification without shrinkage - decrement magnitude
+  [32m✓[0m Test 5: Permutation stability - P depends only on N and seed
+  [32m✓[0m Permutation should NOT depend on coefficient values
+
+[1mErrorCorrection (Property-Based Tests)[0m
+  [32m✓[0m Property: Protect/Recover Symmetry across all profiles
+  [32m✓[0m Property: Error Correction Recovery (Medium profile)
+  [32m✓[0m should reject unknown ECC profile for protect via tuple
+  [32m✓[0m should reject unknown ECC profile for recover via tuple
+  [32m✓[0m should calculate overhead multiplier correctly
+  [32m✓[0m should calculate encoded size correctly
+  [32m✓[0m should handle legacy protect/recover (no profile)
+
+[1mContainerFormat (Property-Based Tests)[0m
+  [32m✓[0m Property: Encode/Decode Symmetry
+  [32m✓[0m Property: Flag Preservation
+  [32m✓[0m Property: CRC Tamper Detection
+  [32m✓[0m should reject containers that are too small
+  [32m✓[0m should reject invalid magic bytes
+  [32m✓[0m should reject unsupported version
+  [32m✓[0m should reject truncated containers
+  [32m✓[0m should reject oversized metadata via tuple
+  [32m✓[0m isContainer should detect valid containers
+  [32m✓[0m isContainer should reject non-containers
+  [32m✓[0m isContainer should handle data that is too small
+
+[1mCapacityScanner (Unit Tests)[0m
+  [32m✓[0m should return a success Result tuple with capacity data for a list of JPEGs
+  [32m✓[0m should handle non-JPEG files by returning an error result
+  [32m✓[0m should propagate progress updates via the onProgress callback
+  [32m✓[0m should return zero capacity for an empty file list
+  [32m✓[0m should truly process files in parallel
+  [32m✓[0m should aggregate results correctly when processed out of order
+  [32m✓[0m should gracefully terminate the worker pool when finished
+  [32m✓[0m should handle corrupted JPEG data gracefully
+
+[1mCapacityScanner (Property-Based Tests)[0m
+  [32m✓[0m Property: Total capacity must be invariant under file ordering
+  [32m✓[0m Property: Total capacity must be invariant under different concurrency levels
+  [32m✓[0m Property: Total capacity must always be >= 0
+  [32m✓[0m Property: Image count must match the number of successfully scanned files
+
+[1mEncryption (Property-Based Tests)[0m
+  [32m✓[0m Property: Symmetry (encrypt then decrypt yields original data)
+  [32m✓[0m Property: Incorrect Key Rejection
+  [32m✓[0m Property: Ciphertext Tamper Resistance
+  [32m✓[0m Property: Unique IV & Identical Decryption per pass
+
+[1mKeyDerivation (Property-Based Tests)[0m
+  [32m✓[0m Property: Deterministic Derivation (same password & salt = same key)
+  [32m✓[0m Property: Salt Uniqueness and Influence (different salt = different key)
+  [32m✓[0m Property: Salt Generation Uniqueness
+
+[1mErrorCorrection (Reed-Solomon Integration)[0m
+
+[1mProfile-based protect/recover[0m
+  [32m✓[0m should protect data and add parity bytes
+  [32m✓[0m should recover data from clean (uncorrupted) encoded payload
+  [32m✓[0m should recover data from corruption within RS limits
+  [32m✓[0m should return error for unknown profile
+  [32m✓[0m should return error on recover with unknown profile
+
+[1mPBT: protect/recover roundtrip[0m
+  [32m✓[0m Property: roundtrip preserves data for random payloads
+
+[1mECC Profiles[0m
+  [32m✓[0m all profiles protect and recover correctly
+  [32m✓[0m higher profiles have larger encoded sizes
+
+[1mOverhead Multiplier[0m
+  [32m✓[0m Low profile has lowest overhead
+  [32m✓[0m overhead multiplier is always > 1
+
+[1mLegacy path[0m
+  [32m✓[0m protect with no profile returns Uint8Array directly
+  [32m✓[0m legacy protect systemtatic: data bytes preserved at start
+
+[1mGenericGF (Galois Field)[0m
+
+[1mField Construction[0m
+  [32m✓[0m exp and log tables should be size 256
+  [32m✓[0m exp table should have all values 1..255 exactly once
+  [32m✓[0m log(exp(i)) === i for all i in [0, 254]
+  [32m✓[0m getSize returns 256
+  [32m✓[0m getGeneratorBase returns expected value
+  [32m✓[0m toString includes primitive
+
+[1maddOrSubtract (XOR)[0m
+  [32m✓[0m a XOR a === 0 (self-inverse)
+  [32m✓[0m a XOR 0 === a (identity)
+  [32m✓[0m commutativity: a XOR b === b XOR a
+  [32m✓[0m associativity: (a XOR b) XOR c === a XOR (b XOR c)
+
+[1mmultiply[0m
+  [32m✓[0m a * 1 === a (multiplicative identity)
+  [32m✓[0m a * 0 === 0 (zero annihilation)
+  [32m✓[0m commutativity: a * b === b * a
+  [32m✓[0m result is always in [0, 255]
+
+[1minverse[0m
+  [32m✓[0m a * inverse(a) === 1 for all non-zero a
+  [32m✓[0m inverse(inverse(a)) === a (involution)
+  [32m✓[0m inverse(0) throws
+
+[1mlog / exp[0m
+  [32m✓[0m exp(log(a)) === a for all non-zero a
+  [32m✓[0m log(0) throws
+
+[1mbuildMonomial[0m
+  [32m✓[0m monomial(0, c) has degree 0 and coefficient c
+  [32m✓[0m monomial(d, c) has degree d
+  [32m✓[0m monomial(d, 0) is zero polynomial
+  [32m✓[0m negative degree throws
+
+[1mGenericGFPoly[0m
+
+[1mConstruction[0m
+  [32m✓[0m zero coefficients yield zero polynomial
+  [32m✓[0m leading zeros are stripped
+  [32m✓[0m empty coefficients array throws
+
+[1mevaluateAt[0m
+  [32m✓[0m evaluateAt(0) returns constant term
+  [32m✓[0m zero polynomial evaluates to 0 everywhere
+  [32m✓[0m evaluateAt(1) equals XOR of all coefficients
+
+[1maddOrSubtract (polynomial)[0m
+  [32m✓[0m p + 0 === p
+  [32m✓[0m p + p === 0 (GF(2^n) self-cancellation)
+  [32m✓[0m commutativity: p + q === q + p
+
+[1mmultiply (polynomial)[0m
+  [32m✓[0m p * 1 === p (scalar identity)
+  [32m✓[0m p * 0 === 0 (scalar zero)
+  [32m✓[0m degree of product equals sum of degrees
+  [32m✓[0m p * zero_poly === zero_poly
+
+[1mdivide (polynomial)[0m
+  [32m✓[0m quotient and remainder have correct degrees
+  [32m✓[0m divisor root zeroes out dividend minus remainder
+  [32m✓[0m remainder degree is less than divisor degree
+  [32m✓[0m dividing by zero polynomial throws
+
+[1mDistributive Law (PBT)[0m
+  [32m✓[0m a * (b + c) === a*b + a*c for field elements
+
+[1mField Instance Variants[0m
+  [32m✓[0m DATA_MATRIX_FIELD_256 has size 256 and generatorBase 1
+  [32m✓[0m QR_CODE_FIELD_256 has generatorBase 0
+
+[1mReedSolomonEncoder[0m
+  [32m✓[0m should append parity bytes without modifying data bytes
+  [32m✓[0m PBT: systematic encoding preserves data for random payloads
+  [32m✓[0m should throw for zero ecBytes
+  [32m✓[0m should throw when no data bytes
+  [32m✓[0m parity bytes are all in [0, 255]
+
+[1mReedSolomonDecoder[0m
+  [32m✓[0m should decode clean (uncorrupted) codeword without modification
+  [32m✓[0m PBT: encode/decode roundtrip recovers from t errors (t = ecBytes/2)
+  [32m✓[0m should recover from single error at any position
+  [32m✓[0m should throw when errors exceed correction capacity
+
+[1mReed-Solomon Cross-Field[0m
+  [32m✓[0m DATA_MATRIX field encode/decode works the same way
+
+[1mReed-Solomon Encoder Generator Caching[0m
+  [32m✓[0m should cache generator polynomials
+  [32m✓[0m cached generators grow incrementally
+
+[1mReed-Solomon Integration[0m
+  [32m✓[0m testDataMatrix
+  [32m✓[0m testQRCode
+
+[1mJpegDecoder Integration[0m
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should decode solid black 8x8 JPEG
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should decode solid white 8x8 JPEG
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should decode solid red 8x8 JPEG
+F5: Extraction ran out of coefficients at bit 16
+F5: Extraction ran out of coefficients at bit 10
+F5: Extraction ran out of coefficients at bit 6
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 16
+  [32m✓[0m should decode checkerboard 8x8 JPEG
+F5: Extraction ran out of coefficients at bit 8
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 3
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 8
+  [32m✓[0m should decode gradient 16x16 JPEG
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should decode color blocks 24x24 JPEG
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should set alpha channel to 255
+F5: Extraction ran out of coefficients at bit 16
+F5: Extraction ran out of coefficients at bit 10
+F5: Extraction ran out of coefficients at bit 6
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 16
+F5: Extraction ran out of coefficients at bit 16
+F5: Extraction ran out of coefficients at bit 10
+F5: Extraction ran out of coefficients at bit 6
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 16
+  [32m✓[0m should handle different quality settings
+  [32m✓[0m should validate SOI marker
+  [32m✓[0m should require SOF0 marker
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should reset state between decodes
+  [32m✓[0m should handle invalid input to setDequantizationMethod
+  [32m✓[0m should handle invalid input to setIdctMethod
+  [32m✓[0m should return error for truncated SOF
+  [32m✓[0m should return error for missing SOS marker
+  [32m✓[0m should return error for invalid block count (too large)
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should return error for missing Quantization table
+
+[1mProperty-Based Fuzzing[0m
+  [32m✓[0m should never throw an unhandled exception on random garbage (PBT)
+
+[1mJPEG Decoder Defensive Tests[0m
+  [32m✓[0m should fail fast with distinct error if file does not start with FF D8 (SOI)
+  [32m✓[0m should fail safely on empty or null buffers
+
+[1mEncoder-Decoder Roundtrip[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 18
+Total JPEG file size: 413 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should roundtrip solid black image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 18
+Total JPEG file size: 413 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should roundtrip solid white image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 19
+Total JPEG file size: 414 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should roundtrip solid color image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 40
+Total JPEG file size: 435 bytes
+F5: Extraction ran out of coefficients at bit 8
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 3
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 8
+  [32m✓[0m should roundtrip gradient image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 17
+Total JPEG file size: 412 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 23
+Total JPEG file size: 418 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 35
+Total JPEG file size: 430 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 23
+Total JPEG file size: 418 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 23
+Total JPEG file size: 418 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should maintain image dimensions
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 40
+Total JPEG file size: 435 bytes
+F5: Extraction ran out of coefficients at bit 8
+F5: Extraction ran out of coefficients at bit 4
+F5: Extraction ran out of coefficients at bit 3
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 8
+  [32m✓[0m should produce acceptable quality at Q=90
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 17
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 17
+Total JPEG file size: 412 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 17
+Total JPEG file size: 412 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should handle different quality settings
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 19
+Total JPEG file size: 414 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should preserve alpha channel
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 17
+Total JPEG file size: 412 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m should handle edge case 1x1 image
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 21
+Total JPEG file size: 416 bytes
+F5: Extraction ran out of coefficients at bit 2
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 2
+  [32m✓[0m should handle 8x8 image (single MCU)
+
+[1mSteganography Roundtrip[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+Capacity: 669 bytes, Data: 46 bytes (ECC: true)
+F5: Embedding 2728 bits with k=3, n=7, nonZero=10515, totalAC=12096
+F5: Embedded 2728 bits successfully with k=3
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 7021
+Total JPEG file size: 7416 bytes
+Extracted secret data (container): 46 bytes
+Metadata: { ecc: true, eccProfile: 'Medium', originalLength: 46, blockCount: 1 }
+  [32m✓[0m should roundtrip secret data
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 100 bytes (ECC: false)
+  [32m✓[0m should handle data too large for capacity (graceful failure)
+
+[1mSteganography Auto-Detection Roundtrip[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Processing block 1000
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+Capacity: 14495 bytes, Data: 13 bytes (ECC: true)
+F5: Embedding 2728 bits with k=4, n=15, nonZero=168442, totalAC=193536
+F5: Embedded 2728 bits successfully with k=4
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 113308
+Total JPEG file size: 113703 bytes
+Extracted secret data (container): 13 bytes
+Metadata: { ecc: true, eccProfile: 'Medium', originalLength: 13, blockCount: 1 }
+  [32m✓[0m should roundtrip with legacy format (current encoder behavior)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Processing block 1000
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 113448
+Total JPEG file size: 113843 bytes
+  [32m✓[0m should handle images without secret data
+
+[1mCapacity Validation[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 1000 bytes (ECC: false)
+  [32m✓[0m should throw error when secret data exceeds capacity
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Processing block 1000
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+Capacity: 14495 bytes, Data: 10 bytes (ECC: true)
+F5: Embedding 2728 bits with k=4, n=15, nonZero=168536, totalAC=193536
+F5: Embedded 2728 bits successfully with k=4
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 113334
+Total JPEG file size: 113729 bytes
+  [32m✓[0m should succeed when secret data fits
+
+[1mJsteg Format Detection[0m
+  [32m✓[0m should extract legacy format with extract()
+  [32m✓[0m should extract container format with extractContainer()
+Jsteg: Invalid length detected: 1246975047
+  [32m✓[0m should NOT extract container format with legacy extract()
+
+[1mJPEG Encoder - Coefficient Encoding[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 158
+Total JPEG file size: 553 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 158
+Total JPEG file size: 553 bytes
+  [32m✓[0m Encode from Coefficients - Basic
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2462
+Total JPEG file size: 2857 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 2462
+Total JPEG file size: 2857 bytes
+  [32m✓[0m Encode from Coefficients - 4:2:0 Subsampling
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 162
+Total JPEG file size: 557 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 162
+Total JPEG file size: 557 bytes
+  [32m✓[0m Encode from Coefficients - Preserves Component Structure
+
+[1mJPEG Transcoder (Lossless)[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 797
+Total JPEG file size: 1192 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 797
+Total JPEG file size: 1192 bytes
+  [32m✓[0m Lossless Roundtrip - Identical Pixels
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Processing block 1000
+Processing block 2000
+Processing block 3000
+Processing block 4000
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 22 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=674176, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 453607
+Total JPEG file size: 454002 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 22 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673950, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453591
+Total JPEG file size: 453986 bytes
+Extracted secret data (container): 22 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Medium',
+  encrypted: true,
+  originalLength: 66,
+  blockCount: 1
+}
+  [32m✓[0m Steganography Persistence - Single Update
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Processing block 1000
+Processing block 2000
+Processing block 3000
+Processing block 4000
+Embedding secret data...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=674108, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 453406
+Total JPEG file size: 453801 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673837, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453398
+Total JPEG file size: 453793 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673766, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453422
+Total JPEG file size: 453817 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673705, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453393
+Total JPEG file size: 453788 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673632, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453406
+Total JPEG file size: 453801 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673546, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453391
+Total JPEG file size: 453786 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673471, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453357
+Total JPEG file size: 453752 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673391, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453333
+Total JPEG file size: 453728 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673333, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453322
+Total JPEG file size: 453717 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 5 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673233, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453318
+Total JPEG file size: 453713 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+Capacity: 58175 bytes, Data: 6 bytes (ECC: true)
+F5: Embedding 2864 bits with k=4, n=15, nonZero=673156, totalAC=774144
+F5: Embedded 2864 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Flushing writer...
+Headers length: 393
+Scan data length: 453290
+Total JPEG file size: 453685 bytes
+Extracted secret data (container): 6 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Medium',
+  encrypted: true,
+  originalLength: 50,
+  blockCount: 1
+}
+  [32m✓[0m Multiple Generations - No Quality Loss
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 356 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 828 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 630 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 500 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 326 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 364 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 475 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 759 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 995 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 422 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 314 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 209 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 707 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 398 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 299 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 325 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 255 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 112 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 599 bytes (ECC: false)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2136
+Total JPEG file size: 2531 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:4:4 subsampling
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Medium
+ECC capacity (0 bytes) insufficient, trying without ECC...
+No-ECC capacity: 0 bytes
+Capacity: 0 bytes, Data: 314 bytes (ECC: false)
+  [32m✓[0m Property: Transcoder Fuzzing Payload Integrity
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 461
+Total JPEG file size: 856 bytes
+  [32m✓[0m coefficientsOnly mode should return coefficients without image data
+
+[1mOrchestrator & Transcoding Equivalency (PBT)[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 80
+Total JPEG file size: 475 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 31
+Total JPEG file size: 426 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 98
+Total JPEG file size: 493 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 71
+Total JPEG file size: 466 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 44
+Total JPEG file size: 439 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 35
+Total JPEG file size: 430 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 71
+Total JPEG file size: 466 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 40
+Total JPEG file size: 435 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 44
+Total JPEG file size: 439 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 53
+Total JPEG file size: 448 bytes
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+F5: Extraction ran out of coefficients at bit 0
+  [32m✓[0m Fuzzing Odd JPEG Dimensions (Boundary Rejection/Padding Idempotency)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3603
+Total JPEG file size: 3998 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3613
+Total JPEG file size: 4008 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3008
+Total JPEG file size: 3403 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3022
+Total JPEG file size: 3417 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1537
+Total JPEG file size: 1932 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1552
+Total JPEG file size: 1947 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1050
+Total JPEG file size: 1445 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1064
+Total JPEG file size: 1459 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1386
+Total JPEG file size: 1781 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1400
+Total JPEG file size: 1795 bytes
+  [32m✓[0m Progressive vs. Baseline Equivalency
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 4005
+Total JPEG file size: 4400 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 4007
+Total JPEG file size: 4402 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3339
+Total JPEG file size: 3734 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3338
+Total JPEG file size: 3733 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3329
+Total JPEG file size: 3724 bytes
+F5: Extraction ran out of coefficients at bit 5354
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3324
+Total JPEG file size: 3719 bytes
+F5: Extraction ran out of coefficients at bit 5353
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2305
+Total JPEG file size: 2700 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2307
+Total JPEG file size: 2702 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1920
+Total JPEG file size: 2315 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1922
+Total JPEG file size: 2317 bytes
+  [32m✓[0m Idempotency of Lossless Transcoding (Roundtrip zero-degradation)
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2275
+Total JPEG file size: 2670 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=12
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1200
+Total JPEG file size: 1595 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1330
+Total JPEG file size: 1725 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=6
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 639
+Total JPEG file size: 1034 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 2668
+Total JPEG file size: 3063 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=16
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1519
+Total JPEG file size: 1914 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1092
+Total JPEG file size: 1487 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=6
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 605
+Total JPEG file size: 1000 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 1940
+Total JPEG file size: 2335 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=9
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 937
+Total JPEG file size: 1332 bytes
+  [32m✓[0m Subsampling Degradation Bounds (MSE)
+
+[1mSecureEntry (Hardened Primitive PBT)[0m
+  [32m✓[0m Property: Secure Identity Roundtrip (create then decrypt matches exactly)
+  [32m✓[0m Property: Structural Immutability & Plaintext Absence
+  [32m✓[0m Property: Strict Key Rejection
+
+[1mPasswordVault (Property-Based Tests)[0m
+  [32m✓[0m Property: Idempotent Serialization (toJSON -> fromJSON yields equivalent data)
+  [32m✓[0m Property: Deterministic Locking (lock always destroys keys and sets strict state)
+  [32m✓[0m Property: Rejection of Operations when Locked
+  [32m✓[0m should calculate unique IDs
+  [32m✓[0m should search entries correctly skipping encrypted fields
+
+[1mPasswordVault E2E Steganography (Property-Based Tests)[0m
+2560px-Beyond_the_horizon.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 16547 bytes, Data: 470964 bytes
+  [32m✓[0m Property: End-to-End Vault Save and Load (Full Crypto & Steganography Roundtrip)
+
+[1mPasswordVault E2E Steganography (CRUD Survival)[0m
+Depuis_le_Trièves_(53476365753).jpg: Using original JPEG bytes (lossless path)
+Total capacity: 4732 bytes, Data: 102431 bytes
+  [32m✓[0m Property: Vault CRUD survival across save/load
+
+[1mPasswordVault E2E Steganography (Carrier Formats)[0m
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 7073
+Total JPEG file size: 7468 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=0, subsampling=4:4:4
+Writing Scan: Ss=1, Se=63, subsampling=4:4:4
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 7091
+Total JPEG file size: 7486 bytes
+JpegEncoder.encode called
+Writing headers...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Finished preparing blocks. Writing scans...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (MCU-linear): numMCUs=16
+Finished writing scans, flushing writer
+Writer flushed, assembling file
+Headers length: 393
+Scan data length: 3594
+Total JPEG file size: 3989 bytes
+baseline.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 227 bytes, Data: 8595 bytes
+progressive.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 227 bytes, Data: 8595 bytes
+subsampled.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 57 bytes, Data: 8595 bytes
+  [32m✓[0m Property: Vault save/load works across Baseline, Progressive, and Subsampled carriers
+
+[1mPasswordVault E2E Steganography (Crypto Boundary)[0m
+2560px-Beyond_the_horizon.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 16547 bytes, Data: 17180 bytes
+  [32m✓[0m Property: Rejects load with incorrect password cleanly
+
+[1mPasswordVault E2E Steganography (ECC Deep Recovery)[0m
+2560px-Beyond_the_horizon.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 16547 bytes, Data: 10755 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:2:0 subsampling (preserving)
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Extreme
+Capacity: 16547 bytes, Data: 10755 bytes (ECC: true)
+F5: Embedding 262920 bits with k=2, n=3, nonZero=769066, totalAC=5443200
+F5: Embedded 262920 bits successfully with k=2
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (row-major): numMCUs=14400, blocksH=320, mcuCols=160
+Flushing writer...
+Headers length: 393
+Scan data length: 527178
+Total JPEG file size: 527573 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:2:0 subsampling (preserving)
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (row-major): numMCUs=14400, blocksH=320, mcuCols=160
+Flushing writer...
+Headers length: 393
+Scan data length: 527200
+Total JPEG file size: 527595 bytes
+F5: CRC mismatch, attempting ECC recovery...
+Extracted secret data (container): 10755 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: 'ef886c57-63cc-46eb-8285-d447d9900848', index: 0, total: 1 },
+  checksum: 728343,
+  encrypted: true,
+  originalLength: 10799,
+  blockCount: 128
+}
+File corrupted_2560px-Beyond_the_horizon.jpg: Found secret data. Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: 'ef886c57-63cc-46eb-8285-d447d9900848', index: 0, total: 1 },
+  checksum: 728343,
+  encrypted: true,
+  originalLength: 10799,
+  blockCount: 128
+}
+File corrupted_2560px-Beyond_the_horizon.jpg: Valid chunk found. Index 0/1
+  [32m✓[0m Property: Vault loaded exactly after targeted AC coefficient corruption
+
+[1mPasswordVault E2E Steganography (Empty Vault & Capacity Boundary)[0m
+2560px-Beyond_the_horizon.jpg: Using original JPEG bytes (lossless path)
+Total capacity: 16547 bytes, Data: 118 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:2:0 subsampling (preserving)
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Extreme
+Capacity: 16547 bytes, Data: 118 bytes (ECC: true)
+F5: Embedding 5832 bits with k=4, n=15, nonZero=769066, totalAC=5443200
+F5: Embedded 5832 bits successfully with k=4
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (row-major): numMCUs=14400, blocksH=320, mcuCols=160
+Flushing writer...
+Headers length: 393
+Scan data length: 594583
+Total JPEG file size: 594978 bytes
+Extracted secret data (container): 118 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: '5018abfd-a309-4e01-9fbb-01e813496878', index: 0, total: 1 },
+  checksum: 8296,
+  encrypted: true,
+  originalLength: 162,
+  blockCount: 2
+}
+File steg_0_2560px-Beyond_the_horizon.jpg: Found secret data. Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: '5018abfd-a309-4e01-9fbb-01e813496878', index: 0, total: 1 },
+  checksum: 8296,
+  encrypted: true,
+  originalLength: 162,
+  blockCount: 2
+}
+File steg_0_2560px-Beyond_the_horizon.jpg: Valid chunk found. Index 0/1
+  [32m✓[0m Property: Saves and loads an empty vault securely
+
+[1mPasswordVault E2E Steganography (Multi-Generation Overwrite)[0m
+Barrage_de_Roselend_(50498176838).jpg: Using original JPEG bytes (lossless path)
+Total capacity: 28107 bytes, Data: 13938 bytes
+JpegEncoder.encodeCoefficients called
+Using component IDs: Y=1, Cb=2, Cr=3
+Detected 4:2:0 subsampling (preserving)
+Writing headers with custom quantization tables...
+writeDHT: type=0, id=0, totalLen=31
+writeDHT: type=1, id=0, totalLen=181
+Embedding secret data into coefficients...
+ECC settings: ecc=true, profile=Extreme
+Capacity: 28107 bytes, Data: 13938 bytes (ECC: true)
+F5: Embedding 338408 bits with k=3, n=7, nonZero=1231817, totalAC=5806080
+F5: Embedded 338408 bits successfully with k=3
+Writing scans from coefficients...
+Writing Scan: Ss=0, Se=63, subsampling=4:2:0
+4:2:0 encoding (row-major): numMCUs=15360, blocksH=320, mcuCols=160
+Flushing writer...
+Headers length: 393
+Scan data length: 869140
+Total JPEG file size: 869535 bytes
+Extracted secret data (container): 13938 bytes
+Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: '5e10b9e3-a28c-4690-9504-f00377de69a7', index: 0, total: 1 },
+  checksum: 1062249,
+  encrypted: true,
+  originalLength: 13982,
+  blockCount: 165
+}
+File steg_0_Barrage_de_Roselend_(50498176838).jpg: Found secret data. Metadata: {
+  ecc: true,
+  eccProfile: 'Extreme',
+  filename: 'vault.json',
+  chunk: { id: '5e10b9e3-a28c-4690-9504-f00377de69a7', index: 0, total: 1 },
+  checksum: 1062249,
+  encrypted: true,
+  originalLength: 13982,
+  blockCount: 165
+}
+File steg_0_Barrage_de_Roselend_(50498176838).jpg: Valid chunk found. Index 0/1
+steg_0_Barrage_de_Roselend_(50498176838).jpg: Using original JPEG bytes (lossless path)
+Total capacity: 25642 bytes, Data: 21831 bytes
+  [32m✓[0m Property: Overwriting a previously saved image cleanly replaces old data
+
+[1mVault Capacity UI Integration[0m
+  [32m✓[0m should update capacity display when files are dropped
+  [32m✓[0m should format capacities correctly
+  [32m✓[0m should display used capacity correctly
+
+[1mCryptographically Secure ID Generation[0m
+  [32m✓[0m ChunkManager should generate valid UUID v4 without Math.random
+  [32m✓[0m ImmutableVault should generate valid UUID v4 without Math.random
+
+[1mTest Summary:[0m
+  Total:  512
+  [32mPassed: 512[0m
+  [31mFailed: 0[0m
