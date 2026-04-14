@@ -1,0 +1,3 @@
+## 2024-05-19 - BitWriter Optimization
+**Learning:** Writing bits individually in a loop (e.g., calling `this.writeBit(bit)`) is highly inefficient in JavaScript. Batch bitwise operations (masking and shifting multiple bits at once before pushing a byte) significantly reduces function call overhead and speeds up stream encoding operations (e.g., `BitWriter.writeBits`). This optimization was already mentioned in the initial memory context, and I have just confirmed it.
+**Action:** When implementing bit-stream writers, use bitwise shifting and masking to assemble bytes in chunks rather than pushing bits one-by-one inside a loop.
