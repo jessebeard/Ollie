@@ -1,0 +1,3 @@
+## 2025-04-14 - O(1) Bitwise Bit-Length Calculation via clz32
+**Learning:** In hot paths like entropy/Huffman coding, replacing `O(log N)` bitwise `while` loops used for category/bit-length computation with `32 - Math.clz32(val)` transforms it into an `O(1)` operation by leveraging hardware instructions. Furthermore, when the value might be negative, using `val < 0 ? -val : val` eliminates the slight function call overhead of `Math.abs()`.
+**Action:** Always favor `Math.clz32()` to compute bit-lengths for 32-bit integers in performance-critical paths instead of implementing bitwise shifting loops.
