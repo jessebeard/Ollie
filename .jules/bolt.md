@@ -1,0 +1,3 @@
+## 2024-04-15 - Optimizing BitWriter and Huffman category calculations
+**Learning:** In JavaScript, looping to write single bits (`(data >> i) & 1`) and computing bit lengths with `while (val > 0) { val >>= 1; }` introduces significant looping, array manipulation, and function call overhead in hot paths like JPEG entropy coding.
+**Action:** Replace bitwise `while` loops for category calculation with the O(1) hardware instruction `32 - Math.clz32(val)`. Furthermore, bypass calling the category function entirely for negative numbers by using `32 - Math.clz32(-val)` to skip the absolute value conversion overhead. In stream writers, batch bit operations and write to bytes directly using shift masks instead of calling `writeBit()` repetitively.
