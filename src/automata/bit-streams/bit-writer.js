@@ -7,9 +7,32 @@ export class BitWriter {
     }
 
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        let remainingBits = length;
+
+        while (remainingBits > 0) {
+            const spaceInCurrentByte = 8 - this.bitCount;
+            const bitsToWrite = Math.min(remainingBits, spaceInCurrentByte);
+
+            // Extract the top bitsToWrite bits from data
+            const shift = remainingBits - bitsToWrite;
+            const mask = (1 << bitsToWrite) - 1;
+            const chunk = (data >> shift) & mask;
+
+            // Add chunk to current byte
+            this.byte = (this.byte << bitsToWrite) | chunk;
+            this.bitCount += bitsToWrite;
+            remainingBits -= bitsToWrite;
+
+            // If byte is full, emit it
+            if (this.bitCount === 8) {
+                this.bytes.push(this.byte);
+                // Bolt: JPEG byte stuffing
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+            }
         }
     }
 
