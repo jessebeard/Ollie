@@ -7,9 +7,28 @@ export class BitWriter {
     }
 
     writeBits(data, length) {
-        for (let i = length - 1; i >= 0; i--) {
-            const bit = (data >> i) & 1;
-            this.writeBit(bit);
+        // Optimization: Writing bits individually in a loop is highly inefficient.
+        // Batching bitwise operations (masking and shifting multiple bits at once)
+        // significantly reduces function call overhead and speeds up stream encoding operations.
+        while (length > 0) {
+            let space = 8 - this.bitCount;
+            let toWrite = Math.min(length, space);
+            let shift = length - toWrite;
+            let bits = (data >>> shift) & ((1 << toWrite) - 1);
+
+            this.byte = (this.byte << toWrite) | bits;
+            this.bitCount += toWrite;
+            length -= toWrite;
+
+            if (this.bitCount === 8) {
+                this.bytes.push(this.byte);
+                // JPEG byte stuffing logic
+                if (this.byte === 0xFF) {
+                    this.bytes.push(0x00);
+                }
+                this.byte = 0;
+                this.bitCount = 0;
+            }
         }
     }
 
