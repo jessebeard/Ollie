@@ -1,3 +1,5 @@
+import { cryptoInstance } from '../cryptography/crypto-compat.js';
+
 /**
  * ChunkManager - Handles splitting large data into chunks and reassembling them
  */
@@ -80,17 +82,12 @@ export class ChunkManager {
     }
 
     /**
-     * Generates a unique ID for a chunk set
+     * Generates a cryptographically secure unique ID for a chunk set
      * 
-     * @returns {string} UUID-like string
+     * @returns {string} UUID v4 string
      */
     static generateId() {
-
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return cryptoInstance.randomUUID();
     }
 
     /**
