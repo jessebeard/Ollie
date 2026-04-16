@@ -38,13 +38,15 @@ export class F5 {
             for (let i = 0; i < seed.length; i++) {
                 state = ((state << 5) - state + seed.charCodeAt(i)) | 0;
             }
-            state = Math.abs(state) || 1;
+            // ⚡ Bolt: Replaced Math.abs(state) to avoid function call overhead
+            state = (state > 0 ? state : -state) || 1;
         } else if (seed instanceof Uint8Array) {
             state = 0;
             for (let i = 0; i < Math.min(seed.length, 8); i++) {
                 state = (state << 8) | seed[i];
             }
-            state = Math.abs(state) || 1;
+            // ⚡ Bolt: Replaced Math.abs(state) to avoid function call overhead
+            state = (state > 0 ? state : -state) || 1;
         } else {
             state = seed || 1;
         }
@@ -185,7 +187,8 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    // ⚡ Bolt: Replaced Math.abs(val) === 1 to avoid function call overhead
+                    if ((val === 1 || val === -1)) onesCount++;
                 }
             }
         }
@@ -250,7 +253,8 @@ export class F5 {
             // Compute current hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                // ⚡ Bolt: Replaced Math.abs(val) % 2 === 1 with bitwise operation to avoid function call overhead
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -329,7 +333,8 @@ export class F5 {
                     const val = blocks[b][c];
                     if (val !== 0) {
                         nonZeroCount++;
-                        if (Math.abs(val) === 1) onesCount++;
+                        // ⚡ Bolt: Replaced Math.abs(val) === 1 to avoid function call overhead
+                    if ((val === 1 || val === -1)) onesCount++;
                     }
                 }
             }
@@ -363,7 +368,8 @@ export class F5 {
             // Compute hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                // ⚡ Bolt: Replaced Math.abs(val) % 2 === 1 with bitwise operation to avoid function call overhead
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -492,7 +498,8 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    // ⚡ Bolt: Replaced Math.abs(val) === 1 to avoid function call overhead
+                    if ((val === 1 || val === -1)) onesCount++;
                 }
             }
         }
@@ -780,7 +787,8 @@ export class F5 {
         // Account for shrinkage: coefficients with |val|=1 may shrink
         let onesCount = 0;
         for (const entry of usable) {
-            if (Math.abs(entry.block[entry.coeffIdx]) === 1) {
+            // ⚡ Bolt: Replaced Math.abs(val) === 1 to avoid function call overhead
+            if ((entry.block[entry.coeffIdx] === 1 || entry.block[entry.coeffIdx] === -1)) {
                 onesCount++;
             }
         }
