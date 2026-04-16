@@ -409,10 +409,11 @@ export class JpegDecoder {
                     return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
                 }
 
+                // ⚡ Bolt: Hoist O(N) array search outside the hot block decoding loop.
+                // The component index is invariant across blocks within the same scan component.
+                const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
                 const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
                 for (let i = 0; i < blocksInMCU; i++) {
-                    const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-
                     const mcuRow = Math.floor(mcuIndex / mcuCols);
                     const mcuCol = mcuIndex % mcuCols;
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
