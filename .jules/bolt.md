@@ -1,0 +1,3 @@
+## 2025-04-19 - Optimize `Math.abs` and modulo operations in hot loops
+**Learning:** In hot loops involving integer coefficient analysis (like F5 steganography), using `Math.abs(val) === 1` and `Math.abs(val) % 2 === 1` introduces function call overhead. JavaScript bitwise operations cast values to 32-bit signed integers, which means `(-3 & 1) !== 0` correctly evaluates to `true` (just like `Math.abs(-3) % 2 === 1`), safely eliminating the need for `Math.abs` and the expensive modulo operation.
+**Action:** Replace `Math.abs(val) === 1` with `val === 1 || val === -1` and `Math.abs(val) % 2 === 1` with bitwise checks like `(val & 1) !== 0` in hot paths to leverage integer math and reduce function call overhead.
