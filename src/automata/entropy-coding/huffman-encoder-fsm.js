@@ -25,19 +25,15 @@ export const DC_LUMA_TABLE = generateHuffmanTable(STD_DC_LUMINANCE_NRCODES, STD_
 
 export function computeCategory(val) {
     if (val === 0) return 0;
-    val = Math.abs(val);
-    let cat = 0;
-    while (val > 0) {
-        val >>= 1;
-        cat++;
-    }
-    return cat;
+    // Bolt: Replaced O(log N) bitwise while loop with O(1) Math.clz32 leveraging hardware instructions
+    return 32 - Math.clz32(val > 0 ? val : -val);
 }
 
 export function getBitRepresentation(val) {
     if (val > 0) return val;
 
-    const cat = computeCategory(val);
+    // Bolt: Since val <= 0 and we already check > 0, we can use -val directly instead of Math.abs(val)
+    const cat = 32 - Math.clz32(-val);
     return val + (1 << cat) - 1;
 }
 
