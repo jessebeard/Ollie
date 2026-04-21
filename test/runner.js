@@ -183,6 +183,9 @@ async function runTests() {
         await import('./automata/bit-streams/bit-core.test.js');
         await import('./utils/marker-parser.test.js');
 
+        // Security
+        await import('./security/id-generation.test.js');
+
         await import('./codec/steganography/steganography.test.js');
         await import('./codec/steganography/container.test.js');
         await import('./information-theory/steganography/chunk-manager.test.js');
