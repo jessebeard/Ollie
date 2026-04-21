@@ -185,7 +185,8 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    // Optimize Math.abs(val) === 1 to val === 1 || val === -1
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -250,7 +251,8 @@ export class F5 {
             // Compute current hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                // Optimize Math.abs(x) % 2 === 1 to (x & 1) !== 0
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -329,7 +331,8 @@ export class F5 {
                     const val = blocks[b][c];
                     if (val !== 0) {
                         nonZeroCount++;
-                        if (Math.abs(val) === 1) onesCount++;
+                        // Optimize Math.abs(val) === 1 to val === 1 || val === -1
+                        if (val === 1 || val === -1) onesCount++;
                     }
                 }
             }
@@ -363,7 +366,8 @@ export class F5 {
             // Compute hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                // Optimize Math.abs(x) % 2 === 1 to (x & 1) !== 0
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -492,7 +496,8 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    // Optimize Math.abs(val) === 1 to val === 1 || val === -1
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -780,7 +785,9 @@ export class F5 {
         // Account for shrinkage: coefficients with |val|=1 may shrink
         let onesCount = 0;
         for (const entry of usable) {
-            if (Math.abs(entry.block[entry.coeffIdx]) === 1) {
+            const val = entry.block[entry.coeffIdx];
+            // Optimize Math.abs(val) === 1 to val === 1 || val === -1
+            if (val === 1 || val === -1) {
                 onesCount++;
             }
         }
