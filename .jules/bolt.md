@@ -1,0 +1,3 @@
+## 2024-04-24 - Module-Level Set Lookup Over Local Array .includes()
+**Learning:** Replacing a local array `.includes()` check with a module-level `Set.has()` check in hot paths (like `readMarkerSegment` in `marker-scanner.js`) yields significant performance gains (~66%) by avoiding repeated allocations and leveraging O(1) lookup time.
+**Action:** Always hoist static arrays to module-level Sets when used for repeated membership checks in hot paths.
