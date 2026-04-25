@@ -51,22 +51,20 @@ export function assembleBlocks(blocks, width, height, blocksPerRow) {
  * @returns {Uint8ClampedArray} RGBA pixel data
  */
 export function componentsToImageData(yData, cbData, crData, width, height) {
-    const imageData = new Uint8ClampedArray(width * height * 4);
+    const len = width * height;
+    const imageData = new Uint8ClampedArray(len * 4);
 
-    for (let i = 0; i < width * height; i++) {
+    let offset = 0;
+    // ⚡ Bolt: Removed Math.max/min/round clamping since Uint8ClampedArray handles it natively
+    for (let i = 0; i < len; i++) {
         const y = yData[i];
-        const cb = cbData[i];
-        const cr = crData[i];
+        const cb = cbData[i] - 128;
+        const cr = crData[i] - 128;
 
-        const r = y + 1.402 * (cr - 128);
-        const g = y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128);
-        const b = y + 1.772 * (cb - 128);
-
-        const offset = i * 4;
-        imageData[offset + 0] = Math.max(0, Math.min(255, Math.round(r)));
-        imageData[offset + 1] = Math.max(0, Math.min(255, Math.round(g)));
-        imageData[offset + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        imageData[offset + 3] = 255; 
+        imageData[offset++] = y + 1.402 * cr;
+        imageData[offset++] = y - 0.344136 * cb - 0.714136 * cr;
+        imageData[offset++] = y + 1.772 * cb;
+        imageData[offset++] = 255;
     }
 
     return imageData;
@@ -81,15 +79,17 @@ export function componentsToImageData(yData, cbData, crData, width, height) {
  * @returns {Uint8ClampedArray} RGBA pixel data
  */
 export function grayscaleToImageData(yData, width, height) {
-    const imageData = new Uint8ClampedArray(width * height * 4);
+    const len = width * height;
+    const imageData = new Uint8ClampedArray(len * 4);
 
-    for (let i = 0; i < width * height; i++) {
-        const gray = Math.max(0, Math.min(255, Math.round(yData[i])));
-        const offset = i * 4;
-        imageData[offset + 0] = gray;
-        imageData[offset + 1] = gray;
-        imageData[offset + 2] = gray;
-        imageData[offset + 3] = 255; 
+    let offset = 0;
+    // ⚡ Bolt: Removed Math.max/min/round clamping since Uint8ClampedArray handles it natively
+    for (let i = 0; i < len; i++) {
+        const gray = yData[i];
+        imageData[offset++] = gray;
+        imageData[offset++] = gray;
+        imageData[offset++] = gray;
+        imageData[offset++] = 255;
     }
 
     return imageData;
