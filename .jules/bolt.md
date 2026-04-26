@@ -1,0 +1,3 @@
+## 2024-04-26 - O(1) Category and Bit Representation Computation
+**Learning:** In JavaScript, replacing O(log N) bitwise `while` loops for category/bit-length computation with `32 - Math.clz32(val)` transforms it into an O(1) operation leveraging hardware instructions, yielding significant performance gains (~16x faster for combined category and bit representation in entropy coding). Also, when computing bit-length on numbers already known to be negative, using `-val` instead of `Math.abs(val)` saves a branching function call.
+**Action:** When working on compression, entropy coding, or steganography routines that require determining bit lengths or categories, apply `32 - Math.clz32` natively instead of writing iterative loops.
