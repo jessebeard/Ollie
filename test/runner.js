@@ -215,6 +215,10 @@ async function runTests() {
 
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/immutable-vault.test.js');
+
+        // --- Security ---
+        await import('./security/id-generation.test.js');
+
         await import('./integration/vault/vault-e2e.test.js');
         await import('./integration/vault/vault-e2e-crud.test.js');
         await import('./integration/vault/vault-e2e-carriers.test.js');
