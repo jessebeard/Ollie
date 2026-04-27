@@ -22,6 +22,12 @@ export const MARKERS = {
     COM: 0xFFFE    
 };
 
+const STANDALONE_MARKERS_SET = new Set([
+    MARKERS.SOI, MARKERS.EOI,
+    MARKERS.RST0, MARKERS.RST0 + 1, MARKERS.RST0 + 2, MARKERS.RST0 + 3,
+    MARKERS.RST0 + 4, MARKERS.RST0 + 5, MARKERS.RST0 + 6, MARKERS.RST7
+]);
+
 /**
  * Find the next marker in the data starting from offset
  * @param {Uint8Array} data - JPEG file data
@@ -51,13 +57,7 @@ export function readMarkerSegment(data, offset) {
 
     const marker = (data[offset] << 8) | data[offset + 1];
 
-    const standaloneMarkers = [
-        MARKERS.SOI, MARKERS.EOI,
-        MARKERS.RST0, MARKERS.RST0 + 1, MARKERS.RST0 + 2, MARKERS.RST0 + 3,
-        MARKERS.RST0 + 4, MARKERS.RST0 + 5, MARKERS.RST0 + 6, MARKERS.RST7
-    ];
-
-    if (standaloneMarkers.includes(marker)) {
+    if (STANDALONE_MARKERS_SET.has(marker)) {
         return {
             type: marker,
             data: new Uint8Array(0),
