@@ -1,6 +1,6 @@
 /**
  * Block Assembly - Assemble decoded 8x8 blocks into full image
- * 
+ *
  * This module handles:
  * - Placing blocks in correct positions
  * - MCU interleaving
@@ -10,7 +10,7 @@
 
 /**
  * Assemble 8x8 blocks into a full component plane
- * 
+ *
  * @param {Array<Float32Array>} blocks - Array of 8x8 blocks (64 elements each)
  * @param {number} width - Image width
  * @param {number} height - Image height
@@ -42,7 +42,7 @@ export function assembleBlocks(blocks, width, height, blocksPerRow) {
 
 /**
  * Convert YCbCr components to RGBA ImageData
- * 
+ *
  * @param {Float32Array} yData - Y component
  * @param {Float32Array} cbData - Cb component
  * @param {Float32Array} crData - Cr component
@@ -63,10 +63,11 @@ export function componentsToImageData(yData, cbData, crData, width, height) {
         const b = y + 1.772 * (cb - 128);
 
         const offset = i * 4;
-        imageData[offset + 0] = Math.max(0, Math.min(255, Math.round(r)));
-        imageData[offset + 1] = Math.max(0, Math.min(255, Math.round(g)));
-        imageData[offset + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        imageData[offset + 3] = 255; 
+        // Uint8ClampedArray handles clamping to [0, 255] and rounding natively
+        imageData[offset + 0] = r;
+        imageData[offset + 1] = g;
+        imageData[offset + 2] = b;
+        imageData[offset + 3] = 255;
     }
 
     return imageData;
@@ -74,7 +75,7 @@ export function componentsToImageData(yData, cbData, crData, width, height) {
 
 /**
  * Convert grayscale component to RGBA ImageData
- * 
+ *
  * @param {Float32Array} yData - Y component (grayscale)
  * @param {number} width - Image width
  * @param {number} height - Image height
@@ -84,12 +85,13 @@ export function grayscaleToImageData(yData, width, height) {
     const imageData = new Uint8ClampedArray(width * height * 4);
 
     for (let i = 0; i < width * height; i++) {
-        const gray = Math.max(0, Math.min(255, Math.round(yData[i])));
+        // Uint8ClampedArray handles clamping to [0, 255] and rounding natively
+        const gray = yData[i];
         const offset = i * 4;
         imageData[offset + 0] = gray;
         imageData[offset + 1] = gray;
         imageData[offset + 2] = gray;
-        imageData[offset + 3] = 255; 
+        imageData[offset + 3] = 255;
     }
 
     return imageData;
@@ -97,7 +99,7 @@ export function grayscaleToImageData(yData, width, height) {
 
 /**
  * Crop image data to actual dimensions (remove padding)
- * 
+ *
  * @param {Uint8ClampedArray} imageData - RGBA pixel data
  * @param {number} paddedWidth - Width including padding
  * @param {number} paddedHeight - Height including padding
