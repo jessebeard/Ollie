@@ -17,7 +17,7 @@ import { dequantize } from '../algebraic/quantization/inverse-quantization.js';
 import { idctPureRef, idctOptimizedRef, idctFastAAN } from '../algebraic/discrete-cosine/inverse-dct-spec.js';
 import { idctAAN, idctNaive } from '../algebraic/discrete-cosine/inverse-dct.js';
 import { upsampleChroma } from '../algebraic/mappings/upsampling.js';
-import { assembleBlocks, componentsToImageData, grayscaleToImageData } from '../algebraic/mappings/block-assembly.js';
+import { componentsToImageData, grayscaleToImageData } from '../algebraic/mappings/block-assembly.js';
 
 import { parseSpiffHeader } from '../automata/parsers/spiff-parser.js';
 import { F5 } from '../information-theory/steganography/f5-syndrome.js';
@@ -459,35 +459,43 @@ export class JpegDecoder {
                 return [null, new Error(`Missing quantization table ${comp.quantTableId}`)];
             }
 
+            const compWidth = compData.blocksH * 8;
+            const compHeight = compData.blocksV * 8;
+            const componentPixels = new Float32Array(compWidth * compHeight);
+
             const tempDequant = new Float32Array(64);
+            const tempZigZagForLoop = new Float32Array(64);
+            const blocksPerRow = compData.blocksH;
 
-            const canReuseZigZagBuffer = this.idctMethod !== idctFastAAN;
-            const tempZigZag = canReuseZigZagBuffer ? new Float32Array(64) : null;
-
-            const processedBlocks = compData.blocks.map(block => {
+            for (let blockIndex = 0; blockIndex < compData.blocks.length; blockIndex++) {
+                const block = compData.blocks[blockIndex];
 
                 const [dequantized, dqErr] = this.dequantizeMethod(block, quantTable, tempDequant);
                 if (dqErr) throw dqErr;
 
-                const [block2D, zigErr] = inverseZigZag(dequantized, tempZigZag);
+                const [block2D, zigErr] = inverseZigZag(dequantized, tempZigZagForLoop);
                 if (zigErr) throw zigErr;
 
                 const [spatial, idctErr] = this.idctMethod(block2D);
                 if (idctErr) throw idctErr;
 
-                for (let i = 0; i < 64; i++) {
-                    const val = spatial[i] + 128;
-                    spatial[i] = Math.max(0, Math.min(255, val));
+                const blockRow = Math.floor(blockIndex / blocksPerRow);
+                const blockCol = blockIndex % blocksPerRow;
+                const startY = blockRow * 8;
+                const startX = blockCol * 8;
+
+                for (let y = 0; y < 8 && startY + y < compHeight; y++) {
+                    for (let x = 0; x < 8 && startX + x < compWidth; x++) {
+                        const blockOffset = y * 8 + x;
+                        const val = spatial[blockOffset] + 128;
+                        const imageOffset = (startY + y) * compWidth + (startX + x);
+                        componentPixels[imageOffset] = Math.max(0, Math.min(255, val));
+                    }
                 }
-
-                return spatial;
-            });
-
-            const compWidth = compData.blocksH * 8;
-            const compHeight = compData.blocksV * 8;
+            }
 
             processedComponents[comp.id] = {
-                data: assembleBlocks(processedBlocks, compWidth, compHeight, compData.blocksH),
+                data: componentPixels,
                 width: compWidth,
                 height: compHeight,
                 hSampling: comp.hSampling,

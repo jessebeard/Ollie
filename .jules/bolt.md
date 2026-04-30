@@ -1,0 +1,3 @@
+## 2024-05-24 - Zero-Allocation JPEG Decoding
+**Learning:** In the JPEG decoder's component processing loop, the original implementation used `.map()` to generate thousands of intermediate `Float32Array(64)` arrays, which were then aggregated using `assembleBlocks`.
+**Action:** By pre-allocating the full component image plane array (`Float32Array(width * height)`) and inlining the component block assembly logic inside the `for` loop, we can eliminate the intermediate arrays entirely and safely reuse a single `workspace` buffer (`tempZigZagForLoop`) for inverse zigzag and IDCT. This provides a massive reduction in memory allocations and GC pressure in the decoding hot path.
