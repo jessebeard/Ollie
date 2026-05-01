@@ -250,7 +250,7 @@ export class F5 {
             // Compute current hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -363,7 +363,7 @@ export class F5 {
             // Compute hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
