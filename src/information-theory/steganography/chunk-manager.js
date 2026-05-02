@@ -1,10 +1,12 @@
+import { cryptoInstance } from '../cryptography/crypto-compat.js';
+
 /**
  * ChunkManager - Handles splitting large data into chunks and reassembling them
  */
 export class ChunkManager {
     /**
      * Splits data into chunks of specified size
-     * 
+     *
      * @param {Uint8Array} data - Data to split
      * @param {number} chunkSize - Maximum size of each chunk in bytes
      * @param {string} [chunkId] - Injected ID for deterministic testing
@@ -34,7 +36,7 @@ export class ChunkManager {
 
     /**
      * Reassembles chunks back into original data
-     * 
+     *
      * @param {Array<Object>} chunks - Array of chunk objects
      * @returns {[Uint8Array|null, Error|null]} Tuple of [reassembledData, error]
      */
@@ -81,22 +83,17 @@ export class ChunkManager {
 
     /**
      * Generates a unique ID for a chunk set
-     * 
+     *
      * @returns {string} UUID-like string
      */
     static generateId() {
-
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
+        return cryptoInstance.randomUUID();
     }
 
     /**
      * Calculates a simple checksum for data
-     * 
-     * @param {Uint8Array} data 
+     *
+     * @param {Uint8Array} data
      * @returns {number} Checksum value
      */
     static calculateChecksum(data) {
