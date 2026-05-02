@@ -1,0 +1,3 @@
+## 2026-05-02 - Native Typed Array Rounding/Clamping
+**Learning:** When writing values to a Uint8ClampedArray in hot loops (like image data construction), using explicit Math.max(), Math.min(), and Math.round() incurs significant JavaScript function call overhead. The JS engine automatically delegates clamping to [0, 255] and 'round-to-even' logic natively at the C++ level for Uint8ClampedArray assignments.
+**Action:** Remove explicit JS Math calls when assigning pixel values to Uint8ClampedArray to boost performance, and document why the missing math is intentional so future maintainers do not 'fix' it.
