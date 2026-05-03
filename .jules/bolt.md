@@ -1,0 +1,3 @@
+## 2024-06-25 - Hardware Bitwise Computation for Category Extraction
+**Learning:** In the JPEG entropy encoder (`computeCategory`), calculating the bit length of the coefficient's absolute value is a heavily executed hot path. Using a bitwise `while (val > 0) { val >>= 1; cat++; }` loop is computationally O(log N). Replacing this with `32 - Math.clz32(Math.abs(val))` turns this into an O(1) calculation using underlying hardware instructions (Count Leading Zeros).
+**Action:** When calculating the category or bit-length of an integer in hot paths like encoders or data compression pipelines, use `32 - Math.clz32(val)` instead of manual shifting loops to leverage hardware acceleration.
