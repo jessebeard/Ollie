@@ -29,15 +29,25 @@ export class ModalManager {
         this.overlay.innerHTML = ''; // Force remove all children
     }
 
+    #escape(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     async prompt(title, label, type = 'text') {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escape(title)}</h3>
                 <div class="form-group">
-                    <label>${label}</label>
-                    <input type="${type}" class="prompt-input">
+                    <label>${this.#escape(label)}</label>
+                    <input type="${this.#escape(type)}" class="prompt-input">
                 </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">Cancel</button>
@@ -81,9 +91,15 @@ export class ModalManager {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
+
+            // message might contain intentional <br> from vault-ui.js
+            // To be secure, we escape the message, but then explicitly allow <br> for newlines
+            // Alternatively, we style the p tag with white-space: pre-wrap; and replace <br> with \n
+            const textContent = String(message).replace(/<br\s*\/?>/gi, '\n');
+
             modal.innerHTML = `
                 <h3>Confirmation</h3>
-                <p>${message}</p>
+                <p style="white-space: pre-wrap;">${this.#escape(textContent)}</p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">No</button>
                     <button class="btn btn-primary confirm-btn">Yes</button>
@@ -121,20 +137,20 @@ export class ModalManager {
                 if (type === 'textarea') {
                     return `
                         <div class="form-group">
-                            <label>${label}</label>
-                            <textarea name="${field.name}" class="form-control" ${required}>${val}</textarea>
+                            <label>${this.#escape(label)}</label>
+                            <textarea name="${this.#escape(field.name)}" class="form-control" ${required}>${this.#escape(val)}</textarea>
                         </div>`;
                 }
 
                 return `
                     <div class="form-group">
-                        <label>${label}</label>
-                        <input type="${type}" name="${field.name}" value="${val}" class="form-control" ${required}>
+                        <label>${this.#escape(label)}</label>
+                        <input type="${this.#escape(type)}" name="${this.#escape(field.name)}" value="${this.#escape(val)}" class="form-control" ${required}>
                     </div>`;
             }).join('');
 
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escape(title)}</h3>
                 <form id="dynamicForm">
                     ${inputsHtml}
                     <div class="modal-actions">
@@ -182,13 +198,17 @@ export class ModalManager {
         }
 
         const modal = document.createElement('div');
-        modal.className = `modal-dialog alert-${type}`;
+        modal.className = `modal-dialog alert-${this.#escape(type)}`;
+
+        // message might contain intentional <br> like confirm
+        const textContent = (message !== null && message !== undefined) ? String(message).replace(/<br\s*\/?>/gi, '\n') : '';
+
         modal.innerHTML = `
             <div style="text-align: center; margin-bottom: 1rem;">
-                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${type}">
+                <img src="${this.#escape(iconSrc)}" width="80" height="80" alt="Ollie ${this.#escape(type)}">
             </div>
-            <h3 style="text-align: center;">${title}</h3>
-            <p style="text-align: center; color: var(--text-muted);">${message}</p>
+            <h3 style="text-align: center;">${this.#escape(title)}</h3>
+            <p style="text-align: center; color: var(--text-muted); white-space: pre-wrap;">${this.#escape(textContent)}</p>
             <div class="modal-actions" style="justify-content: center; margin-top: 1.5rem;">
                 <button class="btn btn-primary confirm-btn">OK</button>
             </div>
