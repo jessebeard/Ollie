@@ -1,0 +1,22 @@
+<<<<<<< SEARCH
+                const [spatial, idctErr] = this.idctMethod(block2D);
+                if (idctErr) throw idctErr;
+
+                for (let i = 0; i < 64; i++) {
+                    spatial[i] = spatial[i] + 128;
+                }
+
+                return spatial;
+            });
+=======
+                const [spatial, idctErr] = this.idctMethod(block2D);
+                if (idctErr) throw idctErr;
+
+                for (let i = 0; i < 64; i++) {
+                    const val = spatial[i] + 128;
+                    spatial[i] = Math.max(0, Math.min(255, val));
+                }
+
+                return spatial;
+            });
+>>>>>>> REPLACE
