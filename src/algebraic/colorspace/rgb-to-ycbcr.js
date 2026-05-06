@@ -20,7 +20,7 @@ export function rgbToYcbcr(r, g, b) {
 
 /**
  * Converts YCbCr to RGB using JFIF standard formulas
- * 
+ *
  * @param {number} y - Luminance [0, 255]
  * @param {number} cb - Blue chrominance [0, 255], centered at 128
  * @param {number} cr - Red chrominance [0, 255], centered at 128
