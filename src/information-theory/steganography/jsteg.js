@@ -1,22 +1,22 @@
 /**
  * Jsteg Steganography Implementation
- * 
+ *
  * Implements the Jsteg algorithm for hiding data in JPEG coefficients.
  * Jsteg embeds data in the Least Significant Bit (LSB) of non-zero quantized DCT coefficients.
  * It skips:
  * - DC coefficients (index 0 of each block) to preserve overall luminance/color.
  * - Coefficients with value 0 or 1 (though some variants use 1, standard Jsteg usually skips 0 and 1 to avoid ambiguity, but simple LSB replacement on non-zeros is common. Let's stick to: skip 0s, and maybe skip 1s if it causes issues, but usually just skip 0s is the definition of "non-zero". Wait, Jsteg specifically skips 0 and 1?
- * 
+ *
  * Actually, the classic Jsteg algorithm:
  * - Sequential embedding.
  * - Skips DC coefficients.
  * - Skips AC coefficients that are 0 or 1.
  * - Replaces LSB of other coefficients.
- * 
+ *
  * However, skipping 1s reduces capacity significantly. A simpler variant is "LSB of non-zeros".
  * Let's implement "LSB of non-zeros" first (skipping only 0). If we encounter issues, we can refine.
  * Actually, let's stick to skipping 0s only for max capacity for now, unless we find a reason not to.
- * 
+ *
  * Data Format:
  * [Length (32-bit BE)][Data Payload]
  */
@@ -29,7 +29,7 @@ export class Jsteg {
     /**
      * Embeds data into the provided blocks.
      * Modifies the blocks in-place.
-     * 
+     *
      * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks (64 elements each)
      * @param {Uint8Array} data - Data to embed
      * @returns {boolean} True if successful, false if data didn't fit
@@ -37,31 +37,19 @@ export class Jsteg {
     /**
      * Gets the Huffman category for a coefficient value.
      * Category determines how many bits are needed to encode the magnitude.
-     * 
+     *
      * @param {number} absVal - Absolute value of coefficient
      * @returns {number} Category (0-10+)
      */
     static getCategory(absVal) {
-        if (absVal === 0) return 0;
-        // 1 is now a valid category for embedding (mapped to 2/3)
-        if (absVal === 1) return 1;
-        if (absVal <= 3) return 2;
-        if (absVal <= 7) return 3;
-        if (absVal <= 15) return 4;
-        if (absVal <= 31) return 5;
-        if (absVal <= 63) return 6;
-        if (absVal <= 127) return 7;
-        if (absVal <= 255) return 8;
-        if (absVal <= 511) return 9;
-        if (absVal <= 1023) return 10;
-        return 11;
+        return absVal === 0 ? 0 : 32 - Math.clz32(absVal);
     }
 
     /**
      * Embeds raw data into the provided blocks without adding a length header.
      * Uses category-aware embedding to prevent Huffman encoding expansion.
      * Modifies the blocks in-place.
-     * 
+     *
      * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks
      * @param {Uint8Array} data - Data to embed
      * @returns {boolean} True if successful, false if data didn't fit
@@ -133,7 +121,7 @@ export class Jsteg {
      * Embeds data into the provided blocks.
      * Modifies the blocks in-place.
      * Legacy format: [Length (32-bit BE)][Data Payload]
-     * 
+     *
      * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks (64 elements each)
      * @param {Uint8Array} data - Data to embed
      * @returns {boolean} True if successful, false if data didn't fit
@@ -151,18 +139,18 @@ export class Jsteg {
     /**
      * Embeds data using the new container format.
      * Format: [Magic:4][Version:1][Flags:1][MetaLen:2][Metadata:N][PayloadLen:4][Payload:N][CRC:4]
-     * 
-     * @param {Array<Int32Array|Float32Array>} blocks 
-     * @param {Uint8Array} data 
-     * @param {Object} metadata 
+     *
+     * @param {Array<Int32Array|Float32Array>} blocks
+     * @param {Uint8Array} data
+     * @param {Object} metadata
      */
     /**
      * Embeds data using the new container format.
      * Format: [Magic:4][Version:1][Flags:1][MetaLen:2][Metadata:N][PayloadLen:4][Payload:N][CRC:4]
-     * 
-     * @param {Array<Int32Array|Float32Array>} blocks 
-     * @param {Uint8Array} data 
-     * @param {Object} metadata 
+     *
+     * @param {Array<Int32Array|Float32Array>} blocks
+     * @param {Uint8Array} data
+     * @param {Object} metadata
      * @param {Object} options - { password: '...' }
      */
     static async embedContainer(blocks, data, metadata, options = {}) {
@@ -258,8 +246,8 @@ export class Jsteg {
     /**
      * Auto-detects format and extracts data.
      * Returns Uint8Array for legacy format, or {data, metadata} for container format.
-     * 
-     * @param {Array<Int32Array|Float32Array>} blocks 
+     *
+     * @param {Array<Int32Array|Float32Array>} blocks
      * @param {Object} options
      * @returns {Promise<Uint8Array|Object|null>}
      */
@@ -280,8 +268,8 @@ export class Jsteg {
 
     /**
      * Extracts data from the provided blocks using the new container format.
-     * 
-     * @param {Array<Int32Array|Float32Array>} blocks 
+     *
+     * @param {Array<Int32Array|Float32Array>} blocks
      * @param {Object} options
      * @returns {Promise<Object|null>} { data, metadata } or null if invalid
      */
@@ -406,7 +394,7 @@ export class Jsteg {
 
     /**
      * Extracts data from the provided blocks.
-     * 
+     *
      * @param {Array<Int32Array|Float32Array>} blocks - Array of 8x8 blocks
      * @returns {Uint8Array|null} Extracted data or null if invalid
      */
@@ -469,8 +457,8 @@ export class Jsteg {
     /**
      * Calculates the maximum capacity in bytes for the given blocks.
      * Accounts for category-aware embedding that skips |val|=1 coefficients.
-     * 
-     * @param {Array<Int32Array|Float32Array>} blocks 
+     *
+     * @param {Array<Int32Array|Float32Array>} blocks
      * @param {Object} options - { format: 'legacy'|'container', metadata: {}, ecc: bool, encrypted: bool }
      * @returns {number} Capacity in bytes (available for payload)
      */
@@ -553,7 +541,7 @@ class JstegReader {
                 // We now support reading from 1s (which were mapped to 2/3 during embedding)
                 // But wait, if we read a raw file that wasn't embedded, we might see 1s.
                 // If we see a 1, it means it wasn't touched by our new embedder (which maps 1->2/3).
-                // But for extraction, we just read the LSB. 
+                // But for extraction, we just read the LSB.
                 // 1 & 1 = 1. -1 & 1 = 1.
                 // So we can read from 1s too.
 
