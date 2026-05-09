@@ -1,0 +1,4 @@
+## 2024-05-09 - XSS in ModalManager DOM Injection
+**Vulnerability:** XSS vulnerabilities found in the `ModalManager` component across `prompt`, `confirm`, `showForm`, and `showAlert` dialogs via direct injection into `innerHTML` using unescaped template literals.
+**Learning:** Constructing complex HTML UI components via template literals combined with user-controlled input (`innerHTML = \`<h3>${title}</h3>\``) allows XSS. Using standard native elements natively prevents it (e.g. `textContent`), or strict manual escaping must be applied if using templates.
+**Prevention:** Always implement an HTML escaping mechanism (e.g. replacing `<`, `>`, `&`, `"`, `'` with entities) when interpolating strings into `innerHTML`. Furthermore, test this securely using generative tests (like Property-Based Tests).
