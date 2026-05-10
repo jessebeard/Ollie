@@ -234,9 +234,9 @@ export class VaultUI {
         try {
             // 1. Confirm intention
             const confirmed = await this.modals.confirm(
-                'Select a folder with JPEG images.<br><br>' +
-                'The vault data will be hidden inside these images.<br>' +
-                '<b>Existing functionality in these images will remain, but they will be modified.</b>'
+                'Select a folder with JPEG images.\n\n' +
+                'The vault data will be hidden inside these images.\n' +
+                'Existing functionality in these images will remain, but they will be modified.'
             );
             if (!confirmed) return;
 
@@ -429,7 +429,7 @@ export class VaultUI {
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
-        const warningMsg = `🔴 SECURITY WARNING: Red Flag Operation<br><br>You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.<br><br>Anyone who gains access to this file will have immediate access to all your passwords.<br><br>Are you absolutely sure you want to proceed?`;
+        const warningMsg = `🔴 SECURITY WARNING: Red Flag Operation\n\nYou are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.\n\nAnyone who gains access to this file will have immediate access to all your passwords.\n\nAre you absolutely sure you want to proceed?`;
 
         const confirmed = await this.modals.confirm(warningMsg);
         if (!confirmed) return;
