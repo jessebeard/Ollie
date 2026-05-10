@@ -1,0 +1,3 @@
+## 2024-05-24 - O(log N) to O(1) Bit Category Optimization
+**Learning:** This codebase computes bit lengths/categories extensively during Huffman encoding (e.g., `computeCategory`). The original implementation used a `while` loop with bit-shifting (`val >>= 1`), which is technically an O(log N) operation relative to the integer size.
+**Action:** Replace bitwise `while` loop bit-length calculations with hardware intrinsics. Specifically, use `32 - Math.clz32(Math.abs(val))` to compute the number of bits in O(1) time. This optimization is particularly beneficial in hot paths like entropy coding.
