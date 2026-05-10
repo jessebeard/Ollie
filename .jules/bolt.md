@@ -1,0 +1,3 @@
+## 2024-05-17 - Eliminate unnecessary bounds clamping on Typed Arrays
+**Learning:** `Uint8ClampedArray` natively handles clamping values to `[0, 255]` and rounding to the nearest even integer. Calling `Math.max(0, Math.min(255, Math.round(x)))` before assignment is redundant and adds significant overhead during image decoding when processing millions of pixels.
+**Action:** When assigning computed pixel values directly to a `Uint8ClampedArray`, remove explicit bounds checking and rely on native typed array behavior. Ensure this is only applied to `Uint8ClampedArray`, as other arrays (e.g. `Float32Array`) lack this feature.
