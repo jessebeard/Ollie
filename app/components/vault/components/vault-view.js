@@ -74,7 +74,22 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                try {
+                    let urlStr = entry.url.trim();
+                    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(urlStr)) {
+                        urlStr = 'https://' + urlStr;
+                    }
+                    const parsed = new URL(urlStr);
+                    if (['http:', 'https:'].includes(parsed.protocol)) {
+                        window.open(parsed.href, '_blank', 'noopener,noreferrer');
+                    } else {
+                        console.warn('Blocked unsafe URL protocol:', parsed.protocol);
+                    }
+                } catch (err) {
+                    console.warn('Invalid URL:', entry.url);
+                }
+            }
         });
 
         return div;
