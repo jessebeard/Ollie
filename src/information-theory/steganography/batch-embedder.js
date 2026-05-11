@@ -105,27 +105,51 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            let allBlocks = [];
 
             if (decoded.coefficients) {
+                let totalBlocks = 0;
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
 
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                if (totalBlocks > 0) {
+                    // Pre-allocate array to avoid expensive reallocations via push()
+                    allBlocks = new Array(totalBlocks);
+                    let offset = 0;
+                    for (const compId in decoded.coefficients) {
+                        const compData = decoded.coefficients[compId];
+                        if (compData && compData.blocks) {
+                            for (let k = 0; k < compData.blocks.length; k++) {
+                                allBlocks[offset++] = compData.blocks[k];
+                            }
                         }
                     }
                 }
             }
 
             if (allBlocks.length === 0 && decoder.components) {
+                let totalBlocks = 0;
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
 
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                if (totalBlocks > 0) {
+                    // Pre-allocate array to avoid expensive reallocations via push()
+                    allBlocks = new Array(totalBlocks);
+                    let offset = 0;
+                    for (const compId in decoder.components) {
+                        const compData = decoder.components[compId];
+                        if (compData && compData.blocks) {
+                            for (let k = 0; k < compData.blocks.length; k++) {
+                                allBlocks[offset++] = compData.blocks[k];
+                            }
                         }
                     }
                 }
