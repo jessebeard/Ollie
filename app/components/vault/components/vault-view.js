@@ -74,10 +74,31 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            const safeUrl = this.validateAndFormatURL(entry.url);
+            if (safeUrl) window.open(safeUrl, '_blank', 'noopener,noreferrer');
         });
 
         return div;
+    }
+
+    validateAndFormatURL(urlStr) {
+        if (!urlStr) return null;
+
+        let formattedStr = urlStr.trim();
+        // If there's no scheme at all, fallback to https
+        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(formattedStr)) {
+            formattedStr = 'https://' + formattedStr;
+        }
+
+        try {
+            const parsed = new URL(formattedStr);
+            if (['http:', 'https:'].includes(parsed.protocol.toLowerCase())) {
+                return parsed.href;
+            }
+        } catch (e) {
+            // Invalid URL
+        }
+        return null;
     }
 
     getIcon(entry) {
