@@ -203,6 +203,7 @@ async function runTests() {
 
         await import('./codec/decoder.test.js');
         await import('./codec/decoder/defensive.test.js');
+        await import('./security/modal-manager.test.js');
         await import('./integration/roundtrip.test.js');
         await import('./integration/steganography-roundtrip.test.js');
         await import('./scripts/auto_detection_roundtrip.test.js');
