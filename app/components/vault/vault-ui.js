@@ -454,8 +454,20 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
+
+        // ⚡ Bolt: Cache expensive size derivation against the immutable vault
+        // reference to prevent main-thread blocking during frequent UI updates (e.g., search)
+        if (this._cachedVaultRef === this.vault) {
+            return this._cachedVaultSize;
+        }
+
         const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+        const size = new TextEncoder().encode(json).length;
+
+        this._cachedVaultRef = this.vault;
+        this._cachedVaultSize = size;
+
+        return size;
     }
 
     updateUI() {
