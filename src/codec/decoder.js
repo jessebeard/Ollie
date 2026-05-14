@@ -237,14 +237,24 @@ export class JpegDecoder {
 
         if (!options.skipExtraction) {
             try {
-                const allBlocks = [];
+                // Two-pass array allocation optimization: Calculate total size first
+                let totalBlocks = 0;
+                for (const comp of this.frameHeader.components) {
+                    const compData = this.components[comp.id];
+                    if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
+
+                // Pre-allocate the array to avoid expensive reallocations during push()
+                const allBlocks = new Array(totalBlocks);
+                let blockOffset = 0;
 
                 for (const comp of this.frameHeader.components) {
                     const compData = this.components[comp.id];
                     if (compData && compData.blocks) {
-                        // Avoid stack overflow with spread (...) for large block arrays
                         for (let i = 0; i < compData.blocks.length; i++) {
-                            allBlocks.push(compData.blocks[i]);
+                            allBlocks[blockOffset++] = compData.blocks[i];
                         }
                     }
                 }
