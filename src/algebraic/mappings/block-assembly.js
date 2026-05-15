@@ -63,9 +63,10 @@ export function componentsToImageData(yData, cbData, crData, width, height) {
         const b = y + 1.772 * (cb - 128);
 
         const offset = i * 4;
-        imageData[offset + 0] = Math.max(0, Math.min(255, Math.round(r)));
-        imageData[offset + 1] = Math.max(0, Math.min(255, Math.round(g)));
-        imageData[offset + 2] = Math.max(0, Math.min(255, Math.round(b)));
+        // Optimization: Uint8ClampedArray handles clamping and rounding natively
+        imageData[offset + 0] = r;
+        imageData[offset + 1] = g;
+        imageData[offset + 2] = b;
         imageData[offset + 3] = 255; 
     }
 
@@ -84,8 +85,9 @@ export function grayscaleToImageData(yData, width, height) {
     const imageData = new Uint8ClampedArray(width * height * 4);
 
     for (let i = 0; i < width * height; i++) {
-        const gray = Math.max(0, Math.min(255, Math.round(yData[i])));
+        const gray = yData[i];
         const offset = i * 4;
+        // Optimization: Uint8ClampedArray handles clamping and rounding natively
         imageData[offset + 0] = gray;
         imageData[offset + 1] = gray;
         imageData[offset + 2] = gray;
