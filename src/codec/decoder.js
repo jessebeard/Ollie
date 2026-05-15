@@ -1,6 +1,6 @@
 /**
  * JPEG Decoder - Main class that orchestrates the complete decoding pipeline
- * 
+ *
  * Decodes baseline sequential DCT JPEG files with Huffman coding.
  * Supports grayscale and color images with various chroma subsampling (4:4:4, 4:2:2, 4:2:0).
  */
@@ -91,7 +91,7 @@ export class JpegDecoder {
 
     /**
      * Decode a JPEG byte array into ImageData
-     * 
+     *
      * @param {Uint8Array} jpegBytes - JPEG file bytes
      * @param {Object} options - { password: '...' }
      * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number, secretData: any}>} ImageData-compatible object
@@ -237,14 +237,24 @@ export class JpegDecoder {
 
         if (!options.skipExtraction) {
             try {
-                const allBlocks = [];
+                // Performance: Two-pass pre-allocation avoids expensive reallocations when flattening large block arrays
+                let totalBlocks = 0;
+                for (const comp of this.frameHeader.components) {
+                    const compData = this.components[comp.id];
+                    if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
+
+                const allBlocks = new Array(totalBlocks);
+                let blockIndex = 0;
 
                 for (const comp of this.frameHeader.components) {
                     const compData = this.components[comp.id];
                     if (compData && compData.blocks) {
                         // Avoid stack overflow with spread (...) for large block arrays
                         for (let i = 0; i < compData.blocks.length; i++) {
-                            allBlocks.push(compData.blocks[i]);
+                            allBlocks[blockIndex++] = compData.blocks[i];
                         }
                     }
                 }
@@ -314,7 +324,7 @@ export class JpegDecoder {
 
     /**
      * Decode entropy-coded scan data
-     * 
+     *
      * @param {Uint8Array} scanData - Raw scan data bytes
      * @param {Object} scanHeader - Parsed scan header
      */
@@ -443,7 +453,7 @@ export class JpegDecoder {
 
     /**
      * Reconstruct and assemble final image
-     * 
+     *
      * @returns {{data: Uint8ClampedArray, width: number, height: number}}
      */
     assembleImage() {

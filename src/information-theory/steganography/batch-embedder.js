@@ -10,7 +10,7 @@ import { F5 } from './f5-syndrome.js';
 export class BatchEmbedder {
     /**
      * Embeds data across multiple images with capacity-aware chunking
-     * 
+     *
      * @param {Uint8Array} data - Data to embed
      * @param {Array<File>} imageFiles - List of image files (File objects)
      * @param {Object} options - Options
@@ -105,33 +105,55 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            // Performance: Two-pass pre-allocation avoids expensive reallocations when flattening large block arrays
+            let totalBlocks = 0;
+            let useCoefficients = false;
+            let useComponents = false;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
+                        totalBlocks += compData.blocks.length;
+                        useCoefficients = true;
                     }
                 }
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (totalBlocks === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                        useComponents = true;
+                    }
+                }
+            }
 
+            const allBlocks = new Array(totalBlocks);
+            let blockIndex = 0;
+
+            if (useCoefficients) {
+                for (const compId in decoded.coefficients) {
+                    const compData = decoded.coefficients[compId];
+                    if (compData && compData.blocks) {
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[blockIndex++] = compData.blocks[k];
+                        }
+                    }
+                }
+            } else if (useComponents) {
+                for (const compId in decoder.components) {
+                    const compData = decoder.components[compId];
+                    if (compData && compData.blocks) {
+                        for (let k = 0; k < compData.blocks.length; k++) {
+                            allBlocks[blockIndex++] = compData.blocks[k];
                         }
                     }
                 }
             }
 
-            if (allBlocks.length === 0) {
+            if (totalBlocks === 0) {
                 console.error('Failed to extract blocks. Decoder state:', {
                     hasCoefficients: !!decoded.coefficients,
                     hasComponents: !!decoder.components,
