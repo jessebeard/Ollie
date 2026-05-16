@@ -105,33 +105,41 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            // Bolt: Two-pass array allocation to avoid push reallocation overhead.
+            // Also refactored to calculate total block count first to correctly handle fallback.
+            let totalBlocksCount = 0;
+            let blocksSource = null;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
-                    if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
-                    }
+                    if (compData && compData.blocks) totalBlocksCount += compData.blocks.length;
                 }
+                if (totalBlocksCount > 0) blocksSource = decoded.coefficients;
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (totalBlocksCount === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
-                    if (compData && compData.blocks) {
+                    if (compData && compData.blocks) totalBlocksCount += compData.blocks.length;
+                }
+                if (totalBlocksCount > 0) blocksSource = decoder.components;
+            }
 
+            let allBlocks = new Array(totalBlocksCount);
+            if (totalBlocksCount > 0 && blocksSource) {
+                let offset = 0;
+                for (const compId in blocksSource) {
+                    const compData = blocksSource[compId];
+                    if (compData && compData.blocks) {
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[offset++] = compData.blocks[k];
                         }
                     }
                 }
             }
 
-            if (allBlocks.length === 0) {
+            if (totalBlocksCount === 0) {
                 console.error('Failed to extract blocks. Decoder state:', {
                     hasCoefficients: !!decoded.coefficients,
                     hasComponents: !!decoder.components,
