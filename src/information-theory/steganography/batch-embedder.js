@@ -105,33 +105,34 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            let totalBlocks = 0;
+            let sourceToUse = null;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
+                        totalBlocks += compData.blocks.length;
                     }
+                }
+                if (totalBlocks > 0) {
+                    sourceToUse = decoded.coefficients;
                 }
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (totalBlocks === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
+                        totalBlocks += compData.blocks.length;
                     }
+                }
+                if (totalBlocks > 0) {
+                    sourceToUse = decoder.components;
                 }
             }
 
-            if (allBlocks.length === 0) {
+            if (totalBlocks === 0) {
                 console.error('Failed to extract blocks. Decoder state:', {
                     hasCoefficients: !!decoded.coefficients,
                     hasComponents: !!decoder.components,
@@ -139,6 +140,20 @@ export class BatchEmbedder {
                     componentKeys: decoder.components ? Object.keys(decoder.components) : []
                 });
                 return [null, new Error(`Failed to extract blocks from ${file.name} for capacity calculation`)];
+            }
+
+            const allBlocks = new Array(totalBlocks);
+            let blockIndex = 0;
+
+            if (sourceToUse) {
+                for (const compId in sourceToUse) {
+                    const compData = sourceToUse[compId];
+                    if (compData && compData.blocks) {
+                        for (let k = 0; k < compData.blocks.length; k++) {
+                            allBlocks[blockIndex++] = compData.blocks[k];
+                        }
+                    }
+                }
             }
 
             const representativeMetadata = {
