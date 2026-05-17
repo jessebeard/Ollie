@@ -5,6 +5,16 @@ export class ModalManager {
         document.body.appendChild(this.overlay);
     }
 
+    #escapeHTML(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     createOverlay() {
         const el = document.createElement('div');
         el.className = 'modal-overlay';
@@ -34,10 +44,10 @@ export class ModalManager {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escapeHTML(title)}</h3>
                 <div class="form-group">
-                    <label>${label}</label>
-                    <input type="${type}" class="prompt-input">
+                    <label>${this.#escapeHTML(label)}</label>
+                    <input type="${this.#escapeHTML(type)}" class="prompt-input">
                 </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">Cancel</button>
@@ -83,7 +93,7 @@ export class ModalManager {
             modal.className = 'modal-dialog';
             modal.innerHTML = `
                 <h3>Confirmation</h3>
-                <p>${message}</p>
+                <p style="white-space: pre-wrap;">${this.#escapeHTML(message)}</p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">No</button>
                     <button class="btn btn-primary confirm-btn">Yes</button>
@@ -121,20 +131,20 @@ export class ModalManager {
                 if (type === 'textarea') {
                     return `
                         <div class="form-group">
-                            <label>${label}</label>
-                            <textarea name="${field.name}" class="form-control" ${required}>${val}</textarea>
+                            <label>${this.#escapeHTML(label)}</label>
+                            <textarea name="${this.#escapeHTML(field.name)}" class="form-control" ${required}>${this.#escapeHTML(val)}</textarea>
                         </div>`;
                 }
 
                 return `
                     <div class="form-group">
-                        <label>${label}</label>
-                        <input type="${type}" name="${field.name}" value="${val}" class="form-control" ${required}>
+                        <label>${this.#escapeHTML(label)}</label>
+                        <input type="${this.#escapeHTML(type)}" name="${this.#escapeHTML(field.name)}" value="${this.#escapeHTML(val)}" class="form-control" ${required}>
                     </div>`;
             }).join('');
 
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escapeHTML(title)}</h3>
                 <form id="dynamicForm">
                     ${inputsHtml}
                     <div class="modal-actions">
@@ -185,10 +195,10 @@ export class ModalManager {
         modal.className = `modal-dialog alert-${type}`;
         modal.innerHTML = `
             <div style="text-align: center; margin-bottom: 1rem;">
-                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${type}">
+                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${this.#escapeHTML(type)}">
             </div>
-            <h3 style="text-align: center;">${title}</h3>
-            <p style="text-align: center; color: var(--text-muted);">${message}</p>
+            <h3 style="text-align: center;">${this.#escapeHTML(title)}</h3>
+            <p style="text-align: center; color: var(--text-muted); white-space: pre-wrap;">${this.#escapeHTML(message)}</p>
             <div class="modal-actions" style="justify-content: center; margin-top: 1.5rem;">
                 <button class="btn btn-primary confirm-btn">OK</button>
             </div>
