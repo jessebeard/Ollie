@@ -44,17 +44,9 @@ export class Jsteg {
     static getCategory(absVal) {
         if (absVal === 0) return 0;
         // 1 is now a valid category for embedding (mapped to 2/3)
-        if (absVal === 1) return 1;
-        if (absVal <= 3) return 2;
-        if (absVal <= 7) return 3;
-        if (absVal <= 15) return 4;
-        if (absVal <= 31) return 5;
-        if (absVal <= 63) return 6;
-        if (absVal <= 127) return 7;
-        if (absVal <= 255) return 8;
-        if (absVal <= 511) return 9;
-        if (absVal <= 1023) return 10;
-        return 11;
+        // O(1) bit-length computation using hardware instructions
+        const cat = 32 - Math.clz32(absVal);
+        return cat > 11 ? 11 : cat;
     }
 
     /**
