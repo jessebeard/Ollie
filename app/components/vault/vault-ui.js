@@ -454,8 +454,22 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
+
+        // ⚡ Bolt Optimization: Cache the size calculation.
+        // JSON stringification and TextEncoder are expensive and block the main thread.
+        // Since `this.vault` is immutable and recreated on modification, we can cache
+        // the calculated size using the vault reference as the cache key.
+        if (this._cachedVaultRef === this.vault) {
+            return this._cachedVaultSize;
+        }
+
         const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+        const size = new TextEncoder().encode(json).length;
+
+        this._cachedVaultRef = this.vault;
+        this._cachedVaultSize = size;
+
+        return size;
     }
 
     updateUI() {
