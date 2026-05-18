@@ -5,6 +5,16 @@ export class ModalManager {
         document.body.appendChild(this.overlay);
     }
 
+    #escape(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     createOverlay() {
         const el = document.createElement('div');
         el.className = 'modal-overlay';
@@ -34,10 +44,10 @@ export class ModalManager {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escape(title)}</h3>
                 <div class="form-group">
-                    <label>${label}</label>
-                    <input type="${type}" class="prompt-input">
+                    <label>${this.#escape(label)}</label>
+                    <input type="${this.#escape(type)}" class="prompt-input">
                 </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">Cancel</button>
@@ -81,9 +91,11 @@ export class ModalManager {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
+            // We use textContent logic for message in case there are multi-line prompts or safe text.
+            // But since it's innerHTML interpolation, escaping is required.
             modal.innerHTML = `
                 <h3>Confirmation</h3>
-                <p>${message}</p>
+                <p>${this.#escape(message)}</p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">No</button>
                     <button class="btn btn-primary confirm-btn">Yes</button>
@@ -113,28 +125,29 @@ export class ModalManager {
             modal.className = 'modal-dialog modal-lg'; // Larger modal
 
             const inputsHtml = fields.map(field => {
-                const val = initialValues[field.name] || '';
-                const type = field.type || 'text';
-                const label = field.label || field.name;
+                const val = this.#escape(initialValues[field.name] || '');
+                const type = this.#escape(field.type || 'text');
+                const label = this.#escape(field.label || field.name);
+                const name = this.#escape(field.name);
                 const required = field.required ? 'required' : '';
 
-                if (type === 'textarea') {
+                if (field.type === 'textarea') {
                     return `
                         <div class="form-group">
                             <label>${label}</label>
-                            <textarea name="${field.name}" class="form-control" ${required}>${val}</textarea>
+                            <textarea name="${name}" class="form-control" ${required}>${val}</textarea>
                         </div>`;
                 }
 
                 return `
                     <div class="form-group">
                         <label>${label}</label>
-                        <input type="${type}" name="${field.name}" value="${val}" class="form-control" ${required}>
+                        <input type="${type}" name="${name}" value="${val}" class="form-control" ${required}>
                     </div>`;
             }).join('');
 
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.#escape(title)}</h3>
                 <form id="dynamicForm">
                     ${inputsHtml}
                     <div class="modal-actions">
@@ -182,13 +195,14 @@ export class ModalManager {
         }
 
         const modal = document.createElement('div');
-        modal.className = `modal-dialog alert-${type}`;
+        // Ensure type doesn't break class attribute
+        modal.className = `modal-dialog alert-${this.#escape(type)}`;
         modal.innerHTML = `
             <div style="text-align: center; margin-bottom: 1rem;">
-                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${type}">
+                <img src="${iconSrc}" width="80" height="80" alt="Ollie ${this.#escape(type)}">
             </div>
-            <h3 style="text-align: center;">${title}</h3>
-            <p style="text-align: center; color: var(--text-muted);">${message}</p>
+            <h3 style="text-align: center;">${this.#escape(title)}</h3>
+            <p style="text-align: center; color: var(--text-muted);">${this.#escape(message)}</p>
             <div class="modal-actions" style="justify-content: center; margin-top: 1.5rem;">
                 <button class="btn btn-primary confirm-btn">OK</button>
             </div>
