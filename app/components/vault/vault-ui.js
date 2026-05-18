@@ -454,8 +454,20 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
+
+        // Performance optimization: Cache expensive synchronous stringify & encode
+        // against the immutable vault reference to prevent main-thread blocking on frequent UI updates (like search)
+        if (this._cachedVaultForSize === this.vault) {
+            return this._cachedVaultSize;
+        }
+
         const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+        const size = new TextEncoder().encode(json).length;
+
+        this._cachedVaultForSize = this.vault;
+        this._cachedVaultSize = size;
+
+        return size;
     }
 
     updateUI() {
