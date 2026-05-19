@@ -1,0 +1,9 @@
+
+> Ollie@0.2.0 serve
+> node scripts/dev-server.js
+
+
+  🚀 Ollie dev server running at http://localhost:8081/
+  📋 Tests:  http://localhost:8081/test.html
+  🔐 Vault:  http://localhost:8081/vault.html
+  ⚡ Cache:  DISABLED (no-store on all responses)

@@ -1,0 +1,3 @@
+## 2024-05-24 - Cache expensive derivations using immutable references
+**Learning:** Running synchronous `JSON.stringify()` and `TextEncoder.encode()` on large objects during frequent UI updates (e.g., search keystrokes) causes main-thread blocking. Because the `PasswordVault` is fully immutable, we can cache these expensive derivations against the object reference.
+**Action:** When working with immutable objects, use reference equality (`===`) checks to safely cache expensive calculations like JSON serialization or byte encoding, avoiding redundant operations during frequent renders or loops.

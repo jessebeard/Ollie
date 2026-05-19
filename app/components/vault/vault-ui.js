@@ -454,8 +454,17 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
-        const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+
+        // ⚡ Bolt Optimization: Cache expensive JSON.stringify and TextEncoder
+        // calls by exploiting the fact that PasswordVault is immutable.
+        // If the vault reference hasn't changed, the size is exactly the same.
+        if (this._cachedVaultForSize !== this.vault) {
+            const json = JSON.stringify(this.vault.toJSON());
+            this._cachedSize = new TextEncoder().encode(json).length;
+            this._cachedVaultForSize = this.vault;
+        }
+
+        return this._cachedSize;
     }
 
     updateUI() {
