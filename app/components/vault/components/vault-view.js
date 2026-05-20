@@ -86,10 +86,11 @@ export class VaultView {
     }
 
     escape(str) {
-        if (!str) return '';
-        return str.replace(/&/g, '&amp;')
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }
