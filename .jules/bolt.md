@@ -1,0 +1,3 @@
+## 2024-05-21 - Cache expensive Vault Size derivation
+**Learning:** Running synchronous `JSON.stringify()` and `TextEncoder.encode()` on large objects during frequent UI updates (like keystrokes on the search bar calling `updateUI`) causes main-thread blocking. Since the `PasswordVault` is completely immutable, we can safely cache these derivations using reference equality checks (`===`) against the vault object.
+**Action:** When deriving expensive UI state from immutable structures, use an instance property cache `_lastVaultRef` and `_lastVaultSize` and check reference equality before recalculating.
