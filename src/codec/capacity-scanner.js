@@ -8,7 +8,7 @@ import { F5 } from '../information-theory/steganography/f5-syndrome.js';
 export class CapacityScanner {
     /**
      * Scans a list of files for their steganographic capacity.
-     * 
+     *
      * @param {File[]|Object[]} files - List of File objects or mocks
      * @param {Object} options - { concurrency, analyzer }
      * @param {Function} onProgress - (current, total, status) callback
@@ -21,22 +21,29 @@ export class CapacityScanner {
 
         const concurrency = options.concurrency || 1;
         let analyzer = options.analyzer;
-        
+
         // Default analyzer: Decodes JPEG and calculates F5 capacity
         if (!analyzer) {
             analyzer = async (file) => {
                 const decoder = new JpegDecoder();
                 const buffer = await file.arrayBuffer();
                 const bytes = new Uint8Array(buffer);
-                
+
                 const [info, err] = await decoder.decode(bytes, { coefficientsOnly: true });
                 if (err) return [null, err];
 
-                const allBlocks = [];
+                // Optimization: Two-pass pre-allocation avoids incremental reallocations
+                let totalSize = 0;
+                for (const compId in info.coefficients) {
+                    totalSize += info.coefficients[compId].blocks.length;
+                }
+
+                const allBlocks = new Array(totalSize);
+                let offset = 0;
                 for (const compId in info.coefficients) {
                     const comp = info.coefficients[compId];
                     for (let i = 0; i < comp.blocks.length; i++) {
-                        allBlocks.push(comp.blocks[i]);
+                        allBlocks[offset++] = comp.blocks[i];
                     }
                 }
 
@@ -49,7 +56,7 @@ export class CapacityScanner {
         let completed = 0;
         let totalCapacity = 0;
         const fileCapacities = new Map();
-        
+
         // Result tracking
         let firstError = null;
 
@@ -62,7 +69,7 @@ export class CapacityScanner {
             // Defensive: Ensure it looks like a JPEG at the byte level before deep analysis
             const buffer = await file.arrayBuffer();
             const bytes = new Uint8Array(buffer);
-            
+
             if (bytes.length < 2 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) {
                 firstError = new Error(`Invalid JPEG signature for ${file.name}`);
                 return;
