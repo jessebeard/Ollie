@@ -10,7 +10,7 @@ import { F5 } from './f5-syndrome.js';
 export class BatchEmbedder {
     /**
      * Embeds data across multiple images with capacity-aware chunking
-     * 
+     *
      * @param {Uint8Array} data - Data to embed
      * @param {Array<File>} imageFiles - List of image files (File objects)
      * @param {Object} options - Options
@@ -105,27 +105,45 @@ export class BatchEmbedder {
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
             if (decodeErr) throw decodeErr;
 
-            const allBlocks = [];
+            let totalBlocks = 0;
+            if (decoded.coefficients) {
+                for (const compId in decoded.coefficients) {
+                    const compData = decoded.coefficients[compId];
+                    if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
+            }
+
+            if (totalBlocks === 0 && decoder.components) {
+                for (const compId in decoder.components) {
+                    const compData = decoder.components[compId];
+                    if (compData && compData.blocks) {
+                        totalBlocks += compData.blocks.length;
+                    }
+                }
+            }
+
+            const allBlocks = totalBlocks > 0 ? new Array(totalBlocks) : [];
+            let blockOffset = 0;
 
             if (decoded.coefficients) {
                 for (const compId in decoded.coefficients) {
                     const compData = decoded.coefficients[compId];
                     if (compData && compData.blocks) {
-
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[blockOffset++] = compData.blocks[k];
                         }
                     }
                 }
             }
 
-            if (allBlocks.length === 0 && decoder.components) {
+            if (blockOffset === 0 && decoder.components) {
                 for (const compId in decoder.components) {
                     const compData = decoder.components[compId];
                     if (compData && compData.blocks) {
-
                         for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
+                            allBlocks[blockOffset++] = compData.blocks[k];
                         }
                     }
                 }

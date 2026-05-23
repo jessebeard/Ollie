@@ -10,7 +10,7 @@ import { downsampleBlock420, extractLumaBlocks420 } from '../algebraic/mappings/
 
 /**
  * JpegEncoder
- * 
+ *
  * This class implements a basic JPEG encoder.
  */
 export class JpegEncoder {
@@ -32,10 +32,12 @@ export class JpegEncoder {
      * Flattens Y, Cb, Cr blocks into a single array for steganography.
      */
     flattenBlocks(blocks) {
-        const allBlocks = [];
-        for (let i = 0; i < blocks.Y.length; i++) allBlocks.push(blocks.Y[i]);
-        for (let i = 0; i < blocks.Cb.length; i++) allBlocks.push(blocks.Cb[i]);
-        for (let i = 0; i < blocks.Cr.length; i++) allBlocks.push(blocks.Cr[i]);
+        const totalSize = blocks.Y.length + blocks.Cb.length + blocks.Cr.length;
+        const allBlocks = totalSize > 0 ? new Array(totalSize) : [];
+        let offset = 0;
+        for (let i = 0; i < blocks.Y.length; i++) allBlocks[offset++] = blocks.Y[i];
+        for (let i = 0; i < blocks.Cb.length; i++) allBlocks[offset++] = blocks.Cb[i];
+        for (let i = 0; i < blocks.Cr.length; i++) allBlocks[offset++] = blocks.Cr[i];
         return allBlocks;
     }
 
@@ -364,11 +366,11 @@ export class JpegEncoder {
 
     /**
      * Upsamples chroma blocks to match luma block count for 4:4:4 encoding.
-     * 
+     *
      * For 4:2:0 subsampled images, Cb/Cr have 1/4 the blocks of Y.
      * This method duplicates chroma blocks to match the Y block count,
      * enabling simple 4:4:4 interleaving in writeScan().
-     * 
+     *
      * @param {Object} blocks - { Y, Cb, Cr } block arrays
      * @returns {Object} Blocks with Cb/Cr upsampled to match Y count
      */
@@ -407,10 +409,10 @@ export class JpegEncoder {
 
     /**
      * Encodes JPEG from pre-calculated DCT coefficients (lossless path).
-     * 
+     *
      * This method enables lossless transcoding by accepting coefficients directly,
      * bypassing the lossy DCT and quantization steps.
-     * 
+     *
      * @param {Object} coefficients - Component coefficients from decoder (indexed by component ID)
      * @param {Map} quantizationTables - Original quantization tables to preserve
      * @param {Object} metadata - { width, height, chromaSubsampling? }
