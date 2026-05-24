@@ -1,0 +1,10 @@
+--- test/runner.js
++++ test/runner.js
+@@ -94,6 +94,8 @@
+         await import('./integration/vault/vault-e2e-multigen.test.js');
+         await import('./integration/vault/vault-capacity-ui.test.js');
+
++        await import('./security/escape-html.test.js');
++
+         await executeTests();
+         const stats = getStats();

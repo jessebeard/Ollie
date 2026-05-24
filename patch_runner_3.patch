@@ -1,0 +1,10 @@
+--- test/runner.js
++++ test/runner.js
+@@ -95,6 +95,7 @@
+         await import('./integration/vault/vault-capacity-ui.test.js');
+
+         await import('./security/escape-html.test.js');
++        await import('./security/escape-html-vault.test.js');
+
+         await executeTests();
+         const stats = getStats();

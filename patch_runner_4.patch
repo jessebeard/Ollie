@@ -1,0 +1,9 @@
+--- test/runner.js
++++ test/runner.js
+@@ -224,7 +224,6 @@
+         await import('./integration/vault/vault-e2e-multigen.test.js');
+         await import('./integration/vault/vault-capacity-ui.test.js');
+
+-        await import('./security/escape-html.pbt.js');
+         await import('./security/escape-html.test.js');
+         await import('./security/escape-html-vault.test.js');

@@ -1,0 +1,11 @@
+--- app/test.html
++++ app/test.html
+@@ -569,6 +569,8 @@
+         // import '../test/integration/vault/vault-e2e-empty.test.js';
+         // import '../test/integration/vault/vault-e2e-multigen.test.js';
+
++        import '../test/security/escape-html.test.js';
++
+         // Run the registered test tree
+         await executeTests();
+     </script>
