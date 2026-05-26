@@ -1,0 +1,3 @@
+## 2024-05-14 - Pre-allocating large block arrays avoids slow dynamic growth
+**Learning:** When flattening multiple large arrays (like DCT block collections in batch-embedder.js or decoder.js), using an incremental push() inside a loop triggers expensive array reallocations. A two-pass approach calculating total size first and pre-allocating with new Array(totalSize) can significantly reduce processing time.
+**Action:** Use size pre-allocation for performance-critical hot paths when aggregating arrays of significant size. Be careful to check totalSize === 0 if fallback logic relies on .length === 0 checks.
