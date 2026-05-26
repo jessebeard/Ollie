@@ -1,0 +1,4 @@
+## 2025-02-18 - XSS attribute breakout in VaultView escape
+**Vulnerability:** XSS breakout possible via unescaped single quotes (`'`) and double quotes in certain contexts in the `escape()` and `escapeHtml()` functions used for `innerHTML` generation in Vault UI.
+**Learning:** Using `replace` for `&`, `<`, `>`, and `"` is not sufficient for elements dynamically rendered inside single quotes or for certain contexts. The DOM `textContent` assignment method also misses attribute injection vectors. The `escape` method needs to use regex, replace single quotes with `&#39;` and must handle non-string inputs safely by casting to string first.
+**Prevention:** Always escape single quotes (`&#39;`) in addition to double quotes, use explicit regex escaping instead of `textContent` trick, and cast input to String when doing custom regex HTML escaping.
