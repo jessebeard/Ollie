@@ -170,4 +170,4 @@ export function forwardDCTAAN(block) {
     return [output, null];
 }
 
-export const forwardDCT = forwardDCTNaive;
+export const forwardDCT = forwardDCTAAN;
