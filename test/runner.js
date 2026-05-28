@@ -218,6 +218,7 @@ async function runTests() {
         await import('./integration/vault/vault-e2e.test.js');
         await import('./integration/vault/vault-e2e-crud.test.js');
         await import('./integration/vault/vault-e2e-carriers.test.js');
+        await import('./integration/vault/vault-xss.test.js');
         await import('./integration/vault/vault-e2e-crypto-boundary.test.js');
         await import('./integration/vault/vault-e2e-ecc.test.js');
         await import('./integration/vault/vault-e2e-empty.test.js');
