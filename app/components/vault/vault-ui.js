@@ -22,6 +22,7 @@ export class VaultUI {
         this.currentQuery = '';
         this.currentSort = 'newest';
         this.totalCapacity = 0;
+        this.sizeCache = new WeakMap();
 
         this.initialize();
     }
@@ -108,7 +109,7 @@ export class VaultUI {
 
             this.vault = newVault;
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
-            
+
             // Scan for capacity
             const [scanResult, scanErr] = await CapacityScanner.scan(filesToLoad, {
                 f5Options: {
@@ -335,7 +336,7 @@ export class VaultUI {
                     // This is a bit tricky because handles are from scanDirectory
                 }
             }
-            
+
             // Re-scan for capacity after save (since carrier images might have changed)
             const [scanResult, scanErr] = await CapacityScanner.scan(fileObjs, {
                 f5Options: {
@@ -454,8 +455,14 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
-        const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+
+        // Use WeakMap cache based on the immutable PasswordVault reference
+        // Avoids synchronously serializing the entire vault multiple times
+        if (!this.sizeCache.has(this.vault)) {
+            const json = JSON.stringify(this.vault.toJSON());
+            this.sizeCache.set(this.vault, new TextEncoder().encode(json).length);
+        }
+        return this.sizeCache.get(this.vault);
     }
 
     updateUI() {
@@ -485,7 +492,7 @@ export class VaultUI {
 
             this.view.render(filteredResults);
             itemCount.textContent = `${filteredResults.length} Items`;
-            
+
             // Update capacity display
             if (capacityText) {
                 const usedSize = this.getVaultSize();
@@ -498,7 +505,7 @@ export class VaultUI {
                 if (progressEl) {
                     const percent = this.totalCapacity > 0 ? Math.min(100, (usedSize / this.totalCapacity) * 100) : 0;
                     progressEl.style.width = `${percent}%`;
-                    
+
                     progressEl.classList.remove('warning', 'danger');
                     if (percent > 90) progressEl.classList.add('danger');
                     else if (percent > 75) progressEl.classList.add('warning');
@@ -518,7 +525,7 @@ export class VaultUI {
             switch (sortMethod) {
                 case 'az': return titleA.localeCompare(titleB);
                 case 'za': return titleB.localeCompare(titleA);
-                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date. 
+                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date.
                 case 'newest':
                 default:
                     return b.id.localeCompare(a.id);
