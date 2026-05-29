@@ -107,34 +107,45 @@ export class ModalManager {
         });
     }
 
+    escape(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     async showForm(title, fields, initialValues = {}) {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog modal-lg'; // Larger modal
 
             const inputsHtml = fields.map(field => {
-                const val = initialValues[field.name] || '';
-                const type = field.type || 'text';
-                const label = field.label || field.name;
+                const val = this.escape(initialValues[field.name] || '');
+                const type = this.escape(field.type || 'text');
+                const label = this.escape(field.label || field.name);
+                const fieldName = this.escape(field.name);
                 const required = field.required ? 'required' : '';
 
                 if (type === 'textarea') {
                     return `
                         <div class="form-group">
                             <label>${label}</label>
-                            <textarea name="${field.name}" class="form-control" ${required}>${val}</textarea>
+                            <textarea name="${fieldName}" class="form-control" ${required}>${val}</textarea>
                         </div>`;
                 }
 
                 return `
                     <div class="form-group">
                         <label>${label}</label>
-                        <input type="${type}" name="${field.name}" value="${val}" class="form-control" ${required}>
+                        <input type="${type}" name="${fieldName}" value="${val}" class="form-control" ${required}>
                     </div>`;
             }).join('');
 
             modal.innerHTML = `
-                <h3>${title}</h3>
+                <h3>${this.escape(title)}</h3>
                 <form id="dynamicForm">
                     ${inputsHtml}
                     <div class="modal-actions">
