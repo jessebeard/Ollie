@@ -1,0 +1,3 @@
+## 2024-05-30 - Cache Expensive Stringification on Immutable Vault Reference
+**Learning:** Running synchronous `JSON.stringify()` and `TextEncoder.encode()` on the entire vault object during frequent UI updates (like keystrokes in search) causes main-thread blocking. Because the `PasswordVault` is strictly immutable, we can safely cache these expensive derived values by associating them with the object reference. We must store the cache externally (e.g. on `this`) rather than mutating the frozen vault instance.
+**Action:** When deriving expensive values from immutable objects that are updated frequently, use reference equality (`===`) to cache the result across renders, falling back to recalculation only when the reference changes.
