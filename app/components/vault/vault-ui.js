@@ -454,8 +454,21 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
+
+        // Cache optimization: To safely cache the expensive JSON.stringify &
+        // TextEncoder.encode without relying purely on object identity,
+        // we use a composite key of the modified timestamp and entry count.
+        const cacheKey = `${this.vault.metadata?.modified}-${this.vault.entries?.length}`;
+
+        if (this._vaultSizeCacheKey === cacheKey && this._cachedVaultSize !== undefined) {
+            return this._cachedVaultSize;
+        }
+
         const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+        this._cachedVaultSize = new TextEncoder().encode(json).length;
+        this._vaultSizeCacheKey = cacheKey;
+
+        return this._cachedVaultSize;
     }
 
     updateUI() {
