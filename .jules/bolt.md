@@ -1,0 +1,3 @@
+## 2025-02-23 - Caching immutable derived states
+**Learning:** For immutable data structures like PasswordVault where object identity may not be viable as a cache invalidator due to deep clones or ecosystem constraints, cache derivations by using a composite key representing the content (like `${metadata.modified}-${entries.length}`).
+**Action:** Always document cache constraints, and when object identity checking is forbidden, use specific composite properties derived from the structure to ensure accurate invalidation and avoid redundant expensive operations like JSON.stringify and TextEncoder.encode on the main thread.
