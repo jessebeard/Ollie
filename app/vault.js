@@ -516,9 +516,11 @@ class VaultUI {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (text == null) return '';
+        // ⚡ Bolt Optimization: Use regex replace instead of DOM manipulation (createElement/innerHTML)
+        // Improves rendering loop performance significantly for vaults with many entries
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return String(text).replace(/[&<>"']/g, m => map[m]);
     }
 }
 
