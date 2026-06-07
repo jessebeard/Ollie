@@ -1,0 +1,3 @@
+## 2024-05-24 - Cache Vault Size Calculation to Prevent UI Blocking
+**Learning:** In a UI with frequent state updates (like typing in a search bar), recalculating the entire vault size using `JSON.stringify` and `TextEncoder` on every render causes significant lag, particularly when relying on complex immutable objects. Additionally, due to ecosystem constraints, reference equality (`===`) checks for the vault object might fail as a caching mechanism.
+**Action:** When deriving expensive values from the vault state, cache the result using a composite key built from explicit properties (e.g., `${vault.metadata?.modified}-${vault.entries?.length}`) instead of object identity.
