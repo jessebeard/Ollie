@@ -185,7 +185,7 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -329,7 +329,7 @@ export class F5 {
                     const val = blocks[b][c];
                     if (val !== 0) {
                         nonZeroCount++;
-                        if (Math.abs(val) === 1) onesCount++;
+                        if (val === 1 || val === -1) onesCount++;
                     }
                 }
             }
@@ -492,7 +492,7 @@ export class F5 {
                 const val = blocks[b][c];
                 if (val !== 0) {
                     nonZeroCount++;
-                    if (Math.abs(val) === 1) onesCount++;
+                    if (val === 1 || val === -1) onesCount++;
                 }
             }
         }
@@ -780,7 +780,8 @@ export class F5 {
         // Account for shrinkage: coefficients with |val|=1 may shrink
         let onesCount = 0;
         for (const entry of usable) {
-            if (Math.abs(entry.block[entry.coeffIdx]) === 1) {
+            const val = entry.block[entry.coeffIdx];
+            if (val === 1 || val === -1) {
                 onesCount++;
             }
         }
