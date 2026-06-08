@@ -1,10 +1,10 @@
 /**
  * F5 Steganography Implementation
- * 
+ *
  * Implements the F5 algorithm for hiding data in JPEG coefficients.
  * F5 uses matrix encoding for improved embedding efficiency and
  * correctly handles "shrinkage" when coefficients become 0.
- * 
+ *
  * Key features:
  * - Matrix encoding (k bits embedded changing at most 1 coefficient per n-group)
  * - Permutation of coefficients for uniform change distribution
@@ -26,8 +26,8 @@ export class F5 {
     /**
      * Create a seeded PRNG for permutation.
      * Uses a simple LCG for reproducibility.
-     * 
-     * @param {Uint8Array|string} seed 
+     *
+     * @param {Uint8Array|string} seed
      * @returns {function(): number}
      */
     static createPRNG(seed) {
@@ -64,8 +64,8 @@ export class F5 {
     /**
      * Collect all usable coefficient indices (non-zero AC coefficients).
      * Returns array of {blockIndex, coeffIndex} pairs.
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @returns {Array<{block: Int32Array, blockIdx: number, coeffIdx: number}>}
      */
     static collectUsableCoefficients(blocks) {
@@ -85,9 +85,9 @@ export class F5 {
     /**
      * Generate a permutation of indices 0..N-1.
      * CRITICAL: Permutation depends ONLY on N and seed, NOT on coefficient values.
-     * 
+     *
      * @param {number} N - Total number of AC coefficient positions
-     * @param {string|Uint8Array} seed 
+     * @param {string|Uint8Array} seed
      * @returns {Uint32Array} Permuted indices
      */
     static generatePermutation(N, seed) {
@@ -109,9 +109,9 @@ export class F5 {
     /**
      * Get coefficient from blocks by flat AC index.
      * Index 0 = block 0 coeff 1, index 62 = block 0 coeff 63, index 63 = block 1 coeff 1, etc.
-     * 
-     * @param {Array<Int32Array>} blocks 
-     * @param {number} flatIdx 
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {number} flatIdx
      * @returns {{block: Int32Array, coeffIdx: number, val: number}}
      */
     static getCoeffByFlatIndex(blocks, flatIdx) {
@@ -124,8 +124,8 @@ export class F5 {
     /**
      * Compute XOR hash for a group of coefficients.
      * Returns k-bit value representing XOR of (1-indexed) positions where LSB == 1.
-     * 
-     * @param {Array<{block: Int32Array, blockIdx: number, coeffIdx: number}>} group 
+     *
+     * @param {Array<{block: Int32Array, blockIdx: number, coeffIdx: number}>} group
      * @returns {number}
      */
     static xorHash(group) {
@@ -142,9 +142,9 @@ export class F5 {
     /**
      * Select optimal k value based on capacity and message size.
      * Higher k = fewer changes but needs more coefficients.
-     * 
-     * @param {number} usableCount 
-     * @param {number} messageBits 
+     *
+     * @param {number} usableCount
+     * @param {number} messageBits
      * @param {number} p1 - Probability of coefficient being ±1 (shrinkage risk)
      * @returns {number}
      */
@@ -165,12 +165,12 @@ export class F5 {
     /**
      * Embeds raw data into the provided blocks using F5 algorithm.
      * Modifies the blocks in-place.
-     * 
+     *
      * SPEC COMPLIANCE: Permutation is generated over ALL AC indices (N = blocks * 63),
      * not just non-zero coefficients. Zeros are skipped during traversal.
-     * 
-     * @param {Array<Int32Array>} blocks 
-     * @param {Uint8Array} data 
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Uint8Array} data
      * @param {Object} options - { seed: string|Uint8Array }
      * @returns {{success: boolean, k: number}} Result with k value for extraction
      */
@@ -250,7 +250,7 @@ export class F5 {
             // Compute current hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -300,11 +300,11 @@ export class F5 {
 
     /**
      * Extracts raw data from the provided blocks.
-     * 
+     *
      * SPEC COMPLIANCE: Uses same permutation logic as embedding.
      * Permutation is generated over ALL AC indices, zeros skipped during traversal.
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @param {number} bitCount - Number of bits to extract
      * @param {Object} options - { seed: string|Uint8Array, k: number }
      * @returns {Uint8Array|null}
@@ -363,7 +363,7 @@ export class F5 {
             // Compute hash (XOR of 1-indexed positions where |val| is odd)
             let hash = 0;
             for (let j = 0; j < group.length; j++) {
-                if (Math.abs(group[j].val) % 2 === 1) {
+                if ((group[j].val & 1) !== 0) {
                     hash ^= (j + 1);
                 }
             }
@@ -385,9 +385,9 @@ export class F5 {
 
     /**
      * Embeds data with length header (legacy format).
-     * 
-     * @param {Array<Int32Array>} blocks 
-     * @param {Uint8Array} data 
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Uint8Array} data
      * @param {Object} options
      * @returns {boolean}
      */
@@ -403,8 +403,8 @@ export class F5 {
 
     /**
      * Extracts data with length header (legacy format).
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @param {Object} options
      * @returns {Uint8Array|null}
      */
@@ -432,10 +432,10 @@ export class F5 {
     /**
      * Embeds data using the container format.
      * Format: [Magic:4][Version:1][Flags:1][K:1][MetaLen:2][Metadata:N][PayloadLen:4][Payload:N][CRC:4]
-     * 
-     * @param {Array<Int32Array>} blocks 
-     * @param {Uint8Array} data 
-     * @param {Object} metadata 
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Uint8Array} data
+     * @param {Object} metadata
      * @param {Object} options - { password, seed }
      */
     static async embedContainer(blocks, data, metadata, options = {}) {
@@ -530,8 +530,8 @@ export class F5 {
 
     /**
      * Auto-detects format and extracts data.
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @param {Object} options
      * @returns {Promise<Uint8Array|Object|null>}
      */
@@ -606,8 +606,8 @@ export class F5 {
 
     /**
      * Extracts data using the container format.
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @param {Object} options
      * @returns {Promise<Object|null>}
      */
@@ -655,7 +655,7 @@ export class F5 {
 
         // Verify that the k we used to read the header matches the k stored IN the header
         // If they mismatch, it's weird but we should trust the stored k for the rest of the payload?
-        // Actually, if we read the header successfully with usedK, then the whole container 
+        // Actually, if we read the header successfully with usedK, then the whole container
         // was likely embedded with usedK. The storedK is redundant but good for verification.
         if (storedK !== usedK) {
             console.warn(`F5: Warning: Extracted k (${usedK}) differs from stored k (${storedK})`);
@@ -766,8 +766,8 @@ export class F5 {
 
     /**
      * Calculates the maximum capacity in bytes.
-     * 
-     * @param {Array<Int32Array>} blocks 
+     *
+     * @param {Array<Int32Array>} blocks
      * @param {Object} options
      * @returns {number}
      */
