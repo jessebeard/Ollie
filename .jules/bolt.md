@@ -1,0 +1,3 @@
+## 2024-06-08 - Immutable Vault Reference Caching
+**Learning:** Due to strict immutability checks in `PasswordVault` (`Object.freeze`), relying on object reference equality (`===`) for caching derived values is safer and more reliable than extracting object properties (like `metadata.modified`). If `metadata.modified` is missing, composite keys evaluate to `undefined-X` causing cache invalidation failures when entries are updated but the total count remains unchanged.
+**Action:** Use object reference equality (`this._lastVaultReference === this.vault`) or explicit, guaranteed unique properties when caching derived state based on immutable structures.
