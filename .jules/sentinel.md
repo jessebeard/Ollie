@@ -1,0 +1,5 @@
+## 2024-05-24 - Unescaped Modal Input and XSS risk in innerHTML usage
+
+**Vulnerability:** XSS vulnerability in Vault UI components (`vault-view.js` and `modal-manager.js`) where user-controlled input (like password entry values and form fields) is injected into `innerHTML` strings without proper escaping or insufficient manual escaping (e.g. `escape` function doesn't cover all cases securely or is missing). Additionally, `VaultUI.escapeHtml` uses `div.innerHTML` which itself can execute injected HTML if not careful, though `div.textContent` is safer. `modal-manager.js`'s `prompt` and `confirm` are vulnerable as well if titles/labels come from user data.
+**Learning:** Manual HTML string building with `innerHTML` without robust sanitization makes the application highly susceptible to XSS, particularly when handling sensitive data like password manager vault entries.
+**Prevention:** Use `textContent` for text insertion or a robust, tested sanitization function for all data inserted into `innerHTML`.
