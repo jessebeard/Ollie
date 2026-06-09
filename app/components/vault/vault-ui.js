@@ -338,8 +338,14 @@ export class VaultUI {
                 }
             }
 
+            // Refresh fileObjs with new File objects since they were modified on disk
+            const refreshedFileObjs = [];
+            for (const h of handles) {
+                refreshedFileObjs.push(await h.getFile());
+            }
+
             // Re-scan for capacity after save (since carrier images might have changed)
-            const [scanResult, scanErr] = await CapacityScanner.scan(fileObjs, {
+            const [scanResult, scanErr] = await CapacityScanner.scan(refreshedFileObjs, {
                 f5Options: {
                     format: 'container',
                     ecc: true,
