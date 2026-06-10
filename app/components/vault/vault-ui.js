@@ -22,6 +22,8 @@ export class VaultUI {
         this.currentQuery = '';
         this.currentSort = 'newest';
         this.totalCapacity = 0;
+        this._vaultSizeCache = 0;
+        this._vaultSizeCacheKey = '';
 
         this.initialize();
     }
@@ -108,7 +110,7 @@ export class VaultUI {
 
             this.vault = newVault;
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
-            
+
             // Scan for capacity
             const [scanResult, scanErr] = await CapacityScanner.scan(filesToLoad, {
                 f5Options: {
@@ -335,9 +337,15 @@ export class VaultUI {
                     // This is a bit tricky because handles are from scanDirectory
                 }
             }
-            
+
+            // Refresh fileObjs with new File objects since they were modified on disk
+            const refreshedFileObjs = [];
+            for (const h of handles) {
+                refreshedFileObjs.push(await h.getFile());
+            }
+
             // Re-scan for capacity after save (since carrier images might have changed)
-            const [scanResult, scanErr] = await CapacityScanner.scan(fileObjs, {
+            const [scanResult, scanErr] = await CapacityScanner.scan(refreshedFileObjs, {
                 f5Options: {
                     format: 'container',
                     ecc: true,
@@ -454,8 +462,18 @@ export class VaultUI {
 
     getVaultSize() {
         if (!this.vault) return 0;
+
+        // Use composite key based on modified timestamp and entry count to safely verify state changes
+        const currentKey = `${this.vault.metadata?.modified}-${this.vault.entries?.length}`;
+        if (this._vaultSizeCacheKey === currentKey && this._vaultSizeCacheKey !== 'undefined-undefined') {
+            return this._vaultSizeCache;
+        }
+
         const json = JSON.stringify(this.vault.toJSON());
-        return new TextEncoder().encode(json).length;
+        this._vaultSizeCache = new TextEncoder().encode(json).length;
+        this._vaultSizeCacheKey = currentKey;
+
+        return this._vaultSizeCache;
     }
 
     updateUI() {
@@ -485,7 +503,7 @@ export class VaultUI {
 
             this.view.render(filteredResults);
             itemCount.textContent = `${filteredResults.length} Items`;
-            
+
             // Update capacity display
             if (capacityText) {
                 const usedSize = this.getVaultSize();
@@ -498,7 +516,7 @@ export class VaultUI {
                 if (progressEl) {
                     const percent = this.totalCapacity > 0 ? Math.min(100, (usedSize / this.totalCapacity) * 100) : 0;
                     progressEl.style.width = `${percent}%`;
-                    
+
                     progressEl.classList.remove('warning', 'danger');
                     if (percent > 90) progressEl.classList.add('danger');
                     else if (percent > 75) progressEl.classList.add('warning');
@@ -518,7 +536,7 @@ export class VaultUI {
             switch (sortMethod) {
                 case 'az': return titleA.localeCompare(titleB);
                 case 'za': return titleB.localeCompare(titleA);
-                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date. 
+                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date.
                 case 'newest':
                 default:
                     return b.id.localeCompare(a.id);

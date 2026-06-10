@@ -213,6 +213,7 @@ async function runTests() {
         await import('./codec/transcoder.test.js');
         await import('./codec/orchestration/orchestrator.test.js');
 
+        await import('./security/secure-id-generation.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/immutable-vault.test.js');
         await import('./integration/vault/vault-e2e.test.js');
@@ -223,6 +224,7 @@ async function runTests() {
         await import('./integration/vault/vault-e2e-empty.test.js');
         await import('./integration/vault/vault-e2e-multigen.test.js');
         await import('./integration/vault/vault-capacity-ui.test.js');
+        await import("./ui-xss.test.js");
 
         await executeTests();
         const stats = getStats();

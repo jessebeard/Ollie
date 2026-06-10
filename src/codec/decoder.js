@@ -328,6 +328,33 @@ export class JpegDecoder {
 
         const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
 
+        // Precompute scan component metadata to avoid redundant lookups in the hot loop
+        const scanComponentMetadata = scanHeader.components.map(scanComp => {
+            const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
+            const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
+            const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
+            const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
+            const blocksInMCU = frameComp ? frameComp.hSampling * frameComp.vSampling : 0;
+            const blocksH = this.components[scanComp.selector] ? this.components[scanComp.selector].blocksH : 0;
+
+            return {
+                scanComp,
+                frameComp,
+                compIndex,
+                dcTable,
+                acTable,
+                blocksInMCU,
+                blocksH
+            };
+        });
+
+        // Validate precomputed metadata
+        for (const meta of scanComponentMetadata) {
+            if (!meta.frameComp) return new Error(`Scan component ${meta.scanComp.selector} not found in frame header`);
+            if (Ss === 0 && !meta.dcTable) return new Error(`Missing DC Huffman table for component ${meta.scanComp.selector}`);
+            if (Se > 0 && !meta.acTable) return new Error(`Missing AC Huffman table for component ${meta.scanComp.selector}`);
+        }
+
         let mcusSinceRestart = 0;
         let expectedRstMarker = 0xD0; // Start with RST0
 
@@ -392,32 +419,17 @@ export class JpegDecoder {
                 // DO NOT `continue` the loop, as we still need to process the current MCU index.
             }
 
-            for (const scanComp of scanHeader.components) {
-                const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
+            const mcuRow = Math.floor(mcuIndex / mcuCols);
+            const mcuCol = mcuIndex % mcuCols;
 
-                if (!frameComp) {
-                    return new Error(`Scan component ${scanComp.selector} not found in frame header`);
-                }
+            for (let c = 0; c < scanComponentMetadata.length; c++) {
+                const meta = scanComponentMetadata[c];
+                const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH } = meta;
 
-                const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
-                const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
-
-                if (Ss === 0 && !dcTable) {
-                    return new Error(`Missing DC Huffman table for component ${scanComp.selector}`);
-                }
-                if (Se > 0 && !acTable) {
-                    return new Error(`Missing AC Huffman table for component ${scanComp.selector}`);
-                }
-
-                const blocksInMCU = frameComp.hSampling * frameComp.vSampling;
                 for (let i = 0; i < blocksInMCU; i++) {
-                    const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-
-                    const mcuRow = Math.floor(mcuIndex / mcuCols);
-                    const mcuCol = mcuIndex % mcuCols;
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
                     const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
-                    const blockIndex = blockRow * this.components[scanComp.selector].blocksH + blockCol;
+                    const blockIndex = blockRow * blocksH + blockCol;
 
                     const block = this.components[scanComp.selector].blocks[blockIndex];
 
