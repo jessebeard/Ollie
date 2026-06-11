@@ -435,12 +435,17 @@ class VaultUI {
         this.vaultContent.innerHTML = html;
 
         // Add search functionality
+        // ⚡ Bolt: Debounce search input to prevent synchronous UI re-rendering on every keystroke
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
         searchInput.addEventListener('input', (e) => {
-            const results = this.vault.search(e.target.value);
-            document.getElementById('passwordList').innerHTML =
-                results.map(entry => this.renderPasswordCard(entry)).join('');
-            this.attachCardEventListeners();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const results = this.vault.search(e.target.value);
+                document.getElementById('passwordList').innerHTML =
+                    results.map(entry => this.renderPasswordCard(entry)).join('');
+                this.attachCardEventListeners();
+            }, 300);
         });
 
         this.attachCardEventListeners();
