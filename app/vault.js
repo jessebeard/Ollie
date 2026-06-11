@@ -436,11 +436,16 @@ class VaultUI {
 
         // Add search functionality
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
         searchInput.addEventListener('input', (e) => {
-            const results = this.vault.search(e.target.value);
-            document.getElementById('passwordList').innerHTML =
-                results.map(entry => this.renderPasswordCard(entry)).join('');
-            this.attachCardEventListeners();
+            // Debounce input to prevent synchronous UI updates and main thread blocking
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const results = this.vault.search(e.target.value);
+                document.getElementById('passwordList').innerHTML =
+                    results.map(entry => this.renderPasswordCard(entry)).join('');
+                this.attachCardEventListeners();
+            }, 300);
         });
 
         this.attachCardEventListeners();
