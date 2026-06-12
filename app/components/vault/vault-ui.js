@@ -49,9 +49,13 @@ export class VaultUI {
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
         const searchInput = document.getElementById('searchInput');
+        let timeoutId = null;
         searchInput.addEventListener('input', (e) => {
-            this.currentQuery = e.target.value.trim();
-            this.updateUI();
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                this.currentQuery = e.target.value.trim();
+                this.updateUI();
+            }, 300);
         });
 
         const sortSelect = document.getElementById('sortSelect');
