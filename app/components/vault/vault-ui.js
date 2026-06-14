@@ -49,9 +49,17 @@ export class VaultUI {
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+
+        // ⚡ Bolt: Debounce search input to prevent main thread blocking
+        // Limits `updateUI()` calls (which trigger heavy synchronous DOM updates)
+        // to once per 300ms of inactivity, significantly reducing latency while typing.
         searchInput.addEventListener('input', (e) => {
-            this.currentQuery = e.target.value.trim();
-            this.updateUI();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.currentQuery = e.target.value.trim();
+                this.updateUI();
+            }, 300);
         });
 
         const sortSelect = document.getElementById('sortSelect');

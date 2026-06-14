@@ -436,11 +436,19 @@ class VaultUI {
 
         // Add search functionality
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+
+        // ⚡ Bolt: Debounce search input to prevent main thread blocking
+        // Limits `updateUI()` calls (which trigger heavy synchronous DOM updates)
+        // to once per 300ms of inactivity, significantly reducing latency while typing.
         searchInput.addEventListener('input', (e) => {
-            const results = this.vault.search(e.target.value);
-            document.getElementById('passwordList').innerHTML =
-                results.map(entry => this.renderPasswordCard(entry)).join('');
-            this.attachCardEventListeners();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const results = this.vault.search(e.target.value);
+                document.getElementById('passwordList').innerHTML =
+                    results.map(entry => this.renderPasswordCard(entry)).join('');
+                this.attachCardEventListeners();
+            }, 300);
         });
 
         this.attachCardEventListeners();
