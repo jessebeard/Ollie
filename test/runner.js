@@ -247,3 +247,4 @@ async function runTests() {
 }
 
 runTests();
+import './ui-modal-xss.test.js';
