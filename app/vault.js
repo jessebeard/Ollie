@@ -435,12 +435,18 @@ class VaultUI {
         this.vaultContent.innerHTML = html;
 
         // Add search functionality
+        // ⚡ Bolt Optimization: Debounce search input to prevent main thread blocking
+        // This reduces synchronous DOM updates and expensive vault searches when typing quickly
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
         searchInput.addEventListener('input', (e) => {
-            const results = this.vault.search(e.target.value);
-            document.getElementById('passwordList').innerHTML =
-                results.map(entry => this.renderPasswordCard(entry)).join('');
-            this.attachCardEventListeners();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const results = this.vault.search(e.target.value);
+                document.getElementById('passwordList').innerHTML =
+                    results.map(entry => this.renderPasswordCard(entry)).join('');
+                this.attachCardEventListeners();
+            }, 150);
         });
 
         this.attachCardEventListeners();
@@ -516,9 +522,12 @@ class VaultUI {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (text == null) return '';
+        return String(text).replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }
 

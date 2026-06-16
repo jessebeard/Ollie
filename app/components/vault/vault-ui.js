@@ -48,10 +48,16 @@ export class VaultUI {
         document.getElementById('importBtn').addEventListener('click', () => this.importData());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
+        // ⚡ Bolt Optimization: Debounce search input to prevent main thread blocking
+        // This limits full DOM re-renders and expensive capacity calculations while the user types
         const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
         searchInput.addEventListener('input', (e) => {
-            this.currentQuery = e.target.value.trim();
-            this.updateUI();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.currentQuery = e.target.value.trim();
+                this.updateUI();
+            }, 150);
         });
 
         const sortSelect = document.getElementById('sortSelect');
