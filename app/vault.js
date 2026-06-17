@@ -454,7 +454,7 @@ class VaultUI {
 
     renderPasswordCard(entry) {
         return `
-            <div class="password-card" data-id="${entry.id}">
+            <div class="password-card" data-id="${this.escapeHtml(entry.id)}">
                 <div class="password-card-header">
                     <div>
                         <h3 class="password-title">${this.escapeHtml(entry.title)}</h3>
