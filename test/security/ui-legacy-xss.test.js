@@ -35,4 +35,45 @@ describe('Legacy VaultUI XSS Prevention', () => {
         expect(escapeHtmlFn(0)).toBe("0");
         expect(escapeHtmlFn(false)).toBe("false");
     });
+
+    it('should escape entry.id to prevent attribute injection', async () => {
+        let escapeHtmlFn, renderCardFn;
+        if (isNode) {
+            const code = fs.readFileSync(path.join(process.cwd(), 'app/vault.js'), 'utf-8');
+            const matchEscape = code.match(/escapeHtml\(text\)\s*{([^}]+)}/);
+            if (!matchEscape) throw new Error("escapeHtml not found");
+            escapeHtmlFn = new Function('text', matchEscape[1]);
+
+            // Extract the body of renderPasswordCard
+            const matchRender = code.match(/renderPasswordCard\(entry\)\s*{([\s\S]*?)\s*}\s*attachCardEventListeners\(\)\s*{/);
+            if (!matchRender) throw new Error("renderPasswordCard not found");
+
+            // Extract just the inner block before attachCardEventListeners
+            let renderBody = matchRender[1].trim();
+
+            // Bind this.escapeHtml to our extracted function
+            const proxyContext = {
+                escapeHtml: escapeHtmlFn
+            };
+            renderCardFn = new Function('entry', renderBody).bind(proxyContext);
+        } else {
+            return;
+        }
+
+        await assertProperty(
+            [Arbitrary.string(1, 100)],
+            (maliciousId) => {
+                const entry = { id: maliciousId, title: 'T', username: 'U', password: 'P' };
+                const html = renderCardFn(entry);
+
+                // If the ID contains a quote, we should NOT find data-id="<maliciousId>" unescaped
+                if (maliciousId.includes('"')) {
+                    if (html.includes(`data-id="${maliciousId}"`)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        );
+    });
 });
