@@ -41,10 +41,20 @@ export class VaultView {
         this.element.appendChild(grid);
     }
 
+    sanitizeUrl(url) {
+        if (!url) return '';
+        const normalized = String(url).trim().toLowerCase();
+        if (normalized.startsWith('javascript:') || normalized.startsWith('data:') || normalized.startsWith('vbscript:')) {
+            return 'about:blank';
+        }
+        return url;
+    }
+
     createCard(entry) {
         const div = document.createElement('div');
         div.className = 'password-card';
         div.setAttribute('role', 'article');
+        const safeUrl = this.sanitizeUrl(entry.url);
         div.innerHTML = `
             <div class="card-header">
                 <div class="card-icon" aria-hidden="true">${this.getIcon(entry)}</div>
@@ -59,7 +69,7 @@ export class VaultView {
             </div>
             <div class="card-actions">
                 <button class="btn-copy" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
-                <button class="btn-launch" data-url="${this.escape(entry.url)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
+                <button class="btn-launch" data-url="${this.escape(safeUrl)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
             </div>
         `;
 
@@ -74,7 +84,7 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (safeUrl) window.open(safeUrl, '_blank');
         });
 
         return div;
