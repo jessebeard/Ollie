@@ -1,3 +1,7 @@
 ## 2024-06-08 - VaultUI Capacity Calculation Bottleneck
 **Learning:** `getVaultSize()` in `VaultUI` calls `JSON.stringify(this.vault.toJSON())` and `TextEncoder().encode(json).length` on every `updateUI()` call. This is extremely expensive (O(N) with large constants) and blocks the main thread during simple UI interactions like typing in the search bar, because `updateUI()` is called frequently. The `PasswordVault` is an immutable structure, but ecosystem constraints prevent using `===` for caching.
 **Action:** Implement memoization for `getVaultSize()` using a composite cache key based on `this.vault.metadata?.modified` and `this.vault.entries?.length` to avoid recalculating the size when the vault content hasn't changed.
+
+## 2024-06-08 - Vault Search Regex Optimization
+**Learning:** In the legacy `app/vault.js` and modern `immutable-vault.js`, the `search()` method iteratively filters the entire array of entries. Inside the filter callback, it previously performed `String.toLowerCase().includes()` operations on multiple fields for every entry. This causes repeated string memory allocations during every search tick.
+**Action:** By escaping the query and compiling it into a case-insensitive `RegExp` just once before the loop, the text matching becomes O(N) over the entries without any per-item lowercasing or allocation overhead. To prevent false positives and `TypeError` exceptions with `.test()` coercing `null` into `"null"`, always guard regex tests with truthy checks (e.g., `e.title && regex.test(e.title)`).
