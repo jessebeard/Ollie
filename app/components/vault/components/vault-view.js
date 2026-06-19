@@ -74,10 +74,21 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const safeUrl = this.sanitizeUrl(entry.url);
+                window.open(safeUrl, '_blank');
+            }
         });
 
         return div;
+    }
+
+    sanitizeUrl(url) {
+        const lowerUrl = String(url).trim().toLowerCase();
+        if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('data:') || lowerUrl.startsWith('vbscript:')) {
+            return 'about:blank';
+        }
+        return url;
     }
 
     getIcon(entry) {

@@ -21,4 +21,23 @@ describe('VaultView XSS Prevention', () => {
         expect(view.escape(0)).toBe("0");
         expect(view.escape(false)).toBe("false");
     });
+
+    it('should sanitize dangerous URLs and allow safe ones', async () => {
+        const view = new VaultView(null, null);
+
+        await assertProperty(
+            [Arbitrary.string(1, 50)],
+            (str) => {
+                const dangerous = `javascript:${str}`;
+                return view.sanitizeUrl(dangerous) === 'about:blank';
+            }
+        );
+
+        expect(view.sanitizeUrl('javascript:alert(1)')).toBe('about:blank');
+        expect(view.sanitizeUrl('  JaVaScRiPt:alert(1)')).toBe('about:blank');
+        expect(view.sanitizeUrl('data:text/html,<script>alert(1)</script>')).toBe('about:blank');
+        expect(view.sanitizeUrl('vbscript:msgbox("hello")')).toBe('about:blank');
+        expect(view.sanitizeUrl('https://example.com')).toBe('https://example.com');
+        expect(view.sanitizeUrl('/local/path')).toBe('/local/path');
+    });
 });
