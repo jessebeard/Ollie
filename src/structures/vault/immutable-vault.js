@@ -96,13 +96,19 @@ export class PasswordVault {
     }
 
     search(query, tags = []) {
-        const lowerQuery = (query || '').toLowerCase();
+        // ⚡ Bolt Optimization: Precompile case-insensitive RegExp
+        // This avoids creating numerous intermediate lowercase strings per entry in the filter loop
+        let searchRegex = null;
+        if (query) {
+            const escapedQuery = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            searchRegex = new RegExp(escapedQuery, 'i');
+        }
 
         return this.entries.filter(e => {
-            const matchesText = !lowerQuery || (
-                (e.title && e.title.toLowerCase().includes(lowerQuery)) ||
-                (e.url && e.url.toLowerCase().includes(lowerQuery)) ||
-                (e.username && e.username.toLowerCase().includes(lowerQuery))
+            const matchesText = !searchRegex || (
+                (e.title && searchRegex.test(e.title)) ||
+                (e.url && searchRegex.test(e.url)) ||
+                (e.username && searchRegex.test(e.username))
             );
 
             const matchesTags = tags.length === 0 || tags.every(tag => e.tags.includes(tag));
