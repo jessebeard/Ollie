@@ -74,7 +74,13 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const urlLower = String(entry.url).trim().toLowerCase();
+                const safeUrl = (urlLower.startsWith('javascript:') || urlLower.startsWith('data:') || urlLower.startsWith('vbscript:'))
+                    ? 'about:blank'
+                    : entry.url;
+                window.open(safeUrl, '_blank');
+            }
         });
 
         return div;
