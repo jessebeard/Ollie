@@ -74,7 +74,10 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const safeUrl = this.sanitizeUrl(entry.url);
+                window.open(safeUrl, '_blank');
+            }
         });
 
         return div;
@@ -83,6 +86,25 @@ export class VaultView {
     getIcon(entry) {
         // Simple heuristic for icon
         return '🔑';
+    }
+
+    sanitizeUrl(url) {
+        try {
+            // Strip out whitespace and control characters which could bypass simple string checks
+            const cleanUrl = String(url).replace(/[\x00-\x20]/g, '');
+            const parsed = new URL(cleanUrl);
+            if (['javascript:', 'data:', 'vbscript:'].includes(parsed.protocol)) {
+                return 'about:blank';
+            }
+            return url;
+        } catch (e) {
+            // If URL constructor fails, fall back to string checking
+            const str = String(url).replace(/[\x00-\x20]/g, '').toLowerCase();
+            if (str.startsWith('javascript:') || str.startsWith('data:') || str.startsWith('vbscript:')) {
+                return 'about:blank';
+            }
+            return url;
+        }
     }
 
     escape(str) {
