@@ -74,7 +74,10 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const safeUrl = this.sanitizeUrl(entry.url);
+                window.open(safeUrl, '_blank');
+            }
         });
 
         return div;
@@ -83,6 +86,27 @@ export class VaultView {
     getIcon(entry) {
         // Simple heuristic for icon
         return '🔑';
+    }
+
+    sanitizeUrl(url) {
+        if (!url) return 'about:blank';
+        try {
+            // Strip all control characters (\x00-\x1f, \x7f) to prevent bypasses,
+            // but preserve spaces (\x20) within the URL itself so legitimate URLs aren't corrupted.
+            let cleanUrl = String(url).replace(/[\x00-\x1f\x7f]/g, '');
+            // Strip leading/trailing spaces explicitly (which URL constructor handles anyway, but good practice)
+            cleanUrl = cleanUrl.replace(/^[ \t\n\r]+|[ \t\n\r]+$/g, '');
+
+            // Use dummy base to correctly parse schemeless URLs (e.g. example.com)
+            const parsed = new URL(cleanUrl, 'https://dummy.base');
+            const dangerousProtocols = ['javascript:', 'data:', 'vbscript:'];
+            if (dangerousProtocols.includes(parsed.protocol.toLowerCase())) {
+                return 'about:blank';
+            }
+            return cleanUrl;
+        } catch (e) {
+            return 'about:blank';
+        }
     }
 
     escape(str) {
