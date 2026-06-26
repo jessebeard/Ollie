@@ -6,3 +6,7 @@
 **Vulnerability:** XSS via unescaped string interpolation in `.innerHTML` (in ModalManager) and Attribute Injection XSS via `textContent` anti-pattern (in VaultUI).
 **Learning:** Using `div.textContent = text; return div.innerHTML` fails to escape quotes (`'` and `"`), allowing Attribute Injection. Components built with template literals into `.innerHTML` are highly vulnerable to XSS if variables like titles, error messages, and default values are not explicitly escaped.
 **Prevention:** Always use explicit regex replacement to escape all 5 critical structural characters (`&`, `<`, `>`, `"`, `'`). Ensure all dynamically interpolated variables inside `.innerHTML` assignments are wrapped in an `escape()` function.
+## 2024-06-26 - XSS Vulnerability in UI Component window.open
+**Vulnerability:** XSS via unescaped javascript: URL execution in `window.open` within VaultView.
+**Learning:** Directly passing user-controlled URLs to functions like `window.open()` or injecting them into `<a href="...">` attributes can allow arbitrary code execution if the protocol is malicious (e.g., `javascript:`, `vbscript:`, `data:`).
+**Prevention:** Always validate and sanitize URLs by stripping control characters and checking the protocol using the URL constructor with a dummy base URL (to gracefully handle schemeless URLs) before using them in UI sinks.
