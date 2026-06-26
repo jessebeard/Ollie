@@ -1,4 +1,6 @@
 
+import { sanitizeUrl } from '../../../../src/utils/sanitize-url.js';
+
 export class VaultView {
     constructor(element, eventBus) {
         this.element = element;
@@ -74,7 +76,14 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const safeUrl = sanitizeUrl(entry.url);
+                if (safeUrl) {
+                    window.open(safeUrl, '_blank');
+                } else {
+                    console.error('Invalid or dangerous URL blocked.');
+                }
+            }
         });
 
         return div;
