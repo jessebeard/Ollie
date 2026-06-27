@@ -59,7 +59,7 @@ export class VaultView {
             </div>
             <div class="card-actions">
                 <button class="btn-copy" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
-                <button class="btn-launch" data-url="${this.escape(entry.url)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
+                <button class="btn-launch" data-url="${this.escape(this.sanitizeUrl(entry.url))}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
             </div>
         `;
 
@@ -74,10 +74,26 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            const cleanUrl = this.sanitizeUrl(entry.url);
+            if (cleanUrl) window.open(cleanUrl, '_blank');
         });
 
         return div;
+    }
+
+    sanitizeUrl(url) {
+        if (!url) return '';
+        try {
+            const cleanUrl = String(url).replace(/[\x00-\x1F\x7F]/g, '');
+            const parsed = new URL(cleanUrl, 'http://dummy.base');
+            const protocol = parsed.protocol.toLowerCase();
+            if (['javascript:', 'data:', 'vbscript:'].includes(protocol)) {
+                return '';
+            }
+            return cleanUrl;
+        } catch (e) {
+            return '';
+        }
     }
 
     getIcon(entry) {
