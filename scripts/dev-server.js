@@ -9,6 +9,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveSafePath } from './path-resolver.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -44,7 +45,14 @@ const server = http.createServer((req, res) => {
         reqPath = '/app' + reqPath;
     }
 
-    let filePath = path.join(ROOT, reqPath);
+    let filePath = resolveSafePath(ROOT, reqPath);
+
+    // Security check: Prevent path traversal
+    if (filePath === null) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('403 Forbidden');
+        return;
+    }
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';

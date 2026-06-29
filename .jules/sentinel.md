@@ -1,8 +1,15 @@
-## 2024-11-20 - XSS vulnerabilities when non-strings and single quotes bypass escape routines
-**Vulnerability:** The HTML escape function threw TypeErrors when given non-string values (like integers or booleans) because `.replace` is a String method, leading to component rendering failure and potential fallback attacks. Furthermore, single quotes were not escaped, allowing XSS in single-quote delimited attribute contexts.
-**Learning:** Escape functions must be defensive and accept any primitive value securely without failing. In JS, `String(str)` explicitly casts values safely. Single quotes (`'`) must be escaped (`&#39;`) just as double quotes are.
-**Prevention:** Always cast inputs in Regex-based HTML escape functions and check `if (str == null)` rather than `if (!str)` to avoid stripping valid falsey values like `0`. Always escape all 5 critical structural characters (`&`, `<`, `>`, `"`, `'`).
-## 2024-06-13 - XSS Vulnerability in UI Component innerHTML Interpolation
-**Vulnerability:** XSS via unescaped string interpolation in `.innerHTML` (in ModalManager) and Attribute Injection XSS via `textContent` anti-pattern (in VaultUI).
-**Learning:** Using `div.textContent = text; return div.innerHTML` fails to escape quotes (`'` and `"`), allowing Attribute Injection. Components built with template literals into `.innerHTML` are highly vulnerable to XSS if variables like titles, error messages, and default values are not explicitly escaped.
-**Prevention:** Always use explicit regex replacement to escape all 5 critical structural characters (`&`, `<`, `>`, `"`, `'`). Ensure all dynamically interpolated variables inside `.innerHTML` assignments are wrapped in an `escape()` function.
+## 2024-06-29 - Path Traversal in Dev Server
+
+**Vulnerability:** Path traversal in `scripts/dev-server.js`. The server decodes the URL and uses `path.join(ROOT, reqPath)`. Because `path.join` resolves `..` segments and URL decoding converts `%2e%2e%2f` to `../`, an attacker can read arbitrary files outside the ROOT directory, like `/etc/passwd`.
+
+**Learning:** URL paths should always be sanitized and the resulting absolute path must be checked to ensure it still resides within the intended root directory. Simply using `path.join` with an untrusted decoded path allows directory traversal.
+
+**Prevention:** Always use `path.normalize(path.join(ROOT, reqPath))` and strictly verify that the normalized path starts with `ROOT + path.sep`.
+
+## 2024-06-29 - Path Traversal in Dev Server
+
+**Vulnerability:** Path traversal in `scripts/dev-server.js`. The server decodes the URL and uses `path.join(ROOT, reqPath)`. Because `path.join` resolves `..` segments and URL decoding converts `%2e%2e%2f` to `../`, an attacker can read arbitrary files outside the ROOT directory, like `/etc/passwd`.
+
+**Learning:** URL paths should always be sanitized and the resulting absolute path must be checked to ensure it still resides within the intended root directory. Simply using `path.join` with an untrusted decoded path allows directory traversal.
+
+**Prevention:** Always use `path.normalize(path.join(ROOT, reqPath))` and strictly verify that the normalized path starts with `ROOT + path.sep` or exactly matches `ROOT`.
