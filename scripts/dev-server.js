@@ -46,6 +46,18 @@ const server = http.createServer((req, res) => {
 
     let filePath = path.join(ROOT, reqPath);
 
+    // path.join natively resolves '..' segments. We must assert that the
+    // completely decoded and normalized path strictly begins with ROOT.
+    let absoluteFilePath = path.resolve(filePath);
+
+    if (!absoluteFilePath.startsWith(ROOT + path.sep) && absoluteFilePath !== ROOT) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('403 Forbidden');
+        return;
+    }
+
+    filePath = absoluteFilePath;
+
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
