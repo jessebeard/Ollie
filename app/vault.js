@@ -65,12 +65,15 @@ class PasswordVault {
      * Search entries
      */
     search(query) {
-        const lower = query.toLowerCase();
+        // ⚡ Bolt Optimization: Use a single precompiled regex instead of multiple .toLowerCase().includes()
+        // inside the loop to avoid repeated string allocations and improve search performance.
+        const searchRegex = query ? new RegExp(String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
         return this.entries.filter(e =>
-            e.title?.toLowerCase().includes(lower) ||
-            e.url?.toLowerCase().includes(lower) ||
-            e.username?.toLowerCase().includes(lower) ||
-            e.notes?.toLowerCase().includes(lower)
+            !searchRegex ||
+            (e.title && searchRegex.test(e.title)) ||
+            (e.url && searchRegex.test(e.url)) ||
+            (e.username && searchRegex.test(e.username)) ||
+            (e.notes && searchRegex.test(e.notes))
         );
     }
 
