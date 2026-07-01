@@ -96,18 +96,22 @@ export class PasswordVault {
     }
 
     search(query, tags = []) {
-        const lowerQuery = (query || '').toLowerCase();
+        // ⚡ Bolt Optimization: Precompiled RegExp and short-circuit evaluation
+        const escapedQuery = query ? query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+        const searchRegex = escapedQuery ? new RegExp(escapedQuery, 'i') : null;
+        const hasTags = tags.length > 0;
 
         return this.entries.filter(e => {
-            const matchesText = !lowerQuery || (
-                (e.title && e.title.toLowerCase().includes(lowerQuery)) ||
-                (e.url && e.url.toLowerCase().includes(lowerQuery)) ||
-                (e.username && e.username.toLowerCase().includes(lowerQuery))
+            // Short-circuit tag check before expensive regex
+            if (hasTags && !tags.every(tag => e.tags.includes(tag))) {
+                return false;
+            }
+
+            return !searchRegex || (
+                (e.title && searchRegex.test(e.title)) ||
+                (e.url && searchRegex.test(e.url)) ||
+                (e.username && searchRegex.test(e.username))
             );
-
-            const matchesTags = tags.length === 0 || tags.every(tag => e.tags.includes(tag));
-
-            return matchesText && matchesTags;
         });
     }
 
