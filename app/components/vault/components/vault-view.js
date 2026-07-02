@@ -74,10 +74,29 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+                const safeUrl = this.sanitizeUrl(entry.url);
+                window.open(safeUrl, '_blank');
+            }
         });
 
         return div;
+    }
+
+    sanitizeUrl(url) {
+        if (!url) return 'about:blank';
+        const cleanUrl = String(url).replace(/[\x00-\x1F\x7F]/g, '');
+        const evalUrl = String(url).replace(/[\x00-\x20\x7F]/g, '');
+        try {
+            const parsed = new URL(evalUrl, 'http://dummy.base');
+            const protocol = parsed.protocol.toLowerCase();
+            if (['javascript:', 'data:', 'vbscript:', 'file:'].includes(protocol)) {
+                return 'about:blank';
+            }
+        } catch (e) {
+            return 'about:blank';
+        }
+        return cleanUrl;
     }
 
     getIcon(entry) {
