@@ -1,4 +1,6 @@
 
+import { sanitizeUrl } from './url-sanitizer.js';
+
 export class VaultView {
     constructor(element, eventBus) {
         this.element = element;
@@ -59,7 +61,7 @@ export class VaultView {
             </div>
             <div class="card-actions">
                 <button class="btn-copy" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
-                <button class="btn-launch" data-url="${this.escape(entry.url)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
+                <button class="btn-launch" data-url="${this.escape(sanitizeUrl(entry.url))}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
             </div>
         `;
 
@@ -74,7 +76,7 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) window.open(sanitizeUrl(entry.url), '_blank');
         });
 
         return div;
