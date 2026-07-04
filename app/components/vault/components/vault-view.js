@@ -59,7 +59,7 @@ export class VaultView {
             </div>
             <div class="card-actions">
                 <button class="btn-copy" aria-label="Copy password for ${this.escape(entry.title)}">Copy Pass</button>
-                <button class="btn-launch" data-url="${this.escape(entry.url)}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
+                <button class="btn-launch" data-url="${this.escape(this.sanitizeUrl(entry.url))}" aria-label="Launch URL for ${this.escape(entry.title)}">Launch</button>
             </div>
         `;
 
@@ -74,10 +74,27 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            const safeUrl = this.sanitizeUrl(entry.url);
+            if (safeUrl) window.open(safeUrl, '_blank');
         });
 
         return div;
+    }
+
+    // 🛡️ Sentinel: Sanitize URLs to prevent DOM-based XSS via unsafe protocols (e.g., javascript:, vbscript:)
+    sanitizeUrl(url) {
+        if (!url) return '';
+        const cleanUrl = String(url).replace(/[\x00-\x1F\x7F]/g, '');
+        try {
+            const parsed = new URL(cleanUrl, 'http://dummy.base');
+            const protocol = parsed.protocol.toLowerCase();
+            if (protocol === 'javascript:' || protocol === 'data:' || protocol === 'vbscript:') {
+                return '';
+            }
+            return cleanUrl;
+        } catch (e) {
+            return '';
+        }
     }
 
     getIcon(entry) {
