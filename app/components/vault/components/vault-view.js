@@ -1,3 +1,4 @@
+import { sanitizeUrl } from "../../../utils/security.js";
 
 export class VaultView {
     constructor(element, eventBus) {
@@ -74,7 +75,11 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (entry.url) {
+
+                    window.open(sanitizeUrl(entry.url), '_blank');
+
+            }
         });
 
         return div;
