@@ -74,7 +74,9 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            // Security: Sanitize the URL before opening to prevent DOM-based XSS via javascript:/data:/vbscript:/file: protocols
+            const safeUrl = this.sanitizeUrl(entry.url);
+            if (safeUrl && safeUrl !== 'about:blank') window.open(safeUrl, '_blank');
         });
 
         return div;
@@ -83,6 +85,27 @@ export class VaultView {
     getIcon(entry) {
         // Simple heuristic for icon
         return '🔑';
+    }
+
+    // Security enhancement: Prevent DOM-based XSS in URL contexts (window.open, href) by parsing and rejecting dangerous protocols
+    sanitizeUrl(url) {
+        if (!url) return '';
+        // Strip non-printable control characters that might bypass string validation
+        const cleanUrl = String(url).replace(/[\x00-\x1F\x7F]/g, '');
+        try {
+            // Strip spaces explicitly for protocol checking to prevent "j a v a s c r i p t :" bypasses
+            const validationUrl = String(url).replace(/[\x00-\x20\x7F]/g, '');
+            // Supply a dummy base URL to allow schemeless URLs to parse successfully
+            const parsed = new URL(validationUrl, 'http://dummy.base');
+            const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+            if (dangerousProtocols.includes(parsed.protocol.toLowerCase())) {
+                return 'about:blank';
+            }
+        } catch (e) {
+            // Parse failure, fallback to safe default
+            return 'about:blank';
+        }
+        return cleanUrl;
     }
 
     escape(str) {
