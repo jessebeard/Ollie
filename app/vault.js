@@ -65,12 +65,17 @@ class PasswordVault {
      * Search entries
      */
     search(query) {
-        const lower = query.toLowerCase();
+        if (!query) return this.entries;
+        // Escape query for RegExp to prevent invalid regular expressions
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Precompile case-insensitive regex for faster testing and less GC overhead
+        const queryRegex = new RegExp(escapedQuery, 'i');
+
         return this.entries.filter(e =>
-            e.title?.toLowerCase().includes(lower) ||
-            e.url?.toLowerCase().includes(lower) ||
-            e.username?.toLowerCase().includes(lower) ||
-            e.notes?.toLowerCase().includes(lower)
+            (e.title && queryRegex.test(e.title)) ||
+            (e.url && queryRegex.test(e.url)) ||
+            (e.username && queryRegex.test(e.username)) ||
+            (e.notes && queryRegex.test(e.notes))
         );
     }
 
