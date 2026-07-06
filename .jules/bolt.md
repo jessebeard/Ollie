@@ -1,3 +1,6 @@
 ## 2024-06-08 - VaultUI Capacity Calculation Bottleneck
 **Learning:** `getVaultSize()` in `VaultUI` calls `JSON.stringify(this.vault.toJSON())` and `TextEncoder().encode(json).length` on every `updateUI()` call. This is extremely expensive (O(N) with large constants) and blocks the main thread during simple UI interactions like typing in the search bar, because `updateUI()` is called frequently. The `PasswordVault` is an immutable structure, but ecosystem constraints prevent using `===` for caching.
 **Action:** Implement memoization for `getVaultSize()` using a composite cache key based on `this.vault.metadata?.modified` and `this.vault.entries?.length` to avoid recalculating the size when the vault content hasn't changed.
+## 2024-07-06 - Vault Search RegExp Optimization
+**Learning:** The legacy search filter in `PasswordVault` iteratively invokes `.toLowerCase()` and string interpolation inside the search loop on thousands of entries. This triggers continuous string allocation per keystroke, causing blocking GC pauses during search typing.
+**Action:** Always precompile case-insensitive search queries using `new RegExp(safeQuery, 'i')` outside the loop, and use `.test()` inside the loop to avoid continuous inner-loop memory allocations on large collections.
