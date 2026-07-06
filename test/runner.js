@@ -227,6 +227,7 @@ async function runTests() {
         await import('./integration/vault/vault-capacity-ui.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");
+        await import("./url-xss.test.js");
 
         await executeTests();
         const stats = getStats();
