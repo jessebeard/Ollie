@@ -1,3 +1,6 @@
 ## 2024-06-08 - VaultUI Capacity Calculation Bottleneck
 **Learning:** `getVaultSize()` in `VaultUI` calls `JSON.stringify(this.vault.toJSON())` and `TextEncoder().encode(json).length` on every `updateUI()` call. This is extremely expensive (O(N) with large constants) and blocks the main thread during simple UI interactions like typing in the search bar, because `updateUI()` is called frequently. The `PasswordVault` is an immutable structure, but ecosystem constraints prevent using `===` for caching.
 **Action:** Implement memoization for `getVaultSize()` using a composite cache key based on `this.vault.metadata?.modified` and `this.vault.entries?.length` to avoid recalculating the size when the vault content hasn't changed.
+## 2024-07-07 - Vault Search Filtering
+**Learning:** Returning `this.entries` instead of a shallow copy (like `this.entries.filter()` implicitly does) introduces subtle mutation bugs if the caller modifies the result. The original code always returned a new array, so returning `this.entries` directly broke that implicit contract.
+**Action:** When short-circuiting array methods like `.filter()` or `.map()` (e.g. `if (!query) return;`), make sure to return a shallow copy `[...this.entries]` instead of the reference directly to prevent mutation bugs down the line.
