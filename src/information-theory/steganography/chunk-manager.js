@@ -1,4 +1,4 @@
-import { cryptoInstance } from '../cryptography/crypto-compat.js';
+import { randomUUID } from '../cryptography/crypto-provider.js';
 
 /**
  * ChunkManager - Handles splitting large data into chunks and reassembling them
@@ -87,7 +87,7 @@ export class ChunkManager {
      * @returns {string} UUID string
      */
     static generateId() {
-        return cryptoInstance.randomUUID();
+        return randomUUID();
     }
 
     /**

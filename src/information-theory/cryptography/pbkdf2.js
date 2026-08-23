@@ -2,25 +2,13 @@
  * KeyDerivation - Handles password-based key derivation
  * Uses PBKDF2 with SHA-256
  */
+import { getCrypto } from './crypto-provider.js';
+
 export class KeyDerivation {
 
     static ITERATIONS = 100000;
 
     static SALT_SIZE = 16;
-
-    /**
-     * Gets the crypto object (browser or Node.js)
-     * @private
-     */
-    static getCrypto() {
-        if (typeof crypto === 'undefined' || !crypto.subtle) {
-            return [null, new Error('Web Crypto API is not available. Please use a modern browser or Node.js 19+.')];
-        }
-        return [{
-            subtle: crypto.subtle,
-            getRandomValues: crypto.getRandomValues.bind(crypto)
-        }, null];
-    }
 
     /**
      * Derives a CryptoKey from a password and salt using PBKDF2
@@ -31,7 +19,7 @@ export class KeyDerivation {
      */
     static async deriveKey(password, salt) {
         try {
-            const [cryptoObj, cryptoErr] = this.getCrypto();
+            const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
             const encoder = new TextEncoder();
@@ -71,7 +59,7 @@ export class KeyDerivation {
      */
     static generateSalt() {
         try {
-            const [cryptoObj, cryptoErr] = this.getCrypto();
+            const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
             const salt = new Uint8Array(this.SALT_SIZE);

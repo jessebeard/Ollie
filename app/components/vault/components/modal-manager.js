@@ -92,7 +92,7 @@ export class ModalManager {
             modal.className = 'modal-dialog';
             modal.innerHTML = `
                 <h3>Confirmation</h3>
-                <p>${this.escape(message)}</p>
+                <p style="white-space: pre-line;">${this.escape(message)}</p>
                 <div class="modal-actions">
                     <button class="btn btn-secondary cancel-btn">No</button>
                     <button class="btn btn-primary confirm-btn">Yes</button>

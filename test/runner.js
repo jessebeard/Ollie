@@ -9,19 +9,8 @@ const htmlContent = fs.readFileSync(path.join(__dirname, '../app/index.html'), '
 
 global.document = {
     getElementById: (id) => {
-
         const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
         const match = htmlContent.match(regex);
-
-        if (!match && id === 'progressive-checkbox') {
-            const idx = htmlContent.indexOf(id);
-            if (idx !== -1) {
-                console.log('Context around ID:', htmlContent.substring(idx - 50, idx + 50));
-            } else {
-                console.log('ID string not found in HTML content!');
-            }
-            console.log('Regex used:', regex);
-        }
 
         if (match) {
             const tag = match[0];
@@ -158,7 +147,6 @@ async function runTests() {
         await import('./algebraic/mappings/forward-zigzag.test.js');
         await import('./automata/entropy-coding/huffman-encoder-fsm.test.js');
         await import('./algebraic/mappings/downsampling.test.js');
-        await import('./automata/parsers/progressive-encoding.test.js');
         await import('./automata/parsers/spiff-generation.test.js');
         await import('./codec/encoder.test.js');
         await import('./codec/encoder/quality.test.js');
@@ -177,19 +165,16 @@ async function runTests() {
         await import('./algebraic/colorspace/ycbcr-to-rgb.test.js');
         await import('./algebraic/mappings/upsampling.test.js');
         await import('./algebraic/mappings/block-assembly.test.js');
-        await import('./automata/parsers/progressive-decoding.test.js');
         await import('./codec/decoder/rst-markers.test.js');
         await import('./utils/bit-reader.test.js');
         await import('./automata/bit-streams/bit-core.test.js');
         await import('./utils/marker-parser.test.js');
 
-        await import('./codec/steganography/steganography.test.js');
-        await import('./codec/steganography/container.test.js');
         await import('./information-theory/steganography/chunk-manager.test.js');
+        await import('./codec/steganography/result-contracts.test.js');
         await import('./information-theory/steganography/f5-syndrome.test.js');
         await import('./codec/steganography/batch-process.test.js');
         await import('./information-theory/error-correction/rs-interleaver.test.js');
-        await import('./codec/steganography/container-format.test.js');
         await import('./codec/capacity-scanner.test.js');
         await import('./codec/capacity-scanner.pbt.js');
 
@@ -207,7 +192,6 @@ async function runTests() {
         await import('./integration/steganography-roundtrip.test.js');
         await import('./scripts/auto_detection_roundtrip.test.js');
         await import('./scripts/capacity_validation.test.js');
-        await import('./scripts/format_detection.test.js');
 
         await import('./codec/encoder/coefficients.test.js');
         await import('./codec/transcoder.test.js');

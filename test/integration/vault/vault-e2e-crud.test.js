@@ -104,12 +104,10 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
 
                 expect(vault.entries.length).toBe(expectedCount);
 
-                let savedImageFiles = [];
-                try {
-                    savedImageFiles = await vault.save(selectedImages, masterPass);
-                } catch (e) {
-                    if (e.message.includes('Insufficient capacity')) return true;
-                    console.error("Save embedding error:", e);
+                const [savedImageFiles, saveErr] = await vault.save(selectedImages, masterPass);
+                if (saveErr) {
+                    if (saveErr.message.includes('Insufficient capacity')) return true;
+                    console.error("Save embedding error:", saveErr);
                     return false;
                 }
 

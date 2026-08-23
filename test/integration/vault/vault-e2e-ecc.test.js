@@ -67,11 +67,9 @@ describe('PasswordVault E2E Steganography (ECC Deep Recovery)', () => {
                 // Setting a global option via monkey-patching would be hard, but batch-embedder has options logic
                 // that doesn't let us directly pipe eccProfile down unless vault logic allows it.
                 // Right now BatchEmbedder defaults to 'Medium' profile. We will corrupt just a few coefficients.
-                let savedFiles;
-                try {
-                    savedFiles = await vault.save([mockImage], password);
-                } catch (e) {
-                    if (e.message.includes('capacity')) return true;
+                const [savedFiles, saveErr] = await vault.save([mockImage], password);
+                if (saveErr) {
+                    if (saveErr.message.includes('capacity')) return true;
                     return false;
                 }
 
@@ -113,7 +111,7 @@ describe('PasswordVault E2E Steganography (ECC Deep Recovery)', () => {
                 }
 
                 // Re-encode corrupted coefficients using Lossless path
-                const encoder = new JpegEncoder(90, { progressive: decoded.metadata?.progressive || false });
+                const encoder = new JpegEncoder(90, { subsampling: '4:4:4' });
                 let corruptedBytes;
                 try {
                     corruptedBytes = await encoder.encodeCoefficients(

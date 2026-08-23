@@ -104,7 +104,6 @@ export function initDecoderUI() {
                 document.getElementById('decoder-info-size').textContent = `${bytes.length} bytes`;
                 document.getElementById('decoder-info-dims').textContent = `${result.metadata.width}x${result.metadata.height}`;
                 document.getElementById('decoder-info-colorspace').textContent = result.metadata.colorSpace;
-                document.getElementById('decoder-info-progressive').textContent = result.metadata.progressive ? 'Yes' : 'No';
                 document.getElementById('decoder-info-chroma').textContent = result.metadata.chromaSubsampling;
             }
 

@@ -86,19 +86,18 @@ describe('PasswordVault E2E Steganography (Property-Based Tests)', () => {
                 }
 
                 // E2E Pipeline Act: Save the vault (Triggers AES-GCM Encryption, JpegEncoder, and BatchEmbedder ECC)
-                let savedImageFiles = [];
-                try {
-                    savedImageFiles = await vault.save(selectedImages, masterPass);
-                } catch (e) {
+                const [savedImageFiles, saveErr] = await vault.save(selectedImages, masterPass);
+                if (saveErr) {
                     // Capacity limits might be hit during fuzzing since some images are small and data is thick
-                    // We only fail if the error isn't a known capacity throw.
-                    if (e.message.includes('Insufficient capacity')) {
+                    // We only fail if the error isn't a known capacity error.
+                    if (saveErr.message.includes('Insufficient capacity')) {
                         return true; // Ignore capacity limitations on small images during random fuzzing
                     }
-                    console.error("Save embedding error:", e);
+                    console.error("Save embedding error:", saveErr);
                     return false;
                 }
 
+                expect(savedImageFiles).not.toEqual(null);
                 expect(savedImageFiles.length).toBeGreaterThan(0);
 
                 // Mock Files representing the completely distinct output of the save step

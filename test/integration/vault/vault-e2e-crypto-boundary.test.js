@@ -68,11 +68,9 @@ describe('PasswordVault E2E Steganography (Crypto Boundary)', () => {
                     vault = newVault;
                 }
 
-                let savedImageFiles = [];
-                try {
-                    savedImageFiles = await vault.save(selectedImages, passwordOne);
-                } catch (e) {
-                    if (e.message.includes('capacity')) return true;
+                const [savedImageFiles, saveErr] = await vault.save(selectedImages, passwordOne);
+                if (saveErr) {
+                    if (saveErr.message.includes('capacity')) return true;
                     return false;
                 }
 

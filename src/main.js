@@ -6,6 +6,7 @@ import { initEncoderUI } from '../app/components/encoder-ui.js';
 import { initDecoderUI } from '../app/components/decoder-ui.js';
 import { initTabs } from '../app/components/tabs.js';
 import { JpegEncoder } from './codec/encoder.js';
+import { logger } from './utils/logger.js';
 
 function init() {
     
@@ -15,12 +16,12 @@ function init() {
 
     const testBtn = document.getElementById('test-btn');
     if (testBtn) {
-        testBtn.addEventListener('click', () => {
+        testBtn.addEventListener('click', async () => {
             const statusDiv = document.getElementById('status');
             const originalCanvas = document.getElementById('original-canvas');
             const processedCanvas = document.getElementById('processed-canvas');
 
-            console.log('Starting diagnostic...');
+            logger.debug('Starting diagnostic...');
             statusDiv.textContent = 'Running diagnostic...';
 
             try {
@@ -45,11 +46,11 @@ function init() {
                 ctx.putImageData(imgDataObj, 0, 0);
 
                 const encoder = new JpegEncoder();
-                const jpegBytes = encoder.encode({ width, height, data });
+                const jpegBytes = await encoder.encode({ width, height, data });
 
-                console.log('jpegBytes length:', jpegBytes.length);
-                console.log('First 10 bytes:', Array.from(jpegBytes.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
-                console.log('Last 2 bytes:', Array.from(jpegBytes.slice(-2)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+                logger.debug('jpegBytes length:', jpegBytes.length);
+                logger.debug('First 10 bytes:', Array.from(jpegBytes.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+                logger.debug('Last 2 bytes:', Array.from(jpegBytes.slice(-2)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 
                 const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
                 const url = URL.createObjectURL(blob);
@@ -63,12 +64,12 @@ function init() {
                     statusDiv.textContent = `Diagnostic Success! Size: ${jpegBytes.length} bytes`;
                 };
                 resImg.onerror = (e) => {
-                    console.error('Failed to load JPEG image', e);
+                    logger.error('Failed to load JPEG image', e);
                     statusDiv.textContent = 'Diagnostic Failed: could not load image';
                 };
                 resImg.src = url;
             } catch (e) {
-                console.error(e);
+                logger.error(e);
                 statusDiv.textContent = 'Diagnostic Failed: ' + e.message;
             }
         });

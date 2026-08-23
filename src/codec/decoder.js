@@ -21,6 +21,7 @@ import { assembleBlocks, componentsToImageData, grayscaleToImageData } from '../
 
 import { parseSpiffHeader } from '../automata/parsers/spiff-parser.js';
 import { F5 } from '../information-theory/steganography/f5-syndrome.js';
+import { logger } from '../utils/logger.js';
 
 export class JpegDecoder {
     constructor() {
@@ -145,7 +146,7 @@ export class JpegDecoder {
                 if (!spiffErr) {
                     this.spiff = spiffResult;
                 } else {
-                    console.warn('Failed to parse APP8 (SPIFF) segment:', spiffErr.message);
+                    logger.warn('Failed to parse APP8 (SPIFF) segment:', spiffErr.message);
                 }
             }
         }
@@ -180,19 +181,21 @@ export class JpegDecoder {
             }
         }
 
+        if (segments.has('SOF2')) {
+            return [null, new Error('Unsupported JPEG: Progressive JPEG (SOF2) is not supported')];
+        }
+
         let sofData = null;
         if (segments.has('SOF0')) {
             sofData = segments.get('SOF0')[0].data;
-        } else if (segments.has('SOF2')) {
-            sofData = segments.get('SOF2')[0].data;
         } else {
-            return [null, new Error('Unsupported JPEG: Missing SOF0 or SOF2 marker')];
+            return [null, new Error('Unsupported JPEG: Missing SOF0 marker')];
         }
 
         this.frameHeader = parseFrameHeader(sofData);
         if (this.frameHeader[1]) return [null, this.frameHeader[1]];
         this.frameHeader = this.frameHeader[0];
-        this.frameHeader.sofType = segments.has('SOF2') ? 0xC2 : 0xC0;
+        this.frameHeader.sofType = 0xC0;
         const initErr = this.initializeComponents();
         if (initErr) return [null, initErr];
 
@@ -225,7 +228,6 @@ export class JpegDecoder {
                     width: this.frameHeader.width,
                     height: this.frameHeader.height,
                     components: this.frameHeader.components.length,
-                    progressive: this.frameHeader.sofType === 0xC2,
                     chromaSubsampling: this.frameHeader.components.length >= 3
                         ? this.getChromaSubsamplingString(this.frameHeader.components)
                         : '4:4:4'
@@ -253,15 +255,15 @@ export class JpegDecoder {
                 if (extractedSecretData) {
 
                     if (extractedSecretData instanceof Uint8Array) {
-                        console.log(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
+                        logger.debug(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
                     } else if (extractedSecretData.data) {
-                        console.log(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
-                        console.log('Metadata:', extractedSecretData.metadata);
+                        logger.debug(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
+                        logger.debug('Metadata:', extractedSecretData.metadata);
 
                     }
                 }
             } catch (e) {
-                console.warn('Failed to extract secret data:', e);
+                logger.warn('Failed to extract secret data:', e);
             }
         }
 
@@ -378,7 +380,7 @@ export class JpegDecoder {
                 const marker = bitReader.data[bitReader.byteOffset + 1];
 
                 if (ff !== 0xFF || marker !== expectedRstMarker) {
-                    console.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
+                    logger.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
 
                     // Attempt to resync: Scan forward for the next RST marker
                     let foundMarker = false;
@@ -391,7 +393,7 @@ export class JpegDecoder {
                         const b1 = bitReader.data[bitReader.byteOffset + i + 1];
 
                         if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {
-                            console.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
+                            logger.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
                             bitReader.byteOffset += (i + 2);
                             bitReader.bitOffset = 0;
                             expectedRstMarker = (b1 + 1);
@@ -402,7 +404,7 @@ export class JpegDecoder {
                     }
 
                     if (!foundMarker) {
-                        console.error('Failed to resync: No RST marker found within search limit.');
+                        logger.error('Failed to resync: No RST marker found within search limit.');
                     }
                 } else {
                     // Correct marker found, advance the pointers manually
@@ -533,7 +535,6 @@ export class JpegDecoder {
                         height: yComp.height,
                         components: components.length,
                         colorSpace: 'Grayscale',
-                        progressive: this.frameHeader.sofType === 0xC2,
                         chromaSubsampling: '4:4:4'
                     }
                 }, null];
@@ -548,7 +549,6 @@ export class JpegDecoder {
                     height,
                     components: components.length,
                     colorSpace: 'Grayscale',
-                    progressive: this.frameHeader.sofType === 0xC2,
                     chromaSubsampling: '4:4:4'
                 }
             }, null];
@@ -594,7 +594,6 @@ export class JpegDecoder {
                         height,
                         components: components.length,
                         colorSpace: 'YCbCr',
-                        progressive: this.frameHeader.sofType === 0xC2,
                         chromaSubsampling: this.getChromaSubsamplingString(components)
                     }
                 }, null];
@@ -610,7 +609,6 @@ export class JpegDecoder {
                     height,
                     components: components.length,
                     colorSpace: 'YCbCr',
-                    progressive: this.frameHeader.sofType === 0xC2,
                     chromaSubsampling: this.getChromaSubsamplingString(components)
                 }
             }, null];

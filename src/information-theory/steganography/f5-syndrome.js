@@ -14,6 +14,7 @@ import { ErrorCorrection, ECC_PROFILES } from '../error-correction/rs-interleave
 import { Encryption } from '../cryptography/aes-gcm.js';
 import { KeyDerivation } from '../cryptography/pbkdf2.js';
 import { crc32 } from '../../utils/crc32.js';
+import { logger } from '../../utils/logger.js';
 
 export class F5 {
     static MAGIC = 'F5SG';
@@ -207,7 +208,7 @@ export class F5 {
         const totalAC = blocks.length * 63;
         const permutation = this.generatePermutation(totalAC, seed);
 
-        console.log(`F5: Embedding ${bits.length} bits with k=${k}, n=${n}, nonZero=${nonZeroCount}, totalAC=${totalAC}`);
+        logger.debug(`F5: Embedding ${bits.length} bits with k=${k}, n=${n}, nonZero=${nonZeroCount}, totalAC=${totalAC}`);
 
         // Embed k bits at a time using matrix encoding
         let permIdx = 0;
@@ -243,7 +244,7 @@ export class F5 {
             }
 
             if (group.length < n) {
-                console.warn(`F5: Ran out of coefficients at bit ${bitIdx}`);
+                logger.warn(`F5: Ran out of coefficients at bit ${bitIdx}`);
                 return { success: false, k };
             }
 
@@ -266,7 +267,7 @@ export class F5 {
             const targetIdx = diff - 1; // 0-indexed within group
 
             if (targetIdx >= group.length) {
-                console.warn(`F5: Invalid target index ${targetIdx} for group size ${group.length}`);
+                logger.warn(`F5: Invalid target index ${targetIdx} for group size ${group.length}`);
                 return { success: false, k };
             }
 
@@ -294,7 +295,7 @@ export class F5 {
             bitIdx += k;
         }
 
-        console.log(`F5: Embedded ${bits.length} bits successfully with k=${k}`);
+        logger.debug(`F5: Embedded ${bits.length} bits successfully with k=${k}`);
         return { success: true, k };
     }
 
@@ -356,7 +357,7 @@ export class F5 {
             }
 
             if (group.length < n) {
-                console.warn(`F5: Extraction ran out of coefficients at bit ${bits.length}`);
+                logger.warn(`F5: Extraction ran out of coefficients at bit ${bits.length}`);
                 return null;
             }
 
@@ -417,7 +418,7 @@ export class F5 {
         const length = view.getUint32(0, false);
 
         if (length > 100 * 1024 * 1024) {
-            // console.warn('F5: Invalid length detected:', length);
+            // logger.warn('F5: Invalid length detected:', length);
             return null;
         }
 
@@ -437,6 +438,7 @@ export class F5 {
      * @param {Uint8Array} data
      * @param {Object} metadata
      * @param {Object} options - { password, seed }
+     * @returns {Promise<[boolean|null, Error|null]>} Tuple of [success, error]
      */
     static async embedContainer(blocks, data, metadata, options = {}) {
         const magic = new TextEncoder().encode(this.MAGIC);
@@ -447,13 +449,13 @@ export class F5 {
         if (options.password) {
             metadata.encrypted = true;
             const [salt, saltErr] = KeyDerivation.generateSalt();
-            if (saltErr) return { success: false, error: saltErr };
+            if (saltErr) return [null, saltErr];
 
             const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
-            if (keyErr) return { success: false, error: keyErr };
+            if (keyErr) return [null, keyErr];
 
             const [encResult, encErr] = await Encryption.encrypt(data, key);
-            if (encErr) return { success: false, error: encErr };
+            if (encErr) return [null, encErr];
             const { ciphertext, iv } = encResult;
 
             const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
@@ -469,8 +471,7 @@ export class F5 {
             const eccProfile = metadata.eccProfile || 'Medium';
             const [eccResult, eccErr] = ErrorCorrection.protect(payloadToEmbed, eccProfile);
             if (eccErr) {
-                console.error('F5: ECC protection failed:', eccErr);
-                return null;
+                return [null, eccErr];
             }
             protectedPayload = eccResult.encoded;
 
@@ -525,7 +526,10 @@ export class F5 {
 
         // Pass k to embedRaw to ensure consistency
         const result = this.embedRaw(blocks, container, { seed, k });
-        return result.success;
+        if (!result.success) {
+            return [null, new Error('F5: Insufficient capacity to embed container payload')];
+        }
+        return [true, null];
     }
 
     /**
@@ -578,12 +582,7 @@ export class F5 {
         }
 
         if (!magicBytes) {
-            // Fallback: try legacy JSTG or raw F5
-            // For legacy F5, we don't have magic bytes, so we just return null here
-            // and let the caller handle it? No, the logic below handles it.
-
-            // If we couldn't find MAGIC with any k, it might be legacy F5 or JSTG
-            // Let's try to read just with default selectK logic for legacy support
+            // No container found at any k: fall back to legacy length-header F5.
             magicBytes = this.extractRaw(blocks, 32, { seed });
         }
 
@@ -593,12 +592,7 @@ export class F5 {
 
         if (magic === this.MAGIC) {
             return this.extractContainer(blocks, { ...options, k: detectedK });
-        } else if (magic === 'JSTG') {
-            // Legacy Jsteg format - can't decode with F5
-            console.warn('F5: Detected legacy JSTG format, cannot extract');
-            return null;
         } else {
-            // Try legacy F5 format
             const extracted = this.extract(blocks, { seed });
             return extracted;
         }
@@ -658,7 +652,7 @@ export class F5 {
         // Actually, if we read the header successfully with usedK, then the whole container
         // was likely embedded with usedK. The storedK is redundant but good for verification.
         if (storedK !== usedK) {
-            console.warn(`F5: Warning: Extracted k (${usedK}) differs from stored k (${storedK})`);
+            logger.warn(`F5: Warning: Extracted k (${usedK}) differs from stored k (${storedK})`);
         }
 
         // Use the k that successfully decoded the header for the rest
@@ -681,8 +675,8 @@ export class F5 {
             const jsonString = new TextDecoder().decode(metaBytes);
             metadata = JSON.parse(jsonString);
         } catch (e) {
-            console.error('F5: Failed to parse metadata:', e);
-            console.error('Corrupted Metadata String:', new TextDecoder().decode(metaBytes));
+            logger.error('F5: Failed to parse metadata:', e);
+            logger.error('Corrupted Metadata String:', new TextDecoder().decode(metaBytes));
             return null;
         }
 
@@ -690,7 +684,7 @@ export class F5 {
         offset += 4;
 
         if (payloadLen > 100 * 1024 * 1024) {
-            console.warn('F5: Invalid payload length:', payloadLen);
+            logger.warn('F5: Invalid payload length:', payloadLen);
             return null;
         }
 
@@ -710,10 +704,10 @@ export class F5 {
 
         if (actualCrc !== expectedCrc) {
             if (!metadata.ecc) {
-                console.warn('F5: CRC mismatch');
+                logger.warn('F5: CRC mismatch');
                 return null;
             }
-            console.warn('F5: CRC mismatch, attempting ECC recovery...');
+            logger.warn('F5: CRC mismatch, attempting ECC recovery...');
         }
 
         if (metadata.ecc) {
@@ -725,18 +719,23 @@ export class F5 {
                     metadata.blockCount
                 );
                 if (recoverErr) {
-                    console.error('F5: ECC recovery failed:', recoverErr);
+                    logger.error('F5: ECC recovery failed:', recoverErr);
                     return null;
                 }
                 payload = recovered;
             } else {
-                payload = ErrorCorrection.recover(payload);
+                const [recovered, legacyRecoverErr] = ErrorCorrection.recover(payload);
+                if (legacyRecoverErr) {
+                    logger.error('F5: Legacy ECC recovery failed:', legacyRecoverErr);
+                    return null;
+                }
+                payload = recovered;
             }
         }
 
         if (metadata.encrypted) {
             if (!options.password) {
-                console.warn('F5: Data is encrypted but no password provided');
+                logger.warn('F5: Data is encrypted but no password provided');
                 return null;
             }
 
@@ -746,13 +745,13 @@ export class F5 {
 
             const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
             if (keyErr) {
-                console.error('F5: Key derivation failed:', keyErr);
+                logger.error('F5: Key derivation failed:', keyErr);
                 return null;
             }
 
             const [decryptedPayload, decErr] = await Encryption.decrypt(ciphertext, key, iv);
             if (decErr) {
-                console.error('F5: Decryption failed:', decErr);
+                logger.error('F5: Decryption failed:', decErr);
                 return null;
             }
             payload = decryptedPayload;
@@ -846,14 +845,3 @@ export class F5 {
     }
 }
 
-// Backward compatibility: export reader class for container extraction
-export class F5Reader {
-    constructor(blocks, options = {}) {
-        this.blocks = blocks;
-        this.seed = options.seed || options.password || 'F5default';
-    }
-
-    async extractContainer() {
-        return F5.extractContainer(this.blocks, { seed: this.seed });
-    }
-}

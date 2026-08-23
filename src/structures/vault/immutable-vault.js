@@ -2,7 +2,7 @@ import { BatchEmbedder } from '../../information-theory/steganography/batch-embe
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
-import { cryptoInstance } from '../../information-theory/cryptography/crypto-compat.js';
+import { randomUUID } from '../../information-theory/cryptography/crypto-provider.js';
 
 export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
@@ -150,6 +150,11 @@ export class PasswordVault {
         return [new PasswordVault(secureEntries, data.metadata, isUnlocked, masterPassword, sessionKey), null];
     }
 
+    /**
+     * Embeds the serialized vault into the provided image files.
+     *
+     * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Tuple of [results, error]
+     */
     async save(imageFiles, password, onProgress = null) {
         const vaultData = JSON.stringify(this.toJSON());
         const vaultBytes = new TextEncoder().encode(vaultData);
@@ -163,8 +168,8 @@ export class PasswordVault {
         };
 
         const [results, embedErr] = await embedder.embed(vaultBytes, imageFiles, options, onProgress);
-        if (embedErr) throw embedErr;
-        return results;
+        if (embedErr) return [null, embedErr];
+        return [results, null];
     }
 
     static async load(imageFiles, password, onProgress = null) {
@@ -193,7 +198,7 @@ export class PasswordVault {
     }
 
     static generateId() {
-        return cryptoInstance.randomUUID();
+        return randomUUID();
     }
 
     lock() {

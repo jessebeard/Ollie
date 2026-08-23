@@ -1,23 +1,11 @@
 /**
  * Encryption - Handles AES-GCM encryption/decryption
  */
+import { getCrypto } from './crypto-provider.js';
+
 export class Encryption {
 
     static IV_LENGTH = 12;
-
-    /**
-     * Gets the crypto object (browser or Node.js)
-     * @private
-     */
-    static getCrypto() {
-        if (typeof crypto === 'undefined' || !crypto.subtle) {
-            return [null, new Error('Web Crypto API is not available. Please use a modern browser or Node.js 19+.')];
-        }
-        return [{
-            subtle: crypto.subtle,
-            getRandomValues: crypto.getRandomValues.bind(crypto)
-        }, null];
-    }
 
     /**
      * Encrypts data using AES-GCM
@@ -28,7 +16,7 @@ export class Encryption {
      */
     static async encrypt(data, key) {
         try {
-            const [cryptoObj, cryptoErr] = this.getCrypto();
+            const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
             const iv = new Uint8Array(this.IV_LENGTH);
@@ -56,7 +44,7 @@ export class Encryption {
      */
     static async decrypt(ciphertext, key, iv) {
         try {
-            const [cryptoObj, cryptoErr] = this.getCrypto();
+            const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
             const decrypted = await cryptoObj.subtle.decrypt(

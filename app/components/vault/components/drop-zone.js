@@ -97,9 +97,20 @@ export class DropZone {
         await Promise.all(promises);
     }
 
-    readEntriesPromise(reader) {
+    async readEntriesPromise(reader) {
         return new Promise((resolve, reject) => {
-            reader.readEntries(entries => resolve(entries), err => reject(err));
+            const allEntries = [];
+            const readBatch = () => {
+                reader.readEntries(entries => {
+                    if (entries.length === 0) {
+                        resolve(allEntries);
+                        return;
+                    }
+                    allEntries.push(...entries);
+                    readBatch();
+                }, err => reject(err));
+            };
+            readBatch();
         });
     }
 

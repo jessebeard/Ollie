@@ -42,7 +42,8 @@ describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', ()
                 const vault = new PasswordVault([], null, true, password);
                 const mockImage = new MockFile(imgBuffer, availableImageFiles[0]);
 
-                const savedFiles = await vault.save([mockImage], password);
+                const [savedFiles, saveErr] = await vault.save([mockImage], password);
+                expect(saveErr).toEqual(null);
                 const [restoredVault, err] = await PasswordVault.load(
                     savedFiles.map(f => new MockFile(f.data, f.name)),
                     password
@@ -71,18 +72,12 @@ describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', ()
         }
 
         const mockImage = new MockFile(imgBuffer, 'solid-black-8x8.jpg');
-        let caughtError = null;
 
-        try {
-            await currentVault.save([mockImage], 'test-password');
-            expect(true).toBe(false); // Should not reach here
-        } catch (e) {
-            caughtError = e;
-        }
-        expect(caughtError).not.toBeNull();
+        const [, saveErr] = await currentVault.save([mockImage], 'test-password');
+        expect(saveErr).not.toBeNull();
         expect(
-            caughtError.message.includes('Insufficient capacity') ||
-            caughtError.message.includes('Not enough image capacity')
+            saveErr.message.includes('Insufficient capacity') ||
+            saveErr.message.includes('Not enough image capacity')
         ).toBe(true);
     });
 });

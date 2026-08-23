@@ -97,12 +97,13 @@ describe('ErrorCorrection (Property-Based Tests)', () => {
 
     it('should handle legacy protect/recover (no profile)', () => {
         const data = new Uint8Array([10, 20, 30, 40, 50]);
-        const encoded = ErrorCorrection.protect(data);
+        const [encoded, protectErr] = ErrorCorrection.protect(data);
 
-        // Legacy returns Uint8Array directly (not a tuple)
+        expect(protectErr).toEqual(null);
         expect(encoded.length).toBe(data.length + 4);
 
-        const recovered = ErrorCorrection.recover(encoded);
+        const [recovered, recoverErr] = ErrorCorrection.recover(encoded);
+        expect(recoverErr).toEqual(null);
         expect(recovered.length).toBe(data.length);
         for (let i = 0; i < data.length; i++) {
             expect(recovered[i]).toBe(data[i]);

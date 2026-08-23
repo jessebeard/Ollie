@@ -37,9 +37,6 @@ export function initEncoderUI() {
             const ctx = originalCanvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
 
-            const progressiveCheckbox = document.getElementById('progressive-checkbox');
-            const isProgressive = progressiveCheckbox ? progressiveCheckbox.checked : false;
-
             const secretInput = document.getElementById('secret-input');
             let secretData = null;
             if (secretInput && secretInput.files.length > 0) {
@@ -59,7 +56,6 @@ export function initEncoderUI() {
             const eccProfile = eccProfileSelect ? eccProfileSelect.value : 'Medium';
 
             const encoder = new JpegEncoder(90, {
-                progressive: isProgressive,
                 secretData: secretData,
                 password: password,
                 metadata: {
@@ -94,7 +90,6 @@ export function initEncoderUI() {
                 document.getElementById('encoder-info-size').textContent = `${jpegBytes.length} bytes`;
                 document.getElementById('encoder-info-dims').textContent = `${resImg.width}x${resImg.height}`;
                 document.getElementById('encoder-info-colorspace').textContent = 'YCbCr';
-                document.getElementById('encoder-info-progressive').textContent = isProgressive ? 'Yes' : 'No';
                 document.getElementById('encoder-info-chroma').textContent = '4:4:4';
             };
             resImg.src = url;

@@ -161,8 +161,9 @@ describe('F5 Steganography', () => {
             const data = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // "Hello"
             const metadata = { filename: 'test.txt', ecc: false };
 
-            const result = await F5.embedContainer(blocks, data, metadata, { seed: 'containertest' });
-            expect(result).toBe(true);
+            const [embedded, embedErr] = await F5.embedContainer(blocks, data, metadata, { seed: 'containertest' });
+            expect(embedErr).toEqual(null);
+            expect(embedded).toBe(true);
 
             const extracted = await F5.extractContainer(blocks, { seed: 'containertest' });
             expect(extracted).not.toBe(null);

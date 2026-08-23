@@ -37,8 +37,7 @@ export class JpegTranscoder {
         const encoder = new JpegEncoder(90, {
             secretData: newSecretData,
             metadata: options.metadata,
-            password: options.password,
-            progressive: decoded.metadata?.progressive || false
+            password: options.password
         });
 
         try {

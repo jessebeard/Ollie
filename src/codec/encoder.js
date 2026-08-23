@@ -7,6 +7,7 @@ import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from '../automata/entropy-c
 import { BitWriter } from '../automata/bit-streams/bit-writer.js';
 import { F5 } from '../information-theory/steganography/f5-syndrome.js';
 import { downsampleBlock420, extractLumaBlocks420 } from '../algebraic/mappings/downsampling.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * JpegEncoder
@@ -18,11 +19,11 @@ export class JpegEncoder {
         this.quality = quality;
         this.options = {
             writeSpiff: options.writeSpiff || false,
-            progressive: options.progressive || false,
             secretData: options.secretData || null,
+            metadata: options.metadata || null,
+            password: options.password || null,
             subsampling: options.subsampling || '4:4:4', // '4:4:4' or '4:2:0'
-            restartInterval: options.restartInterval || 0,
-            ...options
+            restartInterval: options.restartInterval || 0
         };
         // Store subsampling for methods that need it
         this.subsampling = this.options.subsampling;
@@ -49,7 +50,7 @@ export class JpegEncoder {
         let useEcc = userEccSetting !== false;
         let eccProfile = userEccProfile || 'Medium';
 
-        console.log(`ECC settings: ecc=${useEcc}, profile=${eccProfile}`);
+        logger.debug(`ECC settings: ecc=${useEcc}, profile=${eccProfile}`);
 
         let metadata = {
             ecc: useEcc,
@@ -67,7 +68,7 @@ export class JpegEncoder {
 
         // Auto-fallback to no-ECC if ECC capacity is insufficient
         if (capacity < this.options.secretData.length && useEcc && userEccSetting !== true) {
-            console.log(`ECC capacity (${capacity} bytes) insufficient, trying without ECC...`);
+            logger.debug(`ECC capacity (${capacity} bytes) insufficient, trying without ECC...`);
             useEcc = false;
             metadata.ecc = false;
             capacity = F5.calculateCapacity(allBlocks, {
@@ -76,10 +77,10 @@ export class JpegEncoder {
                 ecc: false,
                 encrypted: !!this.options.password
             });
-            console.log(`No-ECC capacity: ${capacity} bytes`);
+            logger.debug(`No-ECC capacity: ${capacity} bytes`);
         }
 
-        console.log(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes (ECC: ${useEcc})`);
+        logger.debug(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes (ECC: ${useEcc})`);
 
         if (this.options.secretData.length > capacity) {
             return [null, new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`)];
@@ -93,15 +94,10 @@ export class JpegEncoder {
     }
 
     /**
-     * Writes progressive or baseline scans.
+     * Writes the single baseline sequential scan.
      */
     writeScans(writer, blocks) {
-        if (this.options.progressive) {
-            this.writeScan(writer, blocks, 0, 0);
-            this.writeScan(writer, blocks, 1, 63);
-        } else {
-            this.writeScan(writer, blocks, 0, 63);
-        }
+        this.writeScan(writer, blocks, 0, 63);
     }
 
     /**
@@ -166,11 +162,11 @@ export class JpegEncoder {
     }
 
     /**
-     * Writes SOF marker (SOF0 for baseline, SOF2 for progressive).
+     * Writes SOF marker (SOF0, baseline sequential DCT).
      * Sampling factors: 4:4:4 = 0x11 for all, 4:2:0 = 0x22 for Y, 0x11 for Cb/Cr
      */
     writeSOF(writeByte, writeWord, width, height, subsampling = '4:4:4') {
-        writeWord(this.options.progressive ? 0xFFC2 : 0xFFC0);
+        writeWord(0xFFC0);
         writeWord(8 + 3 * 3);
         writeByte(8);
         writeWord(height);
@@ -198,7 +194,7 @@ export class JpegEncoder {
      * @returns {Uint8Array} The raw JPEG file bytes.
      */
     async encode(imageData) {
-        console.log('JpegEncoder.encode called');
+        logger.debug('JpegEncoder.encode called');
         const width = imageData.width;
         const height = imageData.height;
         const data = imageData.data;
@@ -224,7 +220,7 @@ export class JpegEncoder {
             for (let mcuY = 0; mcuY < padded.height; mcuY += 16) {
                 for (let mcuX = 0; mcuX < padded.width; mcuX += 16) {
                     mcuCount++;
-                    if (mcuCount % 500 === 0) console.log('Processing MCU ' + mcuCount);
+                    if (mcuCount % 500 === 0) logger.debug('Processing MCU ' + mcuCount);
 
                     // Extract 4 Y blocks (8x8 each) from the 16x16 MCU
                     // Order: [0][1]
@@ -283,7 +279,7 @@ export class JpegEncoder {
             for (let y = 0; y < padded.height; y += 8) {
                 for (let x = 0; x < padded.width; x += 8) {
                     blockCount++;
-                    if (blockCount % 1000 === 0) console.log('Processing block ' + blockCount);
+                    if (blockCount % 1000 === 0) logger.debug('Processing block ' + blockCount);
 
                     const Y = new Float32Array(64);
                     const Cb = new Float32Array(64);
@@ -314,14 +310,14 @@ export class JpegEncoder {
         }
 
         if (this.options.secretData) {
-            console.log('Embedding secret data...');
+            logger.debug('Embedding secret data...');
             let blocksForEmbedding = blocks;
 
             // CRITICAL FIX: Reorder 4:2:0 Y blocks to row-major order for embedding.
             // The encoder generates blocks in MCU-linear order, but the decoder reads them in row-major order.
             // We must embed into the row-major view so the data ends up in the correct visual blocks consistent with the decoder.
             if (this.subsampling === '4:2:0') {
-                console.log('Reordering 4:2:0 blocks to row-major for embedding...');
+                logger.debug('Reordering 4:2:0 blocks to row-major for embedding...');
                 // We need the padded dimensions here. 'padded' variable is available in this scope?
                 // Actually 'padded' is scoped to the if block above. We need to recalculate or access it.
                 // We can use 'mcuCount' derived from blocks.Cb.length or recalculate.
@@ -353,12 +349,12 @@ export class JpegEncoder {
             if (embedErr) throw embedErr;
         }
 
-        console.log('Finished preparing blocks. Writing scans...');
+        logger.debug('Finished preparing blocks. Writing scans...');
         this.writeScans(writer, blocks);
 
-        console.log('Finished writing scans, flushing writer');
+        logger.debug('Finished writing scans, flushing writer');
         const body = writer.flush();
-        console.log('Writer flushed, assembling file');
+        logger.debug('Writer flushed, assembling file');
         return this.assembleFile(body);
     }
 
@@ -382,7 +378,7 @@ export class JpegEncoder {
             return blocks;
         }
 
-        console.log(`Upsampling chroma: Y=${yCount}, Cb=${cbCount}, Cr=${crCount}`);
+        logger.debug(`Upsampling chroma: Y=${yCount}, Cb=${cbCount}, Cr=${crCount}`);
 
         // Calculate subsampling ratio (typically 4 for 4:2:0)
         const cbRatio = Math.round(yCount / cbCount);
@@ -417,14 +413,14 @@ export class JpegEncoder {
      * @returns {Promise<Uint8Array>} The raw JPEG file bytes
      */
     async encodeCoefficients(coefficients, quantizationTables, metadata) {
-        console.log('JpegEncoder.encodeCoefficients called');
+        logger.debug('JpegEncoder.encodeCoefficients called');
         const { width, height } = metadata;
 
         // Detect component IDs dynamically (e.g. 1,2,3 or 0,1,2)
         const compIds = Object.keys(coefficients).map(id => parseInt(id, 10)).sort((a, b) => a - b);
 
         if (compIds.length < 3) {
-            console.warn(`Warning: Image has fewer than 3 components (${compIds.length}). Grayscale not fully supported in simple encoder yet.`);
+            logger.warn(`Warning: Image has fewer than 3 components (${compIds.length}). Grayscale not fully supported in simple encoder yet.`);
             // Fallback for grayscale might be needed, but assuming mostly YCbCr for now
         }
 
@@ -432,7 +428,7 @@ export class JpegEncoder {
         const idCb = compIds[1];
         const idCr = compIds[2];
 
-        console.log(`Using component IDs: Y=${idY}, Cb=${idCb}, Cr=${idCr}`);
+        logger.debug(`Using component IDs: Y=${idY}, Cb=${idCb}, Cr=${idCr}`);
 
         // Detect subsampling from block counts
         const yCount = coefficients[idY].blocks.length;
@@ -442,13 +438,13 @@ export class JpegEncoder {
         // Determine source subsampling
         if (yCount === cbCount * 4 && yCount === crCount * 4) {
             this.subsampling = '4:2:0';
-            console.log('Detected 4:2:0 subsampling (preserving)');
+            logger.debug('Detected 4:2:0 subsampling (preserving)');
         } else if (yCount === cbCount && yCount === crCount) {
             this.subsampling = '4:4:4';
-            console.log('Detected 4:4:4 subsampling');
+            logger.debug('Detected 4:4:4 subsampling');
         } else {
             // If subsampling ratio doesn't match standard, fall back to upsampling to 4:4:4
-            console.log(`Non-standard subsampling detected (Y=${yCount}, Cb=${cbCount}, Cr=${crCount}), upsampling to 4:4:4`);
+            logger.debug(`Non-standard subsampling detected (Y=${yCount}, Cb=${cbCount}, Cr=${crCount}), upsampling to 4:4:4`);
             this.subsampling = '4:4:4';
         }
 
@@ -471,15 +467,15 @@ export class JpegEncoder {
         }
 
         if (this.options.secretData) {
-            console.log('Embedding secret data into coefficients...');
+            logger.debug('Embedding secret data into coefficients...');
             const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocks));
             if (embedErr) throw embedErr;
         }
 
-        console.log('Writing scans from coefficients...');
+        logger.debug('Writing scans from coefficients...');
         this.writeScans(writer, blocks);
 
-        console.log('Flushing writer...');
+        logger.debug('Flushing writer...');
         const body = writer.flush();
         return this.assembleFile(body);
     }
@@ -495,7 +491,7 @@ export class JpegEncoder {
     }
 
     writeScan(writer, blocks, Ss, Se) {
-        console.log(`Writing Scan: Ss=${Ss}, Se=${Se}, subsampling=${this.subsampling}`);
+        logger.debug(`Writing Scan: Ss=${Ss}, Se=${Se}, subsampling=${this.subsampling}`);
 
         this.writeSOS(writer, Ss, Se);
 
@@ -528,7 +524,7 @@ export class JpegEncoder {
             if (blocksH) {
                 // Row-major storage: compute correct indices
                 const mcuCols = blocksH / 2; // Y blocksH = mcuCols * 2
-                console.log(`4:2:0 encoding (row-major): numMCUs=${numMCUs}, blocksH=${blocksH}, mcuCols=${mcuCols}`);
+                logger.debug(`4:2:0 encoding (row-major): numMCUs=${numMCUs}, blocksH=${blocksH}, mcuCols=${mcuCols}`);
 
                 for (let mcu = 0; mcu < numMCUs; mcu++) {
                     handleRestart();
@@ -549,7 +545,7 @@ export class JpegEncoder {
                 }
             } else {
                 // MCU-linear storage (from encode()): blocks already in correct order
-                console.log(`4:2:0 encoding (MCU-linear): numMCUs=${numMCUs}`);
+                logger.debug(`4:2:0 encoding (MCU-linear): numMCUs=${numMCUs}`);
 
                 for (let mcu = 0; mcu < numMCUs; mcu++) {
                     handleRestart();
@@ -576,7 +572,7 @@ export class JpegEncoder {
     }
 
     writeHeaders(writer, width, height, qTables) {
-        console.log('Writing headers...');
+        logger.debug('Writing headers...');
         const { writeByte, writeWord, writeArray } = this.createHeaderWriters();
 
         this.writeCommonHeaders(writeByte, writeWord, writeArray, width, height);
@@ -602,7 +598,7 @@ export class JpegEncoder {
      * Write headers with custom quantization tables (for lossless transcoding)
      */
     writeHeadersWithTables(writer, width, height, quantizationTables) {
-        console.log('Writing headers with custom quantization tables...');
+        logger.debug('Writing headers with custom quantization tables...');
         const { writeByte, writeWord, writeArray } = this.createHeaderWriters();
 
         this.writeCommonHeaders(writeByte, writeWord, writeArray, width, height);
@@ -663,7 +659,7 @@ export class JpegEncoder {
             ];
 
         let totalLen = 2 + 1 + 16 + dcValues.length;
-        console.log('writeDHT: type=' + type + ', id=' + id + ', totalLen=' + totalLen);
+        logger.debug('writeDHT: type=' + type + ', id=' + id + ', totalLen=' + totalLen);
         writeWord(totalLen);
         writeByte((type << 4) | id);
 
@@ -700,9 +696,9 @@ export class JpegEncoder {
         file[totalLength - 2] = 0xFF;
         file[totalLength - 1] = 0xD9;
 
-        console.log('Headers length:', headers.length);
-        console.log('Scan data length:', scanData.length);
-        console.log('Total JPEG file size:', totalLength, 'bytes');
+        logger.debug('Headers length:', headers.length);
+        logger.debug('Scan data length:', scanData.length);
+        logger.debug('Total JPEG file size:', totalLength, 'bytes');
 
         return file;
     }

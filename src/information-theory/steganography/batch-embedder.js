@@ -3,6 +3,7 @@ import { JpegTranscoder } from '../../codec/transcoder.js';
 import { JpegDecoder } from '../../codec/decoder.js';
 import { JpegEncoder } from '../../codec/encoder.js';
 import { F5 } from './f5-syndrome.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * BatchEmbedder - Handles embedding data across multiple images
@@ -43,7 +44,7 @@ export class BatchEmbedder {
                 if (isJpeg) {
 
                     jpegBytes = originalBytes;
-                    console.log(`${file.name}: Using original JPEG bytes (lossless path)`);
+                    logger.debug(`${file.name}: Using original JPEG bytes (lossless path)`);
                 } else {
 
                     let imageData;
@@ -74,7 +75,7 @@ export class BatchEmbedder {
 
                     const encoder = new JpegEncoder();
                     jpegBytes = await encoder.encode(imageData);
-                    console.log(`${file.name}: Converted to JPEG`);
+                    logger.debug(`${file.name}: Converted to JPEG`);
                 }
 
                 normalizedImages.push({
@@ -88,7 +89,7 @@ export class BatchEmbedder {
                     onProgress(i + 1, imageFiles.length, `Processed ${file.name}`);
                 }
             } catch (error) {
-                console.error(`Failed to process ${file.name}:`, error);
+                logger.error(`Failed to process ${file.name}:`, error);
                 return [null, new Error(`Failed to process ${file.name}: ${error.message}`)];
             }
         }
@@ -103,7 +104,7 @@ export class BatchEmbedder {
 
             const decoder = new JpegDecoder();
             const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
-            if (decodeErr) throw decodeErr;
+            if (decodeErr) return [null, new Error(`Failed to decode ${file.name} for capacity calculation: ${decodeErr.message}`)];
 
             const allBlocks = [];
 
@@ -132,7 +133,7 @@ export class BatchEmbedder {
             }
 
             if (allBlocks.length === 0) {
-                console.error('Failed to extract blocks. Decoder state:', {
+                logger.error('Failed to extract blocks. Decoder state:', {
                     hasCoefficients: !!decoded.coefficients,
                     hasComponents: !!decoder.components,
                     decodedKeys: Object.keys(decoded),
@@ -165,7 +166,7 @@ export class BatchEmbedder {
                     ecc: false,
                     encrypted: !!options.password
                 });
-                console.log(`${file.name}: ECC capacity 0, fallback to no-ECC: ${capacity} bytes`);
+                logger.debug(`${file.name}: ECC capacity 0, fallback to no-ECC: ${capacity} bytes`);
             }
 
             imageCapacities.push({
@@ -182,7 +183,7 @@ export class BatchEmbedder {
             }
         }
 
-        console.log(`Total capacity: ${totalCapacity} bytes, Data: ${data.length} bytes`);
+        logger.debug(`Total capacity: ${totalCapacity} bytes, Data: ${data.length} bytes`);
 
         if (data.length > totalCapacity) {
             return [null, new Error(
@@ -229,7 +230,7 @@ export class BatchEmbedder {
                 });
 
             } catch (error) {
-                console.error(`Error processing ${imageInfo.file.name}:`, error);
+                logger.error(`Error processing ${imageInfo.file.name}:`, error);
                 return [null, new Error(`Failed to embed into ${imageInfo.file.name}: ${error.message}`)];
             }
         }
@@ -239,19 +240,6 @@ export class BatchEmbedder {
         }
 
         return [results, null];
-    }
-
-    /**
-     * Estimate capacity of a decoded JPEG
-     * @private
-     */
-    estimateCapacity(decoded) {
-
-        const totalBlocks = Math.ceil(decoded.width / 8) * Math.ceil(decoded.height / 8) * 3;
-
-        const estimatedCapacity = Math.floor(totalBlocks * 0.25);
-
-        return Math.max(100, estimatedCapacity);
     }
 
     /**
@@ -272,7 +260,7 @@ export class BatchEmbedder {
             const chunkSize = Math.min(safeCapacity, data.length - offset);
 
             if (chunkSize < 10) {
-                console.warn(`Image ${imageInfo.file.name} has very low capacity (${imageInfo.capacity} bytes), skipping`);
+                logger.warn(`Image ${imageInfo.file.name} has very low capacity (${imageInfo.capacity} bytes), skipping`);
                 continue;
             }
 

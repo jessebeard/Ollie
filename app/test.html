@@ -495,7 +495,6 @@
         import '../test/algebraic/mappings/forward-zigzag.test.js';
         import '../test/automata/entropy-coding/huffman-encoder-fsm.test.js';
         import '../test/algebraic/mappings/downsampling.test.js';
-        import '../test/automata/parsers/progressive-encoding.test.js';
         import '../test/automata/parsers/spiff-generation.test.js';
         import '../test/codec/encoder.test.js';
         import '../test/codec/encoder/quality.test.js';
@@ -518,7 +517,6 @@
         import '../test/algebraic/colorspace/ycbcr-to-rgb.test.js';
         import '../test/algebraic/mappings/upsampling.test.js';
         import '../test/algebraic/mappings/block-assembly.test.js';
-        import '../test/automata/parsers/progressive-decoding.test.js';
         import '../test/codec/decoder/rst-markers.test.js';
         import '../test/codec/decoder/spiff-parsing.test.js';
 
@@ -528,14 +526,12 @@
         import '../test/utils/marker-parser.test.js';
 
         // Steganography Tests
-        import '../test/codec/steganography/steganography.test.js';
-        import '../test/codec/steganography/container.test.js';
         import '../test/information-theory/steganography/chunk-manager.test.js';
+        import '../test/codec/steganography/result-contracts.test.js';
         import '../test/information-theory/steganography/f5-syndrome.test.js';
         // Node only tests that rely on fs/path will skip their inner bodies dynamically
         // import '../test/codec/steganography/batch-process.test.js';
         import '../test/information-theory/error-correction/rs-interleaver.test.js';
-        import '../test/codec/steganography/container-format.test.js';
 
         // Crypto Tests
         import '../test/information-theory/cryptography/aes-gcm.test.js';
@@ -554,7 +550,6 @@
         import '../test/integration/steganography-roundtrip.test.js';
         import '../test/scripts/auto_detection_roundtrip.test.js';
         import '../test/scripts/capacity_validation.test.js';
-        import '../test/scripts/format_detection.test.js';
         import '../test/codec/capacity-scanner.test.js';
         import '../test/codec/capacity-scanner.pbt.js';
 

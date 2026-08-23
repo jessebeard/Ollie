@@ -133,10 +133,6 @@
                     <input type="file" id="file-input" accept="image/*">
 
                     <div style="margin: 10px 0;">
-                        <label><input type="checkbox" id="progressive-checkbox"> Progressive Encoding</label>
-                    </div>
-
-                    <div style="margin: 10px 0;">
                         <label style="display: block; margin-bottom: 5px;">Steganography File (Optional):</label>
                         <input type="file" id="secret-input">
                         <input type="password" id="encrypt-password" placeholder="Password (optional)"
@@ -168,7 +164,6 @@
                     <div>Size: <span id="encoder-info-size">-</span></div>
                     <div>Dimensions: <span id="encoder-info-dims">-</span></div>
                     <div>Color Space: <span id="encoder-info-colorspace">-</span></div>
-                    <div>Progressive: <span id="encoder-info-progressive">-</span></div>
                     <div>Chroma Subsampling: <span id="encoder-info-chroma">-</span></div>
                 </div>
             </div>
@@ -244,7 +239,6 @@
                     <div>Size: <span id="decoder-info-size">-</span></div>
                     <div>Dimensions: <span id="decoder-info-dims">-</span></div>
                     <div>Color Space: <span id="decoder-info-colorspace">-</span></div>
-                    <div>Progressive: <span id="decoder-info-progressive">-</span></div>
                     <div>Chroma Subsampling: <span id="decoder-info-chroma">-</span></div>
                     <div id="secret-data-section"
                         style="display: none; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ccc;">

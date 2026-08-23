@@ -1,5 +1,6 @@
 import { ChunkManager } from './chunk-manager.js';
 import { JpegDecoder } from '../../codec/decoder.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * BatchExtractor - Handles extracting and reassembling data from multiple images
@@ -33,10 +34,10 @@ export class BatchExtractor {
                 if (err) throw err;
 
                 if (result.secretData) {
-                    console.log(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
+                    logger.debug(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
                     if (result.secretMetadata && result.secretMetadata.chunk) {
                         const chunkMeta = result.secretMetadata.chunk;
-                        console.log(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
+                        logger.debug(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
 
                         chunks.push({
                             chunkId: chunkMeta.id,
@@ -50,13 +51,13 @@ export class BatchExtractor {
                             firstMetadata = result.secretMetadata;
                         }
                     } else {
-                        console.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
+                        logger.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
                     }
                 } else {
-                    console.log(`File ${file.name}: No secret data found.`);
+                    logger.debug(`File ${file.name}: No secret data found.`);
                 }
             } catch (error) {
-                console.error(`Failed to extract from ${file.name}:`, error);
+                logger.error(`Failed to extract from ${file.name}:`, error);
                 if (onProgress) {
                     onProgress(i + 1, total, `Error extracting from ${file.name}`);
                 }
@@ -91,7 +92,7 @@ export class BatchExtractor {
                     if (!presentIndices.has(i)) missingIndices.push(i);
                 }
                 const msg = `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`;
-                console.warn(msg);
+                logger.warn(msg);
                 bestErrorMsg = msg;
                 continue; // Try next group
             }
@@ -102,7 +103,7 @@ export class BatchExtractor {
         }
 
         if (!completeGroup) {
-            console.error(bestErrorMsg);
+            logger.error(bestErrorMsg);
             return [null, new Error(bestErrorMsg)];
         }
 
@@ -112,7 +113,7 @@ export class BatchExtractor {
 
         const [reassembled, reassembleErr] = ChunkManager.reassemble(completeGroup);
         if (reassembleErr) {
-            console.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
+            logger.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
             return null; // or perhaps return [null, reassembleErr]
         }
 
