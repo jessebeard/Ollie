@@ -555,7 +555,10 @@ export class VaultUI {
                 }
             }
 
-            statusText.textContent = 'Unlocked';
+            const savedDate = this.vault.metadata.modified
+                ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
+                : 'unknown';
+            statusText.textContent = `Unlocked · Rev ${this.vault.metadata.revision} · ${savedDate} UTC`;
         } else {
             statusText.textContent = 'Locked';
         }

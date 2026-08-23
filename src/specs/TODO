@@ -8,3 +8,12 @@ o comprehensive end to end testing
 - require master password re-entry to export the secrets library
 - allow resetting the master password
 
+
+## 2026-08-22 — Whole-container ECC framing (format v2.1 candidate)
+F5.extractContainer parses header/metadata BEFORE Reed-Solomon recovery;
+ErrorCorrection currently covers only the payload. Corrupted coefficients that
+cascade through F5 matrix encoding can therefore kill metadata parsing
+(JSON parse failures) even when the RS budget would have absorbed them.
+Required redesign: two-layer framing (RS-coded fixed header carrying
+eccProfile/lengths + RS-coded body), capacity-math update, and migration of
+hand-crafted container tests. Tracked from vault-e2e-ecc skip note.

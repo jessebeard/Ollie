@@ -48,6 +48,7 @@ export class PasswordVault {
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
         this.metadata = Object.freeze(metadata ? { ...metadata } : {
             version: '3.0',
+            revision: 0,
             created: new Date().toISOString(),
             modified: new Date().toISOString()
         });
@@ -169,6 +170,7 @@ export class PasswordVault {
 
         const newMetadata = {
             ...this.metadata,
+            revision: this.metadata.revision + 1,
             ...(kdfBlock ? { kdf: kdfBlock } : {}),
             modified: new Date().toISOString()
         };
@@ -213,6 +215,7 @@ export class PasswordVault {
         newEntries[index] = newSecureEntry;
         const newMetadata = {
             ...this.metadata,
+            revision: this.metadata.revision + 1,
             ...(kdfBlock ? { kdf: kdfBlock } : {}),
             modified: new Date().toISOString()
         };
@@ -229,7 +232,7 @@ export class PasswordVault {
 
         const newEntries = [...this.entries];
         newEntries.splice(index, 1);
-        const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
+        const newMetadata = { ...this.metadata, revision: this.metadata.revision + 1, modified: new Date().toISOString() };
 
         return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this._password(), this._sessionKey()), null];
     }
@@ -288,6 +291,9 @@ export class PasswordVault {
         if (!data.metadata.kdf) {
             return [null, new Error('Vault document is missing its KDF wrap block')];
         }
+        if (!Number.isInteger(data.metadata.revision) || data.metadata.revision < 0) {
+            return [null, new Error('Vault document is missing a valid revision counter')];
+        }
         if (!Array.isArray(data.entries)) {
             return [null, new Error('Vault document entries must be an array')];
         }
@@ -315,8 +321,7 @@ export class PasswordVault {
 
         const payloadMetadata = {
             ...this.metadata,
-            ...(kdfBlock ? { kdf: kdfBlock } : {}),
-            modified: new Date().toISOString()
+            ...(kdfBlock ? { kdf: kdfBlock } : {})
         };
 
         const vaultData = JSON.stringify({
