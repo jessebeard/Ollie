@@ -9,7 +9,7 @@ o comprehensive end to end testing
 - allow resetting the master password
 
 
-## 2026-08-22 — Whole-container ECC framing (format v2.1 candidate)
+## 2026-08-22 ï¿½ Whole-container ECC framing (format v2.1 candidate)
 F5.extractContainer parses header/metadata BEFORE Reed-Solomon recovery;
 ErrorCorrection currently covers only the payload. Corrupted coefficients that
 cascade through F5 matrix encoding can therefore kill metadata parsing
@@ -17,3 +17,39 @@ cascade through F5 matrix encoding can therefore kill metadata parsing
 Required redesign: two-layer framing (RS-coded fixed header carrying
 eccProfile/lengths + RS-coded body), capacity-math update, and migration of
 hand-crafted container tests. Tracked from vault-e2e-ecc skip note.
+
+
+## 2026-08-23 - Full fuzzing + metamorphic testing coverage (all layers)
+
+Goal: every module owned by seeded, structure-aware fuzzing plus explicit
+metamorphic relations (MRs), not just example tests. Builds on the seeded
+pbt.js harness and the Wave H fuzz/MR culture (npm run fuzz; CI smoke slice).
+Track per-layer adoption; "done" = listed MRs/generators exist + long-run
+fuzz script exercises them without finding open counterexamples.
+
+Current: wire-format L0-L3 (conformance + 12 PBT), capacity scanner,
+escapeHtml, vault structures, algebraic transforms, huffman encoder.
+
+- [ ] codec: encode/decode roundtrip fuzzing (random dimensions/quality/
+      subsampling/restart intervals); MRs - decode-after-encode stability,
+      quality-vs-size monotonicity, dimension preservation
+- [ ] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
+      generator (truncation, marker injection, lying length fields); MR -
+      valid files unchanged, hostile input always fails closed
+- [ ] bit-streams: differential testing across BitReader variants on random
+      streams (all three must agree bit-for-bit)
+- [ ] error-correction core: GF(256) field axioms as properties; RS
+      roundtrip under random corruption distributions at tolerance edges;
+      interleave permutation-invariance MRs
+- [ ] cryptography: AES-GCM/PBKDF2/HMAC roundtrip + AAD-binding properties
+      (structural; CSPRNG prevents byte vectors)
+- [ ] vault layer: operation-sequence fuzzing against invariants (locked
+      never decrypts, revision strictly increases, freeze holds); MR -
+      clone chains equivalent to batch operations
+- [ ] batch embedder/extractor: carrier-subset selection MRs, allocation
+      determinism, capacity-bound enforcement
+- [ ] scripts/cli.mjs: argument fuzzing, fail-closed exit codes
+- [ ] harness: grow npm run fuzz corpus; retune CI smoke budget as layers land
+Related: 2026-08-22 whole-container ECC framing entry (its redesigned
+framing must ship with its own fuzz slice).
+
