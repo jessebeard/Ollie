@@ -51,7 +51,7 @@ describe('PasswordVault E2E Steganography (Empty Vault & Capacity Boundary)', ()
 
                 expect(err).toEqual(null);
                 expect(restoredVault.entries.length).toBe(0);
-                expect(restoredVault.metadata.version).toBe('2.0');
+                expect(restoredVault.metadata.version).toBe('3.0');
                 return true;
             },
             1

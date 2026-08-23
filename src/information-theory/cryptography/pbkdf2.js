@@ -12,13 +12,18 @@ export class KeyDerivation {
 
     /**
      * Derives a CryptoKey from a password and salt using PBKDF2
-     * 
+     *
      * @param {string} password - User password
      * @param {Uint8Array} salt - Salt (16 bytes recommended)
+     * @param {Object} [options]
+     * @param {number} [options.iterations] - PBKDF2 iteration count (defaults to ITERATIONS)
      * @returns {Promise<[CryptoKey|null, Error|null]>} Tuple with derived key or error
      */
-    static async deriveKey(password, salt) {
+    static async deriveKey(password, salt, options = {}) {
         try {
+            const iterations = this.resolveIterations(options.iterations);
+            if (iterations instanceof Error) return [null, iterations];
+
             const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
@@ -37,7 +42,7 @@ export class KeyDerivation {
                 {
                     name: 'PBKDF2',
                     salt: salt,
-                    iterations: this.ITERATIONS,
+                    iterations: iterations,
                     hash: 'SHA-256'
                 },
                 baseKey,
@@ -50,6 +55,22 @@ export class KeyDerivation {
         } catch (e) {
             return [null, e];
         }
+    }
+
+    /**
+     * Validates and normalizes an iteration count.
+     *
+     * @param {number} [iterations]
+     * @returns {number|Error} Resolved iteration count, or Error when invalid
+     */
+    static resolveIterations(iterations) {
+        if (iterations === undefined || iterations === null) {
+            return this.ITERATIONS;
+        }
+        if (!Number.isInteger(iterations) || iterations < 1) {
+            return new Error(`Invalid PBKDF2 iteration count: ${iterations}`);
+        }
+        return iterations;
     }
 
     /**

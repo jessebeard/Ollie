@@ -13,52 +13,95 @@
 import { ErrorCorrection, ECC_PROFILES } from '../error-correction/rs-interleaver.js';
 import { Encryption } from '../cryptography/aes-gcm.js';
 import { KeyDerivation } from '../cryptography/pbkdf2.js';
+import { sha256 } from '../cryptography/crypto-provider.js';
 import { crc32 } from '../../utils/crc32.js';
 import { logger } from '../../utils/logger.js';
 
 export class F5 {
     static MAGIC = 'F5SG';
-    static VERSION = 1;
+    static VERSION = 2;
+
+    /**
+     * Seed used only for containers embedded WITHOUT a password and WITHOUT
+     * an explicit seed. Such containers are obfuscation, not secrecy; the
+     * constant merely avoids a shared default with any keyed mode.
+     */
+    static PUBLIC_SEED = 'F5SG:v2:public';
+
+    /**
+     * Domain-separation prefix for deriving the permutation seed from a
+     * password. The seed is never stored and never equals the password.
+     */
+    static STEGO_SEED_CONTEXT = 'ollie/f5/permutation/v2/';
+
+    /**
+     * Iteration bounds enforced on attacker-readable container metadata
+     * before any key derivation runs.
+     */
+    static MIN_KDF_ITERATIONS = 50000;
+    static MAX_KDF_ITERATIONS = 10000000;
 
     static crc32(data) {
         return crc32(data);
     }
 
     /**
+     * Resolves the permutation seed for an embedding or extraction pass.
+     * Explicit seeds win (testing/special modes); passwords derive a
+     * full-entropy seed via SHA-256 domain separation; everything else
+     * falls back to the public seed.
+     *
+     * @param {Object} options - { seed?, password? }
+     * @returns {Promise<string>} Seed string
+     */
+    static async resolveSeed(options = {}) {
+        if (options.seed) return options.seed;
+        if (options.password) {
+            const digest = await sha256(this.STEGO_SEED_CONTEXT, options.password);
+            return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('');
+        }
+        return this.PUBLIC_SEED;
+    }
+
+    /**
      * Create a seeded PRNG for permutation.
-     * Uses a simple LCG for reproducibility.
+     * xoshiro128** seeded by FNV-1a diffusion of the full seed material,
+     * so every seed byte contributes to the state.
      *
      * @param {Uint8Array|string} seed
-     * @returns {function(): number}
+     * @returns {function(): number} Uniform uint32 generator
      */
     static createPRNG(seed) {
-        let state;
-        if (typeof seed === 'string') {
-            // Hash string to number
-            state = 0;
-            for (let i = 0; i < seed.length; i++) {
-                state = ((state << 5) - state + seed.charCodeAt(i)) | 0;
+        const bytes = typeof seed === 'string'
+            ? new TextEncoder().encode(seed)
+            : (seed instanceof Uint8Array ? seed : new Uint8Array(0));
+
+        let s0 = 0x243F6A88 >>> 0;
+        let s1 = 0x85A308D3 >>> 0;
+        let s2 = 0x13198A2E >>> 0;
+        let s3 = 0x03707344 >>> 0;
+
+        for (let i = 0; i < bytes.length; i++) {
+            switch (i & 3) {
+                case 0: s0 = Math.imul(s0 ^ bytes[i], 0x01000193) >>> 0; break;
+                case 1: s1 = Math.imul(s1 ^ bytes[i], 0x01000193) >>> 0; break;
+                case 2: s2 = Math.imul(s2 ^ bytes[i], 0x01000193) >>> 0; break;
+                default: s3 = Math.imul(s3 ^ bytes[i], 0x01000193) >>> 0; break;
             }
-            state = Math.abs(state) || 1;
-        } else if (seed instanceof Uint8Array) {
-            state = 0;
-            for (let i = 0; i < Math.min(seed.length, 8); i++) {
-                state = (state << 8) | seed[i];
-            }
-            state = Math.abs(state) || 1;
-        } else {
-            state = seed || 1;
         }
 
-        // LCG constants (same as Java's Random)
-        const a = 25214903917n;
-        const c = 11n;
-        const m = 1n << 48n;
-        let current = BigInt(state);
+        const rotl = (x, k) => ((x << k) | (x >>> (32 - k))) >>> 0;
 
         return function () {
-            current = (a * current + c) % m;
-            return Number(current >> 17n) >>> 0;
+            const result = (Math.imul(rotl(Math.imul(s1, 5) >>> 0, 7) >>> 0, 9) + s0) >>> 0;
+            const t = (s1 << 9) >>> 0;
+            s2 = (s2 ^ s0) >>> 0;
+            s3 = (s3 ^ s1) >>> 0;
+            s1 = (s1 ^ s2) >>> 0;
+            s0 = (s0 ^ s3) >>> 0;
+            s2 = (s2 ^ t) >>> 0;
+            s3 = rotl(s3, 11);
+            return result;
         };
     }
 
@@ -97,9 +140,15 @@ export class F5 {
         for (let i = 0; i < N; i++) {
             perm[i] = i;
         }
-        // Fisher-Yates shuffle
+        // Unbiased Fisher-Yates: rejection sampling avoids modulo bias.
         for (let i = N - 1; i > 0; i--) {
-            const j = prng() % (i + 1);
+            const bound = i + 1;
+            const threshold = 0x100000000 % bound;
+            let draw;
+            do {
+                draw = prng();
+            } while (draw < threshold);
+            const j = draw % bound;
             const temp = perm[i];
             perm[i] = perm[j];
             perm[j] = temp;
@@ -176,7 +225,7 @@ export class F5 {
      * @returns {{success: boolean, k: number}} Result with k value for extraction
      */
     static embedRaw(blocks, data, options = {}) {
-        const seed = options.seed || 'F5default';
+        const seed = options.seed || F5.PUBLIC_SEED;
 
         // Count non-zero coefficients AND ones for k selection
         let nonZeroCount = 0;
@@ -311,7 +360,7 @@ export class F5 {
      * @returns {Uint8Array|null}
      */
     static extractRaw(blocks, bitCount, options = {}) {
-        const seed = options.seed || 'F5default';
+        const seed = options.seed || F5.PUBLIC_SEED;
 
         // CRITICAL: Generate same permutation as embedding (depends on N and seed only)
         const totalAC = blocks.length * 63;
@@ -448,10 +497,13 @@ export class F5 {
         let payloadToEmbed = data;
         if (options.password) {
             metadata.encrypted = true;
+            const iterations = options.iterations || KeyDerivation.ITERATIONS;
             const [salt, saltErr] = KeyDerivation.generateSalt();
             if (saltErr) return [null, saltErr];
 
-            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+            metadata.enc = { kdf: 'PBKDF2-SHA256', iterations: iterations };
+
+            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt, { iterations });
             if (keyErr) return [null, keyErr];
 
             const [encResult, encErr] = await Encryption.encrypt(data, key);
@@ -521,8 +573,7 @@ export class F5 {
         const crcVal = crc32(dataToCrc);
         view.setUint32(offset, crcVal, false); offset += 4;
 
-        // Use password as seed for permutation if provided
-        const seed = options.password || options.seed || 'F5default';
+        const seed = await this.resolveSeed(options);
 
         // Pass k to embedRaw to ensure consistency
         const result = this.embedRaw(blocks, container, { seed, k });
@@ -534,39 +585,15 @@ export class F5 {
 
     /**
      * Auto-detects format and extracts data.
+     * Searches k=1..4 for the container header under the resolved seed.
      *
      * @param {Array<Int32Array>} blocks
      * @param {Object} options
-     * @returns {Promise<Uint8Array|Object|null>}
+     * @returns {Promise<Object|null>} { data, metadata } or null when absent
      */
     static async extractAuto(blocks, options = {}) {
-        const seed = options.password || options.seed || 'F5default';
+        const seed = await this.resolveSeed(options);
 
-        // Try to read magic bytes (4 bytes = 32 bits)
-        // CRITICAL: Use k=1 for magic bytes to ensure we can read them reliably
-        // regardless of capacity or shrinkage. The embedder must ensure magic bytes
-        // are embedded with k=1 or compatible scheme.
-        // Actually, F5 standard doesn't specify k for header.
-        // But since we don't know k yet, we must guess or use a fixed k.
-        // Our embedder uses selectK for the WHOLE container including header.
-        // This is a design flaw in the container format if k is variable.
-
-        // However, we can try to extract with k=1 first. If that fails, we might need
-        // to try other k values. But wait - the k is stored IN the header.
-        // If we used k=4 to embed the header, we can't read it with k=1.
-
-        // RE-READING SPEC: "Store k for extraction".
-        // If k is stored inside the container, we must be able to read the container start
-        // without knowing k. This implies the start (Magic + k) must be embedded with
-        // a fixed k, OR we brute-force k.
-
-        // For now, let's try to extract with the same logic as embedder:
-        // The embedder calculates k based on usable coefficients.
-        // The extractor calculates k based on usable coefficients.
-        // BUT shrinkage changes usable count!
-
-        // FIX: We will try k=1, 2, 3, 4 to find the Magic bytes.
-        let magicBytes = null;
         let detectedK = null;
 
         for (let tryK = 1; tryK <= 4; tryK++) {
@@ -574,28 +601,15 @@ export class F5 {
             if (bytes) {
                 const magic = new TextDecoder().decode(bytes);
                 if (magic === this.MAGIC) {
-                    magicBytes = bytes;
                     detectedK = tryK;
                     break;
                 }
             }
         }
 
-        if (!magicBytes) {
-            // No container found at any k: fall back to legacy length-header F5.
-            magicBytes = this.extractRaw(blocks, 32, { seed });
-        }
+        if (!detectedK) return null;
 
-        if (!magicBytes) return null;
-
-        const magic = new TextDecoder().decode(magicBytes);
-
-        if (magic === this.MAGIC) {
-            return this.extractContainer(blocks, { ...options, k: detectedK });
-        } else {
-            const extracted = this.extract(blocks, { seed });
-            return extracted;
-        }
+        return this.extractContainer(blocks, { ...options, k: detectedK });
     }
 
     /**
@@ -606,7 +620,7 @@ export class F5 {
      * @returns {Promise<Object|null>}
      */
     static async extractContainer(blocks, options = {}) {
-        const seed = options.password || options.seed || 'F5default';
+        const seed = await this.resolveSeed(options);
 
         // Read fixed header: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) = 9 bytes = 72 bits
         // We must use the SAME k that was used to find the magic bytes!
@@ -676,8 +690,22 @@ export class F5 {
             metadata = JSON.parse(jsonString);
         } catch (e) {
             logger.error('F5: Failed to parse metadata:', e);
-            logger.error('Corrupted Metadata String:', new TextDecoder().decode(metaBytes));
             return null;
+        }
+
+        if (metadata.encrypted) {
+            const enc = metadata.enc;
+            const valid =
+                enc &&
+                typeof enc === 'object' &&
+                enc.kdf === 'PBKDF2-SHA256' &&
+                Number.isInteger(enc.iterations) &&
+                enc.iterations >= this.MIN_KDF_ITERATIONS &&
+                enc.iterations <= this.MAX_KDF_ITERATIONS;
+            if (!valid) {
+                logger.warn('F5: Rejecting container with invalid or missing enc KDF parameters');
+                return null;
+            }
         }
 
         const payloadLen = partialView.getUint32(offset, false);
@@ -743,7 +771,11 @@ export class F5 {
             const iv = payload.slice(16, 28);
             const ciphertext = payload.slice(28);
 
-            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt);
+            const [key, keyErr] = await KeyDerivation.deriveKey(
+                options.password,
+                salt,
+                { iterations: metadata.enc.iterations }
+            );
             if (keyErr) {
                 logger.error('F5: Key derivation failed:', keyErr);
                 return null;

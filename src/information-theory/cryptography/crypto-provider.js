@@ -19,6 +19,37 @@ export function getCrypto() {
 }
 
 /**
+ * Computes SHA-256 over the concatenation of the given byte inputs.
+ *
+ * @param {...(Uint8Array|string)} parts - Byte arrays or UTF-8 strings to hash in order
+ * @returns {Promise<Uint8Array>} 32-byte digest
+ * @throws {Error} If no crypto provider is available
+ */
+export async function sha256(...parts) {
+    const [cryptoObj, err] = getCrypto();
+    if (err) throw err;
+
+    const chunks = [];
+    let totalLength = 0;
+    const encoder = new TextEncoder();
+    for (const part of parts) {
+        const bytes = typeof part === 'string' ? encoder.encode(part) : part;
+        chunks.push(bytes);
+        totalLength += bytes.length;
+    }
+
+    const input = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const bytes of chunks) {
+        input.set(bytes, offset);
+        offset += bytes.length;
+    }
+
+    const digest = await cryptoObj.subtle.digest('SHA-256', input);
+    return new Uint8Array(digest);
+}
+
+/**
  * Generates an RFC 4122 version 4 UUID using CSPRNG entropy.
  *
  * @returns {string} UUID string

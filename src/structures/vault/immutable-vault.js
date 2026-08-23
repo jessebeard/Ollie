@@ -2,14 +2,52 @@ import { BatchEmbedder } from '../../information-theory/steganography/batch-embe
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
-import { randomUUID } from '../../information-theory/cryptography/crypto-provider.js';
+import { Encryption } from '../../information-theory/cryptography/aes-gcm.js';
+import { randomUUID, getCrypto } from '../../information-theory/cryptography/crypto-provider.js';
+
+const KDF_ALGO = 'PBKDF2-SHA256';
+const SESSION_KEY_BYTES = 32;
+
+function bytesToBase64(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+function base64ToBytes(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return [bytes, null];
+}
+
+async function importSessionKey(rawBytes) {
+    try {
+        const [cryptoObj, cryptoErr] = getCrypto();
+        if (cryptoErr) return [null, cryptoErr];
+        const key = await cryptoObj.subtle.importKey(
+            'raw',
+            rawBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['encrypt', 'decrypt']
+        );
+        return [key, null];
+    } catch (e) {
+        return [null, e];
+    }
+}
 
 export class PasswordVault {
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
         this.metadata = Object.freeze(metadata ? { ...metadata } : {
-            version: '2.0',
+            version: '3.0',
             created: new Date().toISOString(),
             modified: new Date().toISOString()
         });
@@ -19,12 +57,76 @@ export class PasswordVault {
         Object.freeze(this);
     }
 
+    /**
+     * Resolves the vault's random data-encryption session key.
+     * When absent, it is either unwrapped from the stored KDF block
+     * (existing vaults) or generated and wrapped fresh (new vaults).
+     *
+     * @returns {Promise<[CryptoKey|null, Object|null, Error|null]>} Tuple of [sessionKey, kdfBlock, error]
+     */
+    async _resolveSessionKey() {
+        if (this.sessionKey) return [this.sessionKey, this.metadata.kdf || null, null];
+        if (!this.masterPassword) return [null, null, new Error('Vault is locked')];
+
+        const existing = this.metadata.kdf;
+
+        if (existing) {
+            if (existing.algo !== KDF_ALGO || !Number.isInteger(existing.iterations)) {
+                return [null, null, new Error('Vault KDF block has unsupported parameters')];
+            }
+
+            const [saltBytes] = base64ToBytes(existing.salt);
+            const [ivBytes] = base64ToBytes(existing.wrapIV);
+            const [wrappedBytes] = base64ToBytes(existing.wrappedSessionKey);
+
+            const [kek, kekErr] = await KeyDerivation.deriveKey(
+                this.masterPassword, saltBytes, { iterations: existing.iterations }
+            );
+            if (kekErr) return [null, null, kekErr];
+
+            const [rawSessionKey, unwrapErr] = await Encryption.decrypt(wrappedBytes, kek, ivBytes);
+            if (unwrapErr) {
+                return [null, null, new Error('Vault unlock failed: invalid password or corrupted key material')];
+            }
+
+            const [sessionKey, importErr] = await importSessionKey(rawSessionKey);
+            if (importErr) return [null, null, importErr];
+
+            return [sessionKey, existing, null];
+        }
+
+        const [cryptoObj, cryptoErr] = getCrypto();
+        if (cryptoErr) return [null, null, cryptoErr];
+
+        const rawSessionKey = new Uint8Array(SESSION_KEY_BYTES);
+        cryptoObj.getRandomValues(rawSessionKey);
+
+        const [sessionKey, importErr] = await importSessionKey(rawSessionKey);
+        if (importErr) return [null, null, importErr];
+
+        const [salt, saltErr] = await KeyDerivation.generateSalt();
+        if (saltErr) return [null, null, saltErr];
+
+        const [kek, kekErr] = await KeyDerivation.deriveKey(this.masterPassword, salt);
+        if (kekErr) return [null, null, kekErr];
+
+        const [wrapResult, wrapErr] = await Encryption.encrypt(rawSessionKey, kek);
+        if (wrapErr) return [null, null, wrapErr];
+
+        const kdfBlock = {
+            algo: KDF_ALGO,
+            iterations: KeyDerivation.ITERATIONS,
+            salt: bytesToBase64(salt),
+            wrapIV: bytesToBase64(wrapResult.iv),
+            wrappedSessionKey: bytesToBase64(new Uint8Array(wrapResult.ciphertext))
+        };
+
+        return [sessionKey, kdfBlock, null];
+    }
+
     async _getSessionKey() {
-        if (this.sessionKey) return [this.sessionKey, null];
-        if (!this.masterPassword) return [null, new Error('Vault is locked')];
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
-        const [key, err] = await KeyDerivation.deriveKey(this.masterPassword, salt);
-        return [key, err];
+        const [sessionKey, , err] = await this._resolveSessionKey();
+        return [sessionKey, err];
     }
 
     /**
@@ -34,15 +136,19 @@ export class PasswordVault {
         if (!entry || typeof entry !== 'object') return [this, new Error('Invalid entry data')];
         if (!this.isUnlocked) return [this, new Error('Vault is locked')];
 
-        const [sessionKey, keyErr] = await this._getSessionKey();
+        const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
 
-        entry.id = explicitId || PasswordVault.generateId();
+        const entryWithId = { ...entry, id: explicitId || PasswordVault.generateId() };
 
-        const [secureEntry, secErr] = await SecureEntry.create(entry, sessionKey);
+        const [secureEntry, secErr] = await SecureEntry.create(entryWithId, sessionKey);
         if (secErr) return [this, secErr];
 
-        const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
+        const newMetadata = {
+            ...this.metadata,
+            ...(kdfBlock ? { kdf: kdfBlock } : {}),
+            modified: new Date().toISOString()
+        };
         return [new PasswordVault([...this.entries, secureEntry], newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
     }
 
@@ -55,7 +161,7 @@ export class PasswordVault {
         const index = this.entries.findIndex(e => e.id === id);
         if (index === -1) return [this, new Error('Entry not found')];
 
-        const [sessionKey, keyErr] = await this._getSessionKey();
+        const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
 
         const currentEntry = this.entries[index];
@@ -76,7 +182,11 @@ export class PasswordVault {
 
         const newEntries = [...this.entries];
         newEntries[index] = newSecureEntry;
-        const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
+        const newMetadata = {
+            ...this.metadata,
+            ...(kdfBlock ? { kdf: kdfBlock } : {}),
+            modified: new Date().toISOString()
+        };
 
         return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
     }
@@ -143,8 +253,11 @@ export class PasswordVault {
     }
 
     static fromJSON(data, isUnlocked = false, masterPassword = null, sessionKey = null) {
-        if (data.metadata.version !== '2.0') {
-            return [null, new Error('Unsupported vault version: ' + data.metadata.version)];
+        if (!data.metadata || data.metadata.version !== '3.0') {
+            return [null, new Error('Unsupported vault version: ' + (data.metadata && data.metadata.version))];
+        }
+        if (!data.metadata.kdf) {
+            return [null, new Error('Vault document is missing its KDF wrap block')];
         }
         const secureEntries = data.entries.map(e => SecureEntry.fromJSON(e));
         return [new PasswordVault(secureEntries, data.metadata, isUnlocked, masterPassword, sessionKey), null];
@@ -152,11 +265,24 @@ export class PasswordVault {
 
     /**
      * Embeds the serialized vault into the provided image files.
+     * Guarantees a KDF wrap block exists in the serialized document.
      *
      * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Tuple of [results, error]
      */
     async save(imageFiles, password, onProgress = null) {
-        const vaultData = JSON.stringify(this.toJSON());
+        const [, kdfBlock, keyErr] = await this._resolveSessionKey();
+        if (keyErr) return [null, keyErr];
+
+        const payloadMetadata = {
+            ...this.metadata,
+            ...(kdfBlock ? { kdf: kdfBlock } : {}),
+            modified: new Date().toISOString()
+        };
+
+        const vaultData = JSON.stringify({
+            metadata: payloadMetadata,
+            entries: this.entries.map(e => e.toJSON())
+        });
         const vaultBytes = new TextEncoder().encode(vaultData);
 
         const embedder = new BatchEmbedder();
@@ -190,9 +316,33 @@ export class PasswordVault {
             return [null, new Error('Failed to parse vault data')];
         }
 
-        const salt = new TextEncoder().encode('ollie-session-salt-1234');
-        const [sessionKey, err] = await KeyDerivation.deriveKey(password, salt);
-        if (err) return [null, err];
+        const kdf = vaultJson.metadata && vaultJson.metadata.kdf;
+        const validKdf =
+            kdf &&
+            typeof kdf === 'object' &&
+            kdf.algo === KDF_ALGO &&
+            Number.isInteger(kdf.iterations) &&
+            typeof kdf.salt === 'string' &&
+            typeof kdf.wrapIV === 'string' &&
+            typeof kdf.wrappedSessionKey === 'string';
+        if (!validKdf) {
+            return [null, new Error('Vault document is missing a valid KDF wrap block')];
+        }
+
+        const [saltBytes] = base64ToBytes(kdf.salt);
+        const [ivBytes] = base64ToBytes(kdf.wrapIV);
+        const [wrappedBytes] = base64ToBytes(kdf.wrappedSessionKey);
+
+        const [kek, kekErr] = await KeyDerivation.deriveKey(password, saltBytes, { iterations: kdf.iterations });
+        if (kekErr) return [null, kekErr];
+
+        const [rawSessionKey, unwrapErr] = await Encryption.decrypt(wrappedBytes, kek, ivBytes);
+        if (unwrapErr) {
+            return [null, new Error('Vault unlock failed: invalid password or corrupted key material')];
+        }
+
+        const [sessionKey, importErr] = await importSessionKey(rawSessionKey);
+        if (importErr) return [null, importErr];
 
         return PasswordVault.fromJSON(vaultJson, true, password, sessionKey);
     }

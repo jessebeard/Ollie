@@ -172,6 +172,7 @@ async function runTests() {
 
         await import('./information-theory/steganography/chunk-manager.test.js');
         await import('./codec/steganography/result-contracts.test.js');
+        await import('./codec/steganography/format-v2.test.js');
         await import('./information-theory/steganography/f5-syndrome.test.js');
         await import('./codec/steganography/batch-process.test.js');
         await import('./information-theory/error-correction/rs-interleaver.test.js');
