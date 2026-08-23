@@ -1,4 +1,9 @@
 import { Encryption } from '../../information-theory/cryptography/aes-gcm.js';
+import { bytesToBase64, base64ToBytes, utf8ToBytes } from '../../utils/encoding.js';
+
+function isNonEmptyString(value) {
+    return typeof value === 'string';
+}
 
 export class SecureEntry {
     /**
@@ -26,8 +31,11 @@ export class SecureEntry {
 
     /**
      * Asynchronously creates a new SecureEntry by encrypting sensitive fields.
-     * @param {Object} plaintextEntry 
-     * @param {CryptoKey} key 
+     * The entry id is bound into the AES-GCM authentication data so a
+     * ciphertext cannot be transplanted onto another entry.
+     *
+     * @param {Object} plaintextEntry
+     * @param {CryptoKey} key
      * @returns {Promise<[SecureEntry|null, Error|null]>}
      */
     static async create(plaintextEntry, key) {
@@ -54,9 +62,10 @@ export class SecureEntry {
             };
 
             const jsonStr = JSON.stringify(sensitiveFields);
-            const bytes = new TextEncoder().encode(jsonStr);
+            const bytes = utf8ToBytes(jsonStr);
+            const bindingData = utf8ToBytes(publicFields.id);
 
-            const [encrypted, encErr] = await Encryption.encrypt(bytes, key);
+            const [encrypted, encErr] = await Encryption.encrypt(bytes, key, { additionalData: bindingData });
             if (encErr) return [null, encErr];
 
             // Deep clone buffers into frozen view
@@ -74,14 +83,15 @@ export class SecureEntry {
 
     /**
      * Asynchronously decrypts the SecureEntry and returns the full plaintext representation.
-     * @param {CryptoKey} key 
+     * @param {CryptoKey} key
      * @returns {Promise<[Object|null, Error|null]>}
      */
     async decrypt(key) {
         try {
             const { ciphertext, iv } = this._encrypted;
+            const bindingData = utf8ToBytes(this.id);
 
-            const [decryptedBytes, decErr] = await Encryption.decrypt(ciphertext, key, iv);
+            const [decryptedBytes, decErr] = await Encryption.decrypt(ciphertext, key, iv, { additionalData: bindingData });
             if (decErr) return [null, decErr];
 
             const jsonStr = new TextDecoder().decode(decryptedBytes);
@@ -108,7 +118,8 @@ export class SecureEntry {
     }
 
     /**
-     * Serializes the SecureEntry for storage.
+     * Serializes the SecureEntry for storage. Encrypted material is
+     * base64-encoded; the legacy number-array form is not produced.
      */
     toJSON() {
         return {
@@ -120,34 +131,55 @@ export class SecureEntry {
             created: this.created,
             modified: this.modified,
             _encrypted: this._encrypted ? {
-                ciphertext: Array.from(this._encrypted.ciphertext),
-                iv: Array.from(this._encrypted.iv)
+                ciphertext: bytesToBase64(this._encrypted.ciphertext),
+                iv: bytesToBase64(this._encrypted.iv)
             } : null
         };
     }
 
     /**
      * Rehydrates a SecureEntry from JSON storage.
+     *
+     * @returns {[SecureEntry|null, Error|null]} Tuple of [entry, error]
      */
     static fromJSON(data) {
+        if (!data || typeof data !== 'object') {
+            return [null, new Error('Invalid vault entry: expected an object')];
+        }
+
+        for (const field of ['id', 'title', 'url', 'username', 'created', 'modified']) {
+            if (!isNonEmptyString(data[field])) {
+                return [null, new Error(`Invalid vault entry: field "${field}" must be a string`)];
+            }
+        }
+
+        if (!Array.isArray(data.tags)) {
+            return [null, new Error('Invalid vault entry: field "tags" must be an array')];
+        }
+        if (data.tags.some(t => !isNonEmptyString(t))) {
+            return [null, new Error('Invalid vault entry: all tags must be strings')];
+        }
+
+        if (!data._encrypted || typeof data._encrypted !== 'object' ||
+            !isNonEmptyString(data._encrypted.ciphertext) ||
+            !isNonEmptyString(data._encrypted.iv)) {
+            return [null, new Error('Invalid vault entry: missing or malformed _encrypted block')];
+        }
+
         const publicFields = {
             id: data.id,
             title: data.title,
             url: data.url,
             username: data.username,
-            tags: data.tags,
+            tags: [...data.tags],
             created: data.created,
             modified: data.modified
         };
 
-        const encryptedFields = data._encrypted ? {
-            ciphertext: new Uint8Array(data._encrypted.ciphertext),
-            iv: new Uint8Array(data._encrypted.iv)
-        } : {
-            ciphertext: new Uint8Array(0),
-            iv: new Uint8Array(0)
-        };
+        const [ciphertext] = base64ToBytes(data._encrypted.ciphertext);
+        const [iv] = base64ToBytes(data._encrypted.iv);
+        const encryptedFields = { ciphertext, iv };
 
-        return new SecureEntry(publicFields, encryptedFields);
+        return [new SecureEntry(publicFields, encryptedFields), null];
     }
 }

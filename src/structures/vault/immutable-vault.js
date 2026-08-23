@@ -52,9 +52,28 @@ export class PasswordVault {
             modified: new Date().toISOString()
         });
         this.isUnlocked = isUnlocked;
-        this.masterPassword = masterPassword;
-        this.sessionKey = sessionKey;
+
+        // Credentials are held in a non-enumerable slot so they never leak
+        // through serialization or key enumeration.
+        const unlock = (isUnlocked && (masterPassword || sessionKey))
+            ? Object.freeze({ password: masterPassword, sessionKey })
+            : null;
+        Object.defineProperty(this, '_unlock', {
+            value: unlock,
+            enumerable: false,
+            writable: false,
+            configurable: false
+        });
+
         Object.freeze(this);
+    }
+
+    _password() {
+        return this._unlock ? this._unlock.password : null;
+    }
+
+    _sessionKey() {
+        return this._unlock ? this._unlock.sessionKey : null;
     }
 
     /**
@@ -65,8 +84,9 @@ export class PasswordVault {
      * @returns {Promise<[CryptoKey|null, Object|null, Error|null]>} Tuple of [sessionKey, kdfBlock, error]
      */
     async _resolveSessionKey() {
-        if (this.sessionKey) return [this.sessionKey, this.metadata.kdf || null, null];
-        if (!this.masterPassword) return [null, null, new Error('Vault is locked')];
+        if (this._sessionKey()) return [this._sessionKey(), this.metadata.kdf || null, null];
+        const masterPassword = this._password();
+        if (!masterPassword) return [null, null, new Error('Vault is locked')];
 
         const existing = this.metadata.kdf;
 
@@ -80,7 +100,7 @@ export class PasswordVault {
             const [wrappedBytes] = base64ToBytes(existing.wrappedSessionKey);
 
             const [kek, kekErr] = await KeyDerivation.deriveKey(
-                this.masterPassword, saltBytes, { iterations: existing.iterations }
+                masterPassword, saltBytes, { iterations: existing.iterations }
             );
             if (kekErr) return [null, null, kekErr];
 
@@ -107,7 +127,7 @@ export class PasswordVault {
         const [salt, saltErr] = await KeyDerivation.generateSalt();
         if (saltErr) return [null, null, saltErr];
 
-        const [kek, kekErr] = await KeyDerivation.deriveKey(this.masterPassword, salt);
+        const [kek, kekErr] = await KeyDerivation.deriveKey(masterPassword, salt);
         if (kekErr) return [null, null, kekErr];
 
         const [wrapResult, wrapErr] = await Encryption.encrypt(rawSessionKey, kek);
@@ -136,6 +156,9 @@ export class PasswordVault {
         if (!entry || typeof entry !== 'object') return [this, new Error('Invalid entry data')];
         if (!this.isUnlocked) return [this, new Error('Vault is locked')];
 
+        const validationError = PasswordVault.validateEntryInput(entry);
+        if (validationError) return [this, validationError];
+
         const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
 
@@ -149,7 +172,7 @@ export class PasswordVault {
             ...(kdfBlock ? { kdf: kdfBlock } : {}),
             modified: new Date().toISOString()
         };
-        return [new PasswordVault([...this.entries, secureEntry], newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
+        return [new PasswordVault([...this.entries, secureEntry], newMetadata, this.isUnlocked, this._password(), sessionKey), null];
     }
 
     /**
@@ -160,6 +183,12 @@ export class PasswordVault {
 
         const index = this.entries.findIndex(e => e.id === id);
         if (index === -1) return [this, new Error('Entry not found')];
+
+        for (const field of ['tags', 'customFields']) {
+            if (updates[field] !== undefined && !Array.isArray(updates[field])) {
+                return [this, new Error(`${field} must be an array`)];
+            }
+        }
 
         const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
@@ -188,7 +217,7 @@ export class PasswordVault {
             modified: new Date().toISOString()
         };
 
-        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword, sessionKey), null];
+        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this._password(), sessionKey), null];
     }
 
     /**
@@ -202,7 +231,7 @@ export class PasswordVault {
         newEntries.splice(index, 1);
         const newMetadata = { ...this.metadata, modified: new Date().toISOString() };
 
-        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this.masterPassword, this.sessionKey), null];
+        return [new PasswordVault(newEntries, newMetadata, this.isUnlocked, this._password(), this._sessionKey()), null];
     }
 
     search(query, tags = []) {
@@ -259,7 +288,18 @@ export class PasswordVault {
         if (!data.metadata.kdf) {
             return [null, new Error('Vault document is missing its KDF wrap block')];
         }
-        const secureEntries = data.entries.map(e => SecureEntry.fromJSON(e));
+        if (!Array.isArray(data.entries)) {
+            return [null, new Error('Vault document entries must be an array')];
+        }
+
+        const secureEntries = [];
+        for (let i = 0; i < data.entries.length; i++) {
+            const [entry, entryErr] = SecureEntry.fromJSON(data.entries[i]);
+            if (entryErr) {
+                return [null, new Error(`Invalid vault entry at position ${i}: ${entryErr.message}`)];
+            }
+            secureEntries.push(entry);
+        }
         return [new PasswordVault(secureEntries, data.metadata, isUnlocked, masterPassword, sessionKey), null];
     }
 
@@ -347,11 +387,57 @@ export class PasswordVault {
         return PasswordVault.fromJSON(vaultJson, true, password, sessionKey);
     }
 
+    /**
+     * Validates untrusted entry input at the trust boundary.
+     *
+     * @param {Object} entry
+     * @returns {Error|null} Typed error, or null when valid
+     */
+    static validateEntryInput(entry) {
+        if (!entry || typeof entry !== 'object') {
+            return new Error('Invalid entry data');
+        }
+
+        if (typeof entry.title !== 'string' || entry.title.length === 0) {
+            return new Error('Entry "title" must be a non-empty string');
+        }
+
+        const stringFields = ['username', 'password', 'notes', 'totp', 'url'];
+        for (const field of stringFields) {
+            if (entry[field] !== undefined && typeof entry[field] !== 'string') {
+                return new Error(`Entry "${field}" must be a string`);
+            }
+        }
+
+        if (entry.tags !== undefined) {
+            if (!Array.isArray(entry.tags)) {
+                return new Error('Entry "tags" must be an array');
+            }
+            if (entry.tags.some(t => typeof t !== 'string')) {
+                return new Error('Entry "tags" must contain only strings');
+            }
+        }
+
+        if (entry.customFields !== undefined) {
+            if (!Array.isArray(entry.customFields)) {
+                return new Error('Entry "customFields" must be an array');
+            }
+            for (const cf of entry.customFields) {
+                if (!cf || typeof cf !== 'object' ||
+                    typeof cf.label !== 'string' || typeof cf.value !== 'string') {
+                    return new Error('Entry "customFields" items need string "label" and "value"');
+                }
+            }
+        }
+
+        return null;
+    }
+
     static generateId() {
         return randomUUID();
     }
 
     lock() {
-        return new PasswordVault(this.entries, this.metadata, false, null, null);
+        return new PasswordVault([], this.metadata, false, null, null);
     }
 }

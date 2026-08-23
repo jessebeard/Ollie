@@ -17,7 +17,6 @@ Whether you're exploring how JPEG works under the hood or integrating a codec in
 - **JPEG Encoder:** Converts raw RGBA image data → JPEG binary.
 - **JPEG Decoder:** Converts JPEG binary → raw RGBA image data.
 - **Baseline Sequential DCT:** The most widely supported JPEG variant.
-- **Progressive JPEG:** Multi-scan encoding and decoding support.
 
 ### Advanced Features
 - **SPIFF Markers:** Support for APP8 SPIFF (Still Picture Interchange File Format) markers.
@@ -306,7 +305,7 @@ node test/runner.js
 ```
 
 ### Test Coverage
-- **Encoder Tests:** Color space conversion, DCT, quantization, Huffman coding, progressive encoding, SPIFF generation
+- **Encoder Tests:** Color space conversion, DCT, quantization, Huffman coding, SPIFF generation
 - **Decoder Tests:** Frame/scan parsing, Huffman decoding, IDCT algorithms, progressive decoding, SPIFF parsing
 - **Utility Tests:** Bit readers/writers, marker parsing
 - **Steganography Tests:** Data embedding, container format, chunk management

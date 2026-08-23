@@ -62,10 +62,6 @@ export function parseFrameHeader(segmentData) {
         const vSampling = hvByte & 0x0F;
         const quantTableId = segmentData[offset++];
 
-        if (componentId === 0) {
-            return [null, new Error(`Invalid component ID: 0`)];
-        }
-
         if (seenComponentIds.has(componentId)) {
             return [null, new Error(`Duplicate component ID in SOF: ${componentId}`)];
         }

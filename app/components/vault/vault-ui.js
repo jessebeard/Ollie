@@ -5,6 +5,7 @@ import { ModalManager } from './components/modal-manager.js';
 import { VaultView } from './components/vault-view.js';
 import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
+import { logger } from '../../../src/utils/logger.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -40,6 +41,9 @@ export class VaultUI {
         // Bind Events
         this.events.on('edit-entry', (e) => this.editEntry(e));
         this.events.on('copy-password', (p) => this.copyPassword(p));
+        this.events.on('unsafe-url-blocked', () => {
+            this.modals.showAlert('Blocked', 'That entry URL uses an unsupported scheme. Only http(s) links can be opened.', 'error');
+        });
 
         // Buttons
         document.getElementById('createBtn').addEventListener('click', () => this.createVault());
@@ -48,7 +52,7 @@ export class VaultUI {
         document.getElementById('importBtn').addEventListener('click', () => this.importData());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
-        // ⚡ Bolt Optimization: Debounce search input to prevent main thread blocking
+        // ΓÜí Bolt Optimization: Debounce search input to prevent main thread blocking
         // This limits full DOM re-renders and expensive capacity calculations while the user types
         const searchInput = document.getElementById('searchInput');
         let searchTimeout;
@@ -115,6 +119,7 @@ export class VaultUI {
             }
 
             this.vault = newVault;
+            this._sessionPassword = password;
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
 
             // Scan for capacity
@@ -150,6 +155,7 @@ export class VaultUI {
         }
 
         this.vault = new PasswordVault([], null, true, pass1);
+        this._sessionPassword = pass1;
 
         this.updateUI();
         this.modals.showAlert('Created', 'New vault created. Add entries and save.');
@@ -237,7 +243,7 @@ export class VaultUI {
 
 
     async saveVault() {
-        if (!this.vault.masterPassword) return;
+        if (!this.vault.isUnlocked || !this._sessionPassword) return;
 
         try {
             // 1. Confirm intention
@@ -275,13 +281,15 @@ export class VaultUI {
                 return;
             }
 
-            // 3. Prepare Files
+            // 3. Prepare Files (buffering originals so a failed write can be rolled back)
             this.showLoading(true, 'Reading images...');
             const fileObjs = [];
             const handleMap = new Map(); // name -> handle
+            const originalBytes = new Map(); // name -> ArrayBuffer
 
             for (const h of handles) {
                 const file = await h.getFile();
+                originalBytes.set(file.name, await file.arrayBuffer());
                 fileObjs.push(file);
                 handleMap.set(file.name, h);
             }
@@ -290,17 +298,17 @@ export class VaultUI {
             this.showLoading(true, 'Encrypting & Saving...');
 
             // vault.save returns [results, error]
-            const [results, saveErr] = await this.vault.save(fileObjs, this.vault.masterPassword,
+            const [results, saveErr] = await this.vault.save(fileObjs, this._sessionPassword,
                 (curr, total, status) => {
                     this.showLoading(true, `${status} (${curr}/${total})`);
                 }
             );
             if (saveErr) throw saveErr;
 
-            // 5. Write back to disk
+            // 5. Write back to disk — pre-flight permissions so no carrier is
+            // half-written when a permission prompt is declined mid-batch.
             this.showLoading(true, 'Writing files to disk...');
-
-            console.log(`Available handles in map: ${Array.from(handleMap.keys()).join(', ')}`);
+            const writeTargets = [];
 
             for (const result of results) {
                 let originalName = result.name;
@@ -311,27 +319,41 @@ export class VaultUI {
 
                 let handle = handleMap.get(originalName);
                 if (!handle) handle = handleMap.get(result.name);
+                if (!handle) {
+                    logger.warn(`Could not find handle for ${result.name} (original: ${originalName})`);
+                    continue;
+                }
 
-                if (handle) {
-                    console.log(`Writing result ${result.name} to ${handle.name}...`);
-
-                    // Verify/Request Permission
-                    const options = { mode: 'readwrite' };
-                    if ((await handle.queryPermission(options)) !== 'granted') {
-                        const perm = await handle.requestPermission(options);
-                        if (perm !== 'granted') {
-                            console.error(`Permission denied for ${handle.name}`);
-                            continue;
-                        }
+                const options = { mode: 'readwrite' };
+                if ((await handle.queryPermission(options)) !== 'granted') {
+                    const perm = await handle.requestPermission(options);
+                    if (perm !== 'granted') {
+                        throw new Error(`Write permission denied for ${handle.name}. No images were modified.`);
                     }
+                }
+                writeTargets.push({ handle, result });
+            }
 
+            const written = [];
+            try {
+                for (const { handle, result } of writeTargets) {
                     const writable = await handle.createWritable();
                     await writable.write(result.data);
                     await writable.close();
-                    console.log(`Successfully wrote to ${handle.name}`);
-                } else {
-                    console.warn(`Could not find handle for ${result.name} (original: ${originalName})`);
+                    written.push(handle);
                 }
+            } catch (writeError) {
+                logger.error('Write failed; restoring originals...', writeError);
+                for (const handle of written) {
+                    try {
+                        const restore = await handle.createWritable();
+                        await restore.write(originalBytes.get(handle.name));
+                        await restore.close();
+                    } catch (restoreErr) {
+                        logger.error(`Rollback failed for ${handle.name}:`, restoreErr);
+                    }
+                }
+                throw new Error(`Saving failed partway through; affected images were restored. ${writeError.message}`);
             }
 
             this.showLoading(false);
@@ -444,7 +466,7 @@ export class VaultUI {
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
-        const warningMsg = '🔴 SECURITY WARNING: Red Flag Operation\n\n' +
+        const warningMsg = '≡ƒö┤ SECURITY WARNING: Red Flag Operation\n\n' +
             'You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.\n\n' +
             'Anyone who gains access to this file will have immediate access to all your passwords.\n\n' +
             'Are you absolutely sure you want to proceed?';
@@ -497,7 +519,7 @@ export class VaultUI {
             return;
         }
 
-        const unlocked = !!this.vault.masterPassword; // Simple check
+        const unlocked = this.vault.isUnlocked;
         document.body.classList.toggle('vault-unlocked', unlocked);
 
         const importBtn = document.getElementById('importBtn');

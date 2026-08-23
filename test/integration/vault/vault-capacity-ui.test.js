@@ -138,11 +138,17 @@ describe('Vault Capacity UI Integration', () => {
         const { SecureEntry } = await import('../../../src/structures/vault/secure-record.js');
         
         const mockSecureEntry = SecureEntry.fromJSON({
-            payload: 'abc',
-            iv: 'def',
-            salt: 'ghi',
-            id: '1'
-        });
+            id: '1',
+            title: 'Capacity Probe',
+            url: 'https://example.invalid',
+            username: 'u',
+            created: '2026-01-01T00:00:00.000Z',
+            modified: '2026-01-01T00:00:00.000Z',
+            tags: [],
+            _encrypted: { ciphertext: 'AAAA', iv: 'AAAA' }
+        })[0];
+
+        expect(mockSecureEntry).not.toEqual(null);
         
         ui.vault = new PasswordVault([mockSecureEntry], null, true, 'password123');
         ui.totalCapacity = 100 * 1024; // 100 KB

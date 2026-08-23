@@ -73,7 +73,7 @@ describe('PasswordVault E2E Steganography (Multi-Generation Overwrite)', () => {
 
                 const [savedImagesV1, saveErrV1] = await vaultV1.save(rawFixtureImages, password);
                 if (saveErrV1) {
-                    if (saveErrV1.message.includes('capacity')) return true;
+                    if ((saveErrV1.message.includes('Insufficient capacity') || saveErrV1.message.includes('Not enough image capacity') || saveErrV1.message.includes('capacity'))) return true;
                     return false;
                 }
 
@@ -92,7 +92,7 @@ describe('PasswordVault E2E Steganography (Multi-Generation Overwrite)', () => {
                 // This forces F5/JpegTranscoder to overwrite existing steganography
                 const [savedImagesV2, saveErrV2] = await vaultV2.save(extractableFilesV1, password);
                 if (saveErrV2) {
-                    if (saveErrV2.message.includes('capacity')) return true;
+                    if ((saveErrV2.message.includes('Insufficient capacity') || saveErrV2.message.includes('Not enough image capacity') || saveErrV2.message.includes('capacity'))) return true;
                     return false;
                 }
 

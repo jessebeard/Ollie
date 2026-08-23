@@ -1,4 +1,6 @@
 
+import { isSafeHttpUrl } from '../../../../src/utils/url-safety.js';
+
 export class VaultView {
     constructor(element, eventBus) {
         this.element = element;
@@ -74,7 +76,12 @@ export class VaultView {
         });
 
         div.querySelector('.btn-launch').addEventListener('click', (e) => {
-            if (entry.url) window.open(entry.url, '_blank');
+            if (!entry.url) return;
+            if (!isSafeHttpUrl(entry.url)) {
+                this.events.emit('unsafe-url-blocked', { id: entry.id, url: entry.url });
+                return;
+            }
+            window.open(entry.url, '_blank', 'noopener,noreferrer');
         });
 
         return div;

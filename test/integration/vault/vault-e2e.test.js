@@ -90,7 +90,7 @@ describe('PasswordVault E2E Steganography (Property-Based Tests)', () => {
                 if (saveErr) {
                     // Capacity limits might be hit during fuzzing since some images are small and data is thick
                     // We only fail if the error isn't a known capacity error.
-                    if (saveErr.message.includes('Insufficient capacity')) {
+                    if (saveErr.message.includes('Insufficient capacity') || saveErr.message.includes('Not enough image capacity')) {
                         return true; // Ignore capacity limitations on small images during random fuzzing
                     }
                     console.error("Save embedding error:", saveErr);

@@ -79,14 +79,16 @@ describe('PasswordVault (Property-Based Tests)', () => {
 
                 const lockedVault = vault.lock();
 
+                // Unlocked instance retains credentials only in a
+                // non-enumerable slot; nothing leaks to serialization.
                 expect(vault.isUnlocked).toBe(true);
-                expect(vault.masterPassword).toBe(masterPassword);
-                expect(vault.sessionKey !== null).toBe(true);
+                expect(Object.keys(vault)).not.toContain('masterPassword');
+                expect(JSON.stringify(vault).includes(masterPassword)).toBe(false);
 
                 expect(lockedVault).not.toBe(vault);
                 expect(lockedVault.isUnlocked).toBe(false);
-                expect(lockedVault.masterPassword).toBe(null);
-                expect(lockedVault.sessionKey).toBe(null);
+                expect(lockedVault.entries.length).toBe(0);
+                expect(lockedVault._sessionKey()).toEqual(null);
 
                 return true;
             },

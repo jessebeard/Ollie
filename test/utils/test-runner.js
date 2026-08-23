@@ -254,10 +254,21 @@ export function expect(actual) {
         },
         toEqual: (expected) => {
             tick();
+            const describeValue = (v) => {
+                if (v instanceof Error) return `${v.name}: ${v.message}`;
+                if (typeof v === 'object' && v !== null && v.constructor && v.constructor.name !== 'Object') {
+                    return `${v.constructor.name} {}`;
+                }
+                return JSON.stringify(v);
+            };
             const actualStr = JSON.stringify(actual);
             const expectedStr = JSON.stringify(expected);
             if (actualStr !== expectedStr) {
-                throw new Error(`Expected ${expectedStr} but got ${actualStr}`);
+                const hint = (actual instanceof Error || expected instanceof Error ||
+                    (actual && typeof actual === 'object') || (expected && typeof expected === 'object'))
+                    ? ` [${describeValue(actual)} vs ${describeValue(expected)}]`
+                    : '';
+                throw new Error(`Expected ${expectedStr} but got ${actualStr}${hint}`);
             }
         },
         toBeCloseTo: (expected, precision = 2) => {

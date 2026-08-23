@@ -9,12 +9,14 @@ export class Encryption {
 
     /**
      * Encrypts data using AES-GCM
-     * 
+     *
      * @param {Uint8Array} data - Data to encrypt
      * @param {CryptoKey} key - AES-GCM key
+     * @param {Object} [options]
+     * @param {Uint8Array} [options.additionalData] - Extra authenticated (non-encrypted) binding data
      * @returns {Promise<[{ciphertext: ArrayBuffer, iv: Uint8Array}, Error|null]>}
      */
-    static async encrypt(data, key) {
+    static async encrypt(data, key, options = {}) {
         try {
             const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
@@ -22,11 +24,12 @@ export class Encryption {
             const iv = new Uint8Array(this.IV_LENGTH);
             cryptoObj.getRandomValues(iv);
 
-            const ciphertext = await cryptoObj.subtle.encrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                data
-            );
+            const params = { name: 'AES-GCM', iv };
+            if (options.additionalData) {
+                params.additionalData = options.additionalData;
+            }
+
+            const ciphertext = await cryptoObj.subtle.encrypt(params, key, data);
 
             return [{ ciphertext, iv }, null];
         } catch (e) {
@@ -36,22 +39,25 @@ export class Encryption {
 
     /**
      * Decrypts data using AES-GCM
-     * 
+     *
      * @param {ArrayBuffer|Uint8Array} ciphertext - Encrypted data (including tag)
      * @param {CryptoKey} key - AES-GCM key
      * @param {Uint8Array} iv - Initialization Vector
+     * @param {Object} [options]
+     * @param {Uint8Array} [options.additionalData] - Must match the encryption-time binding data
      * @returns {Promise<[Uint8Array|null, Error|null]>} Decrypted data tuple
      */
-    static async decrypt(ciphertext, key, iv) {
+    static async decrypt(ciphertext, key, iv, options = {}) {
         try {
             const [cryptoObj, cryptoErr] = getCrypto();
             if (cryptoErr) return [null, cryptoErr];
 
-            const decrypted = await cryptoObj.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv },
-                key,
-                ciphertext
-            );
+            const params = { name: 'AES-GCM', iv };
+            if (options.additionalData) {
+                params.additionalData = options.additionalData;
+            }
+
+            const decrypted = await cryptoObj.subtle.decrypt(params, key, ciphertext);
 
             return [new Uint8Array(decrypted), null];
         } catch (e) {
