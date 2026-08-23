@@ -122,3 +122,27 @@ describe('KeyDerivation (Property-Based Tests)', () => {
         );
     });
 });
+
+describe('KeyDerivation.deriveRawBits', () => {
+    it('derives deterministic raw key material of requested length', async () => {
+        const salt = new Uint8Array(16).fill(7);
+        const [a, errA] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+        const [b, errB] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+
+        if (errA || errB) throw new Error('deriveRawBits failed');
+        expect(a instanceof Uint8Array && a.length === 32).toBe(true);
+        expect(Array.from(a)).toEqual(Array.from(b));
+    });
+
+    it('differs by password, salt, and iteration count', async () => {
+        const salt = new Uint8Array(16).fill(7);
+        const [base] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+        const [otherPw] = await KeyDerivation.deriveRawBits('px', salt, { iterations: 1000, bits: 256 });
+        const [otherSalt] = await KeyDerivation.deriveRawBits('pw', new Uint8Array(16).fill(8), { iterations: 1000, bits: 256 });
+        const [otherIter] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1001, bits: 256 });
+
+        for (const other of [otherPw, otherSalt, otherIter]) {
+            expect(Array.from(base)).not.toEqual(Array.from(other));
+        }
+    });
+});

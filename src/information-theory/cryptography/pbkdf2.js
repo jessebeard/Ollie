@@ -63,6 +63,55 @@ export class KeyDerivation {
     }
 
     /**
+     * Derives raw key material of arbitrary length (unlike deriveKey, which
+     * produces an AES-GCM CryptoKey). Needed when derived bytes feed a
+     * different algorithm, e.g. HMAC manifest authentication.
+     *
+     * @param {string} password
+     * @param {Uint8Array} salt
+     * @param {Object} [options]
+     * @param {number} [options.iterations]
+     * @param {number} [options.bits] - Multiple of 8, minimum 256 (default 256)
+     * @returns {Promise<[Uint8Array|null, Error|null]>} Raw derived bytes tuple
+     */
+    static async deriveRawBits(password, salt, options = {}) {
+        try {
+            const iterations = this.resolveIterations(options.iterations);
+            if (iterations instanceof Error) return [null, iterations];
+
+            const bits = Number.isInteger(options.bits) && options.bits >= 256 && options.bits % 8 === 0
+                ? options.bits
+                : 256;
+
+            const [cryptoObj, cryptoErr] = getCrypto();
+            if (cryptoErr) return [null, cryptoErr];
+
+            const baseKey = await cryptoObj.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(password),
+                'PBKDF2',
+                false,
+                ['deriveBits']
+            );
+
+            const derived = await cryptoObj.subtle.deriveBits(
+                {
+                    name: 'PBKDF2',
+                    salt: /** @type {BufferSource} */ (salt),
+                    iterations,
+                    hash: 'SHA-256'
+                },
+                baseKey,
+                bits
+            );
+
+            return [new Uint8Array(derived), null];
+        } catch (e) {
+            return [null, e instanceof Error ? e : new Error(String(e))];
+        }
+    }
+
+    /**
      * Validates and normalizes an iteration count.
      *
      * @param {number} [iterations]

@@ -40,7 +40,9 @@ async function runTest() {
     const embedder = new BatchEmbedder();
     const options = {
         chunkSize: 1000,
-        filename: 'secret.bin'
+        filename: 'secret.bin',
+        password: 'batch-test-password',
+        manifest: { revision: 0 }
     };
 
     console.log('Embedding...');
@@ -53,7 +55,7 @@ async function runTest() {
 
     const extractor = new BatchExtractor();
     console.log('Extracting...');
-    const [result, extractErr] = await extractor.extract(extractFiles, null, (c, t, s) => console.log(s));
+    const [result, extractErr] = await extractor.extract(extractFiles, 'batch-test-password', (c, t, s) => console.log(s));
     if (extractErr) throw extractErr;
 
     console.log('Extraction complete.');

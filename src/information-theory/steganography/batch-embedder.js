@@ -1,4 +1,5 @@
 ﻿import { ChunkManager } from './chunk-manager.js';
+import { createManifest } from './carrier-manifest.js';
 import { JpegTranscoder } from '../../codec/transcoder.js';
 
 /** Fraction of a carrier's scanned capacity actually used for payload. */
@@ -62,6 +63,7 @@ export class BatchEmbedder {
      * @param {string} [options.filename] - Original filename to preserve in metadata
      * @param {string} [options.eccProfile='Medium'] - ECC profile: 'Low', 'Medium', 'High', 'Ultra', 'Extreme'
      * @param {boolean} [options.ecc=true] - Enable error correction
+     * @param {{revision: number}} [options.manifest] - When present, sign and stamp an authenticated carrier manifest
      * @param {Function} [onProgress] - Callback (current, total, status)
      * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Result tuple of [outputFiles, error]
      */
@@ -225,6 +227,27 @@ export class BatchEmbedder {
         const [chunks, allocErr] = this.allocateDataToImages(data, imageCapacities);
         if (allocErr) return [null, allocErr];
 
+        // Signed manifest: one block shared verbatim by every carrier so any
+        // surviving subset authenticates the whole chunk set on load.
+        let manifestBlock = null;
+        if (options.manifest) {
+            if (!options.password) {
+                return [null, new Error('Manifest signing requires a password')];
+            }
+            const records = chunks.map(c => ({
+                index: c.chunkMeta.index,
+                checksum: ChunkManager.calculateChecksum(c.chunkData)
+            }));
+            const [manifest, manifestErr] = await createManifest({
+                chunkSetId: chunks[0].chunkMeta.id,
+                records,
+                revision: options.manifest.revision,
+                password: options.password
+            });
+            if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
+            manifestBlock = manifest;
+        }
+
         const results = [];
         const transcoder = new JpegTranscoder();
 
@@ -244,6 +267,9 @@ export class BatchEmbedder {
                     ecc: options.ecc !== false,
                     eccProfile: options.eccProfile || 'Medium'
                 };
+                if (manifestBlock) {
+                    metadata.manifest = manifestBlock;
+                }
 
                 const [encodedBytes, transErr] = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {
                     metadata: metadata,

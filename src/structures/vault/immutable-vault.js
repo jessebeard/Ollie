@@ -364,7 +364,8 @@ export class PasswordVault {
             password: password,
             filename: 'vault.json',
             eccProfile: 'Extreme',
-            ecc: true
+            ecc: true,
+            manifest: { revision: this.metadata.revision }
         };
 
         const [results, embedErr] = await embedder.embed(vaultBytes, imageFiles, options, onProgress);
@@ -382,12 +383,26 @@ export class PasswordVault {
             return [null, new Error('No vault data found in images')];
         }
 
+        const manifest = result.metadata && result.metadata.manifest;
+        if (!manifest) {
+            return [null, new Error('Carrier set has no tamper-protection manifest - re-save required')];
+        }
+
         const vaultData = new TextDecoder().decode(result.data);
         let vaultJson;
         try {
             vaultJson = JSON.parse(vaultData);
         } catch (e) {
             return [null, new Error('Failed to parse vault data')];
+        }
+
+        // Document binding: the authenticated manifest must describe exactly
+        // this revision, else the carrier set was rolled back or mixed.
+        if (Number.isInteger(vaultJson.metadata && vaultJson.metadata.revision) &&
+            vaultJson.metadata.revision !== manifest.revision) {
+            return [null, new Error(
+                `Vault revision ${vaultJson.metadata.revision} does not match authenticated carrier manifest (revision ${manifest.revision})`
+            )];
         }
 
         const kdf = vaultJson.metadata && vaultJson.metadata.kdf;

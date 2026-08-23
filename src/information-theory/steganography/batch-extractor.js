@@ -1,4 +1,5 @@
 import { ChunkManager } from './chunk-manager.js';
+import { verifyManifest, bindChunkRecords } from './carrier-manifest.js';
 import { JpegDecoder } from '../../codec/decoder.js';
 import { logger } from '../../utils/logger.js';
 
@@ -16,6 +17,7 @@ export class BatchExtractor {
      */
     async extract(imageFiles, password, onProgress = null) {
         const chunks = [];
+        const manifests = [];
         const total = imageFiles.length;
         let firstMetadata = null;
 
@@ -47,6 +49,10 @@ export class BatchExtractor {
                             checksum: result.secretMetadata.checksum
                         });
 
+                        if (result.secretMetadata.manifest) {
+                            manifests.push(result.secretMetadata.manifest);
+                        }
+
                         if (!firstMetadata) {
                             firstMetadata = result.secretMetadata;
                         }
@@ -68,10 +74,48 @@ export class BatchExtractor {
             return [null, new Error('No valid chunks found in provided images.')];
         }
 
+        // Manifest enforcement: every chunk-bearing carrier must carry a
+        // manifest; all manifests must agree and authenticate under the
+        // password. Legacy (manifest-less) sets fail closed.
+        const carriersWithManifest = manifests.length;
+        if (carriersWithManifest === 0 && chunks.length > 0) {
+            return [null, new Error(
+                'Carrier set has no tamper-protection manifest. ' +
+                'These images were saved by an older Ollie version - re-save the vault to continue.'
+            )];
+        }
+        if (carriersWithManifest > 0 && carriersWithManifest !== chunks.length) {
+            return [null, new Error('Mixed carrier sets detected: some images lack a manifest. Load refused.')];
+        }
+
+        let verifiedManifest = null;
+        for (const m of manifests) {
+            const [ok, verifyErr] = await verifyManifest(m, password);
+            if (verifyErr) return [null, new Error(`Manifest verification failed: ${verifyErr.message}`)];
+            if (ok !== true) {
+                return [null, new Error('Manifest authentication failed: wrong password or tampered carriers.')];
+            }
+            if (!verifiedManifest) {
+                verifiedManifest = m;
+            } else if (JSON.stringify(verifiedManifest) !== JSON.stringify(m)) {
+                return [null, new Error('Carrier manifests disagree: carrier set was mixed or rolled back.')];
+            }
+        }
+
+        // Cross-carrier swap defense: records from other saves fail binding.
+        const recordsForBinding = chunks.map(c => ({ index: c.index, checksum: c.checksum }));
+        const [, bindErr] = bindChunkRecords(recordsForBinding, verifiedManifest);
+        if (bindErr) {
+            return [null, bindErr];
+        }
+
         const { group: completeGroup, error: groupError } = BatchExtractor.selectCompleteGroup(chunks, total);
         if (!completeGroup) {
             logger.warn(groupError.message);
             return [null, groupError];
+        }
+        if (completeGroup[0].chunkId !== verifiedManifest.chunkSetId) {
+            return [null, new Error('Reassembled chunk set does not match the authenticated manifest.')];
         }
 
         if (onProgress) {
@@ -86,7 +130,7 @@ export class BatchExtractor {
         return [{
             data: reassembled,
             filename: firstMetadata?.filename || 'vault.json',
-            metadata: { chunk: completeGroup[0] }
+            metadata: { chunk: completeGroup[0], manifest: verifiedManifest }
         }, null];
     }
 
