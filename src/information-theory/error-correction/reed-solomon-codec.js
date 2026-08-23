@@ -1,4 +1,4 @@
-
+﻿
 
 import { GenericGF, GenericGFPoly } from './galois-field.js';
 
@@ -135,7 +135,7 @@ export class ReedSolomonDecoder {
     findErrorLocations(errorLocator) {
         
         const numErrors = errorLocator.degree;
-        if (numErrors == 1) { 
+        if (numErrors === 1) { 
             return new Int32Array([errorLocator.getCoefficient(1)]);
         }
         const result = new Int32Array(numErrors);
@@ -146,7 +146,7 @@ export class ReedSolomonDecoder {
                 e++;
             }
         }
-        if (e != numErrors) {
+        if (e !== numErrors) {
             throw new Error('ReedSolomonException("Error locator degree does not match number of roots")');
         }
         return result;
@@ -160,7 +160,7 @@ export class ReedSolomonDecoder {
             const xiInverse = this.field.inverse(errorLocations[i]);
             let denominator = 1;
             for (let j = 0; j < s; j++) {
-                if (i != j) {
+                if (i !== j) {
                     denominator = this.field.multiply(denominator, GenericGF.addOrSubtract(1, this.field.multiply(errorLocations[j], xiInverse)));
                 }
             }

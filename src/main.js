@@ -1,3 +1,4 @@
+﻿// @ts-nocheck -- browser-only demo bootstrap; DOM typing noise dominates (see tsconfig.json note)
 /**
  * Main entry point for the JPEG Encoder/Decoder application.
  * Initializes UI modules.

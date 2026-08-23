@@ -1,5 +1,5 @@
-
-import { ReedSolomonEncoder, ReedSolomonDecoder, GenericGF_QR_CODE_FIELD_256 } from '../src/information-theory/error-correction/reedsolomon.js';
+﻿
+import { ReedSolomonEncoder, ReedSolomonDecoder, GenericGF_QR_CODE_FIELD_256 } from '../src/information-theory/error-correction/index.js';
 
 function testRS(dataSize, paritySize) {
     console.log(`Testing RS with Data: ${dataSize}, Parity: ${paritySize}, Total: ${dataSize + paritySize}`);

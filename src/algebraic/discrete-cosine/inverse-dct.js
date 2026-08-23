@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Inverse Discrete Cosine Transform (IDCT)
  * 
  * Converts frequency domain coefficients back to spatial domain pixel values.
@@ -69,9 +69,9 @@ export const idctNaive = idct;
 /**
  * AAN IDCT implementation (O(N))
  * Implements the Arai, Agui, and Nakajima algorithm.
- * 
+ *
  * @param {Float32Array} coefficients - 64-element block of DCT coefficients
- * @returns {Float32Array} 64-element block of spatial domain values
+ * @returns {[Float32Array, null] | [null, Error]} Tuple: 64-element block of spatial domain values, or error
  */
 export function idctAAN(coefficients) {
 
@@ -106,70 +106,3 @@ for (let v = 0; v < 8; v++) {
     }
 }
 
-/**
- * 1D AAN IDCT
- * Performs in-place transform on a row or column.
- * 
- * @param {Float32Array} data - Buffer containing the block
- * @param {number} offset - Start offset
- * @param {number} stride - Step between elements (1 for row, 8 for col)
- */
-function aan1d(data, offset, stride) {
-
-    const x0 = data[offset];
-    const x1 = data[offset + stride];
-    const x2 = data[offset + stride * 2];
-    const x3 = data[offset + stride * 3];
-    const x4 = data[offset + stride * 4];
-    const x5 = data[offset + stride * 5];
-    const x6 = data[offset + stride * 6];
-    const x7 = data[offset + stride * 7];
-
-    const tmp0 = x0;
-    const tmp1 = x4;
-    const tmp2 = x2;
-    const tmp3 = x6;
-
-    const tmp10 = tmp0 + tmp1;
-    const tmp11 = tmp0 - tmp1;
-
-    const tmp13 = tmp2 + tmp3;
-    const tmp12 = (tmp2 - tmp3) * 1.414213562 - tmp13;
-
-    const tmp0_ = tmp10 + tmp13;
-    const tmp3_ = tmp10 - tmp13;
-    const tmp1_ = tmp11 + tmp12;
-    const tmp2_ = tmp11 - tmp12;
-
-    const tmp4 = x1;
-    const tmp5 = x3;
-    const tmp6 = x5;
-    const tmp7 = x7;
-
-    const z13 = tmp6 + tmp5;
-    const z10 = tmp6 - tmp5;
-    const z11 = tmp4 + tmp7;
-    const z12 = tmp4 - tmp7;
-
-    const tmp7_ = z11 + z13;
-    const tmp11_ = (z11 - z13) * 1.414213562;
-
-    const z5 = (z10 + z12) * 1.847759065;
-
-    const z5_ = (z10 + z12) * 1.847759065;
-    const tmp10_ = z5_ - z12 * 1.082392200;
-    const tmp12_ = z5_ - z10 * 2.613125930;
-
-    const tmp6_ = tmp12_ - tmp7_;
-    const tmp5_ = tmp11_ - tmp6_;
-    const tmp4_ = tmp10_ + tmp5_;
-
-    data[offset] = tmp0_ + tmp7_;
-    data[offset + stride * 7] = tmp0_ - tmp7_;
-    data[offset + stride * 1] = tmp1_ + tmp6_;
-    data[offset + stride * 6] = tmp1_ - tmp6_;
-    data[offset + stride * 2] = tmp2_ + tmp5_;
-    data[offset + stride * 5] = tmp2_ - tmp5_;
-    data[offset + stride * 3] = tmp3_ + tmp4_;
-    data[offset + stride * 4] = tmp3_ - tmp4_;
-}

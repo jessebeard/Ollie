@@ -1,5 +1,8 @@
-import { ChunkManager } from './chunk-manager.js';
+﻿import { ChunkManager } from './chunk-manager.js';
 import { JpegTranscoder } from '../../codec/transcoder.js';
+
+/** Fraction of a carrier's scanned capacity actually used for payload. */
+const CHUNK_SAFETY_FACTOR = 0.8;
 import { JpegDecoder } from '../../codec/decoder.js';
 import { JpegEncoder } from '../../codec/encoder.js';
 import { F5 } from './f5-syndrome.js';
@@ -60,7 +63,7 @@ export class BatchEmbedder {
      * @param {string} [options.eccProfile='Medium'] - ECC profile: 'Low', 'Medium', 'High', 'Ultra', 'Extreme'
      * @param {boolean} [options.ecc=true] - Enable error correction
      * @param {Function} [onProgress] - Callback (current, total, status)
-     * @returns {Promise<Array<{name: string, data: Uint8Array}>>} Array of output files
+     * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Result tuple of [outputFiles, error]
      */
     async embed(data, imageFiles, options = {}, onProgress = null) {
 
@@ -272,6 +275,7 @@ export class BatchEmbedder {
     /**
      * Allocate data to images based on their capacities
      * @private
+     * @returns {[Array<{imageInfo: Object, chunkData: Uint8Array, chunkMeta: Object}>|null, Error|null]} Result tuple of [chunkAllocations, error]
      */
     allocateDataToImages(data, imageCapacities) {
         const chunks = [];
@@ -283,7 +287,9 @@ export class BatchEmbedder {
         for (const imageInfo of imageCapacities) {
             if (offset >= data.length) break;
 
-            const safeCapacity = Math.floor(imageInfo.capacity * 0.8);
+            // 20% headroom absorbs metadata growth and shrinkage retries so a
+            // carrier is never asked to hold more than it verifiably can.
+            const safeCapacity = Math.floor(imageInfo.capacity * CHUNK_SAFETY_FACTOR);
             const chunkSize = Math.min(safeCapacity, data.length - offset);
 
             if (chunkSize < 10) {

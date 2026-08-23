@@ -1,12 +1,11 @@
 import { rgbToYcbcr } from '../algebraic/colorspace/rgb-to-ycbcr.js';
-import { padDimensions, padDimensions420, extractBlock } from '../algebraic/mappings/blocks.js';
+import { padDimensions, padDimensions420 } from '../algebraic/mappings/blocks.js';
 import { forwardDCT } from '../algebraic/discrete-cosine/forward-dct.js';
-import { quantize, QUANTIZATION_TABLE_LUMA, QUANTIZATION_TABLE_CHROMA, getScaledQuantizationTables } from '../algebraic/quantization/forward-quantization.js';
+import { quantize, getScaledQuantizationTables } from '../algebraic/quantization/forward-quantization.js';
 import { zigZag } from '../algebraic/mappings/forward-zigzag.js';
 import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from '../automata/entropy-coding/huffman-encoder-fsm.js';
 import { BitWriter } from '../automata/bit-streams/bit-writer.js';
 import { F5 } from '../information-theory/steganography/f5-syndrome.js';
-import { downsampleBlock420, extractLumaBlocks420 } from '../algebraic/mappings/downsampling.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -48,11 +47,11 @@ export class JpegEncoder {
         const userEccProfile = this.options.metadata?.eccProfile;
 
         let useEcc = userEccSetting !== false;
-        let eccProfile = userEccProfile || 'Medium';
+        const eccProfile = userEccProfile || 'Medium';
 
         logger.debug(`ECC settings: ecc=${useEcc}, profile=${eccProfile}`);
 
-        let metadata = {
+        const metadata = {
             ecc: useEcc,
             eccProfile: eccProfile,
             ...this.options.metadata
@@ -191,7 +190,7 @@ export class JpegEncoder {
     /**
      * Encodes the provided ImageData into a JPEG byte array.
      * @param {ImageData|Object} imageData - Object containing width, height, and data (RGBA).
-     * @returns {Uint8Array} The raw JPEG file bytes.
+     * @returns {Promise<Uint8Array>} The raw JPEG file bytes.
      */
     async encode(imageData) {
         logger.debug('JpegEncoder.encode called');
@@ -481,12 +480,17 @@ export class JpegEncoder {
     }
 
     prepareBlock(blockData, qTable) {
+        // Inputs are internal invariants (always 64-element blocks); failures
+        // here are programmer errors, so they surface loudly instead of
+        // propagating Error objects through the coefficient pipeline.
+        const [dct, dctErr] = forwardDCT(blockData);
+        if (dctErr) throw dctErr;
 
-        const [dct] = forwardDCT(blockData);
+        const [quantized, quantErr] = quantize(/** @type {Float32Array} */ (dct), qTable);
+        if (quantErr) throw quantErr;
 
-        const [quantized] = quantize(dct, qTable);
-
-        const [zigzagged] = zigZag(quantized);
+        const [zigzagged, zigzagErr] = zigZag(/** @type {Int32Array} */ (quantized));
+        if (zigzagErr) throw zigzagErr;
         return zigzagged;
     }
 
@@ -625,7 +629,10 @@ export class JpegEncoder {
         this.writeDHT(writeByte, writeWord, writeArray, 0, 1, AC_LUMA_TABLE);
     }
 
-    writeDHT(writeByte, writeWord, writeArray, id, type, tableObj) {
+    // Note: tableObj is accepted for call-site compatibility but unused —
+    // counts/values are derived from the DC/AC tables below (kept from the
+    // legacy signature until the DHT writer is consolidated).
+    writeDHT(writeByte, writeWord, writeArray, id, type, _tableObj) {
         writeWord(0xFFC4);
 
         const dcCounts = type === 0 ?
@@ -658,7 +665,7 @@ export class JpegEncoder {
                 0xf9, 0xfa
             ];
 
-        let totalLen = 2 + 1 + 16 + dcValues.length;
+        const totalLen = 2 + 1 + 16 + dcValues.length;
         logger.debug('writeDHT: type=' + type + ', id=' + id + ', totalLen=' + totalLen);
         writeWord(totalLen);
         writeByte((type << 4) | id);

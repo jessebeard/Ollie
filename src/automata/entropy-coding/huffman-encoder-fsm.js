@@ -1,5 +1,4 @@
-import { BitWriter } from '../bit-streams/bit-writer.js';
-
+﻿/** @typedef {import('../bit-streams/bit-writer.js').BitWriter} BitWriter */
 const STD_DC_LUMINANCE_NRCODES = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
 
 const STD_DC_LUMINANCE_VALUES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];

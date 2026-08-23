@@ -1,3 +1,4 @@
+﻿/** @typedef {import('../bit-streams/bit-reader.js').BitReader} BitReader */
 /**
  * Huffman Table Parser - Parses DHT (Define Huffman Table) segments
  * 
@@ -18,6 +19,16 @@ import { decodeOptimized, buildOptimizedLookup } from '../entropy-coding/huffman
  * Huffman Table class for decoding
  */
 export class HuffmanTable {
+    /**
+     * Populated lazily by the optimized 16-bit LUT decoder
+     * (huffman-optimized-fsm.js); undefined until built.
+     * @type {Uint16Array | undefined}
+     */
+    fastLookup;
+
+    /** @type {number | undefined} */
+    maxCodeLength;
+
     constructor(bits, values, tableClass, tableId) {
         this.bits = bits;
         this.values = values;

@@ -332,11 +332,14 @@ node test/runner.js
 
 ### Test Coverage
 - **Encoder Tests:** Color space conversion, DCT, quantization, Huffman coding, SPIFF generation
-- **Decoder Tests:** Frame/scan parsing, Huffman decoding, IDCT algorithms, progressive decoding, SPIFF parsing
+- **Decoder Tests:** Frame/scan parsing, Huffman decoding, IDCT algorithms, SPIFF parsing
 - **Utility Tests:** Bit readers/writers, marker parsing
 - **Steganography Tests:** Data embedding, container format, chunk management
 - **Error Correction Tests:** Reed-Solomon integration
 - **Integration Tests:** Roundtrip encoding/decoding, steganography roundtrip, format detection
+- **Security Tests:** Forged metadata rejection, decoder/vault hardening, XSS/scheme-injection prevention, capacity consistency
+- **Conformance Tests:** Bit-exact golden vectors for the frozen container wire format (`test/conformance/golden-vectors.json`)
+- **Property-Based Tests:** Seeded invariant fuzzing of the ECC/F5/container/chunk layers (`PBT_SEED` for reproducibility)
 - **UI Tests:** User interface interactions
 
 

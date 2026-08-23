@@ -280,7 +280,7 @@ export class F5 {
             const startPermIdx = permIdx; // Save start position for shrinkage retry
 
             // Collect n non-zero coefficients by walking permutation
-            let group = [];
+            const group = [];
 
             while (group.length < n && permIdx < totalAC) {
                 const flatIdx = permutation[permIdx];
@@ -393,11 +393,11 @@ export class F5 {
 
         while (bits.length < bitCount) {
             // Collect n non-zero coefficients by walking permutation
-            let group = [];
+            const group = [];
 
             while (group.length < n && permIdx < totalAC) {
                 const flatIdx = permutation[permIdx];
-                const { block, coeffIdx, val } = this.getCoeffByFlatIndex(blocks, flatIdx);
+                const { val } = this.getCoeffByFlatIndex(blocks, flatIdx);
                 permIdx++;
 
                 if (val !== 0) {
@@ -658,7 +658,8 @@ export class F5 {
         const version = view.getUint8(offset); offset += 1;
         if (version !== this.VERSION) return null;
 
-        const flags = view.getUint8(offset); offset += 1;
+        // Flags byte is reserved; skipped without binding.
+        view.getUint8(offset); offset += 1;
         const storedK = view.getUint8(offset); offset += 1;
 
         // Verify that the k we used to read the header matches the k stored IN the header
@@ -852,11 +853,11 @@ export class F5 {
         const capacityBytes = Math.floor(bestCapacityBits / 8);
 
         if (options.format === 'container') {
-            let metaStr = JSON.stringify(options.metadata || {});
+            const metaStr = JSON.stringify(options.metadata || {});
             const eccMetadataOverhead = options.ecc ? 70 : 0;
             const metaLen = new TextEncoder().encode(metaStr).length + eccMetadataOverhead;
             // Container overhead: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) + PayloadLen(4) + CRC(4)
-            let containerOverhead = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + 4;
+            const containerOverhead = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + 4;
             const encryptionOverhead = options.encrypted ? 28 : 0;
 
             if (options.ecc) {

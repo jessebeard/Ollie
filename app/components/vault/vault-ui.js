@@ -1,4 +1,4 @@
-
+﻿
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { DropZone } from './components/drop-zone.js';
 import { ModalManager } from './components/modal-manager.js';
@@ -6,6 +6,7 @@ import { VaultView } from './components/vault-view.js';
 import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 import { logger } from '../../../src/utils/logger.js';
+import { writeAllWithRollback } from '../../../src/utils/atomic-writer.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -52,7 +53,7 @@ export class VaultUI {
         document.getElementById('importBtn').addEventListener('click', () => this.importData());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
-        // ΓÜí Bolt Optimization: Debounce search input to prevent main thread blocking
+        // Î“ÃœÃ­ Bolt Optimization: Debounce search input to prevent main thread blocking
         // This limits full DOM re-renders and expensive capacity calculations while the user types
         const searchInput = document.getElementById('searchInput');
         let searchTimeout;
@@ -305,7 +306,7 @@ export class VaultUI {
             );
             if (saveErr) throw saveErr;
 
-            // 5. Write back to disk — pre-flight permissions so no carrier is
+            // 5. Write back to disk â€” pre-flight permissions so no carrier is
             // half-written when a permission prompt is declined mid-batch.
             this.showLoading(true, 'Writing files to disk...');
             const writeTargets = [];
@@ -334,26 +335,11 @@ export class VaultUI {
                 writeTargets.push({ handle, result });
             }
 
-            const written = [];
-            try {
-                for (const { handle, result } of writeTargets) {
-                    const writable = await handle.createWritable();
-                    await writable.write(result.data);
-                    await writable.close();
-                    written.push(handle);
-                }
-            } catch (writeError) {
-                logger.error('Write failed; restoring originals...', writeError);
-                for (const handle of written) {
-                    try {
-                        const restore = await handle.createWritable();
-                        await restore.write(originalBytes.get(handle.name));
-                        await restore.close();
-                    } catch (restoreErr) {
-                        logger.error(`Rollback failed for ${handle.name}:`, restoreErr);
-                    }
-                }
-                throw new Error(`Saving failed partway through; affected images were restored. ${writeError.message}`);
+            const atomicTargets = writeTargets.map(({ handle, result }) => ({ handle, data: result.data }));
+            const [, writeErr] = await writeAllWithRollback(atomicTargets, originalBytes);
+            if (writeErr) {
+                logger.error('Atomic save failed:', writeErr);
+                throw writeErr;
             }
 
             this.showLoading(false);
@@ -362,9 +348,6 @@ export class VaultUI {
             // Update handles and capacity if we saved to a new set
             if (!reusedHandles) {
                 this.droppedHandles = new Map();
-                for (const result of results) {
-                    // This is a bit tricky because handles are from scanDirectory
-                }
             }
 
             // Refresh fileObjs with new File objects since they were modified on disk
@@ -440,7 +423,7 @@ export class VaultUI {
                 for (const entry of data.entries) {
                     const [newVault, err] = await currentVault.addEntry(entry, entry.id);
                     if (err) {
-                        console.error('Failed to import entry:', err);
+                        logger.warn(`Import rejected entry "${entry.title || entry.id}": ${err.message}`);
                         errorCount++;
                     } else {
                         currentVault = newVault;
@@ -466,7 +449,7 @@ export class VaultUI {
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
-        const warningMsg = '≡ƒö┤ SECURITY WARNING: Red Flag Operation\n\n' +
+        const warningMsg = 'â‰¡Æ’Ã¶â”¤ SECURITY WARNING: Red Flag Operation\n\n' +
             'You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.\n\n' +
             'Anyone who gains access to this file will have immediate access to all your passwords.\n\n' +
             'Are you absolutely sure you want to proceed?';
@@ -509,8 +492,7 @@ export class VaultUI {
     }
 
     updateUI() {
-        const vaultList = document.getElementById('vaultList');
-        const itemCount = document.getElementById('itemCount');
+                const itemCount = document.getElementById('itemCount');
         const statusText = document.getElementById('statusText');
         const capacityText = document.getElementById('capacityText');
 
@@ -558,7 +540,7 @@ export class VaultUI {
             const savedDate = this.vault.metadata.modified
                 ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
                 : 'unknown';
-            statusText.textContent = `Unlocked · Rev ${this.vault.metadata.revision} · ${savedDate} UTC`;
+            statusText.textContent = `Unlocked Â· Rev ${this.vault.metadata.revision} Â· ${savedDate} UTC`;
         } else {
             statusText.textContent = 'Locked';
         }

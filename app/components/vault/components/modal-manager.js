@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../../../src/utils/escape-html.js';
 
 export class ModalManager {
     constructor() {
@@ -30,12 +31,7 @@ export class ModalManager {
     }
 
     escape(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return escapeHtml(str);
     }
 
     async prompt(title, label, type = 'text') {
@@ -164,7 +160,7 @@ export class ModalManager {
                 e.preventDefault();
                 const formData = new FormData(form);
                 const data = {};
-                for (let [key, val] of formData.entries()) {
+                for (const [key, val] of formData.entries()) {
                     data[key] = val;
                 }
 

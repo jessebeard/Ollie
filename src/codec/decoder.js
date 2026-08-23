@@ -1,11 +1,15 @@
 /**
  * JPEG Decoder - Main class that orchestrates the complete decoding pipeline
- * 
+ *
  * Decodes baseline sequential DCT JPEG files with Huffman coding.
  * Supports grayscale and color images with various chroma subsampling (4:4:4, 4:2:2, 4:2:0).
  */
 
-import { parseFileStructure, MARKERS } from '../automata/parsers/marker-scanner.js';
+/** Upper bound on blocks a single component may declare; guards
+ * allocation bombs from forged SOF dimensions. */
+const MAX_BLOCKS_PER_COMPONENT = 1000000;
+
+import { parseFileStructure } from '../automata/parsers/marker-scanner.js';
 import { parseAllHuffmanTables } from '../automata/parsers/dht-automaton.js';
 import { parseAllQuantizationTables } from '../automata/parsers/dqt-automaton.js';
 import { parseFrameHeader } from '../automata/parsers/sof-automaton.js';
@@ -91,11 +95,12 @@ export class JpegDecoder {
     }
 
     /**
-     * Decode a JPEG byte array into ImageData
-     * 
+     * Decode a JPEG byte array into pixel data.
+     *
      * @param {Uint8Array} jpegBytes - JPEG file bytes
-     * @param {Object} options - { password: '...' }
-     * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number, secretData: any}>} ImageData-compatible object
+     * @param {Object} options - { password?: string, skipExtraction?: boolean, coefficientsOnly?: boolean }
+     * @returns {Promise<[Object|null, Error|null]>} Result tuple:
+     *   success object is `{ data, width, height, secretData?, secretMetadata?, coefficients? }`
      */
     async decode(jpegBytes, options = {}) {
         this.reset();
@@ -205,7 +210,7 @@ export class JpegDecoder {
 
         const sosSegments = segments.get('SOS');
         for (const sosSegment of sosSegments) {
-            const [scanHeader, scanErr] = parseScanHeader(sosSegment.data, this.frameHeader);
+            const [scanHeader, scanErr] = parseScanHeader(sosSegment.data);
             if (scanErr) return [null, scanErr];
             const scanData = sosSegment.scanData;
 
@@ -294,7 +299,7 @@ export class JpegDecoder {
             const blocksV = mcuRows * comp.vSampling;
             const totalBlocks = blocksH * blocksV;
 
-            if (totalBlocks <= 0 || totalBlocks > 1000000 || !Number.isFinite(totalBlocks)) {
+            if (totalBlocks <= 0 || totalBlocks > MAX_BLOCKS_PER_COMPONENT || !Number.isFinite(totalBlocks)) {
                 return new Error(`Invalid block count: ${totalBlocks} (blocksH=${blocksH}, blocksV=${blocksV})`);
             }
 
@@ -326,7 +331,7 @@ export class JpegDecoder {
         const restartInterval = this.restartInterval;
         const totalMCUs = mcuCols * mcuRows;
 
-        const { Ss, Se, Ah, Al } = scanHeader;
+        const { Ss, Se } = scanHeader;
 
         const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
 
@@ -463,8 +468,8 @@ export class JpegDecoder {
 
     /**
      * Reconstruct and assemble final image
-     * 
-     * @returns {{data: Uint8ClampedArray, width: number, height: number}}
+     *
+     * @returns {[Object, null] | [null, Error]} Result tuple of [imageObject, error]
      */
     assembleImage() {
         const { width, height, components } = this.frameHeader;

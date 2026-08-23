@@ -135,6 +135,13 @@ async function runTests() {
 
     try {
 
+        const { setSeed, getSeed } = await import('./utils/pbt.js');
+        const pbtSeed = process.env.PBT_SEED !== undefined && process.env.PBT_SEED !== ''
+            ? (Number(process.env.PBT_SEED) >>> 0)
+            : ((Date.now() ^ (process.pid << 16)) >>> 0);
+        setSeed(pbtSeed);
+        console.log(`[PBT] seed=${getSeed()} (replay with PBT_SEED=${getSeed()} node test/runner.js)\n`);
+
         const { getStats, resetStats, executeTests } = await import('./utils/test-runner.js');
 
         resetStats();
@@ -206,7 +213,11 @@ async function runTests() {
         await import('./security/vault-hardening.test.js');
         await import('./security/url-safety.test.js');
         await import('./security/probe-regressions.test.js');
+        await import('./conformance/wire-format-conformance.test.js');
+        await import('./conformance/wire-format.pbt.js');
         await import('./security/ui-legacy-xss.test.js');
+        await import('./security/drop-zone-pagination.test.js');
+        await import('./utils/atomic-writer.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/immutable-vault.test.js');
         await import('./structures/vault/revision-tracking.test.js');

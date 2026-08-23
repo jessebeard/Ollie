@@ -6,6 +6,17 @@ function isNonEmptyString(value) {
 }
 
 export class SecureEntry {
+    // Declared for type-checking; populated via Object.assign in the constructor.
+    /** @type {string} */ id;
+    /** @type {string} */ title;
+    /** @type {string} */ url;
+    /** @type {string} */ username;
+    /** @type {string[]} */ tags;
+    /** @type {string} */ created;
+    /** @type {string} */ modified;
+    /** @type {{ciphertext: Uint8Array, iv: Uint8Array}|null} */
+    _encrypted = null;
+
     /**
      * @private
      * Use SecureEntry.create() instead.

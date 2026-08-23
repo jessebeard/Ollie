@@ -128,7 +128,7 @@ export function parseFileStructure(jpegBytes) {
 
         if (segment.type === MARKERS.SOS) {
             
-            let scanDataStart = segment.nextOffset;
+            const scanDataStart = segment.nextOffset;
             let scanDataEnd = scanDataStart;
 
             for (let i = scanDataStart; i < jpegBytes.length - 1; i++) {

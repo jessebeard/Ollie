@@ -1,3 +1,4 @@
+﻿// @ts-nocheck -- DOM-heavy UI; checkJs adoption pending (see tsconfig.json note)
 /**
  * Decoder UI logic
  */
@@ -7,6 +8,7 @@ import { idctPureRef, idctOptimizedRef, idctFastAAN } from '../../src/algebraic/
 import { HuffmanTable } from '../../src/automata/parsers/dht-automaton.js';
 import { BitReader } from '../../src/automata/bit-streams/bit-reader.js';
 import { dequantize, dequantizeBypass } from '../../src/algebraic/quantization/inverse-quantization.js';
+import { logger } from '../../../../src/utils/logger.js';
 
 export function initDecoderUI() {
     const decodeInput = document.getElementById('decode-input');
@@ -35,24 +37,24 @@ export function initDecoderUI() {
                 switch (idctSelect.value) {
                     case 'pureRef':
                         decoder.setIdctMethod(idctPureRef);
-                        console.log('Using Pure Ref IDCT (Spec Formula)');
+                        logger.debug('Using Pure Ref IDCT (Spec Formula)');
                         break;
                     case 'optimizedRef':
                         decoder.setIdctMethod(idctOptimizedRef);
-                        console.log('Using Optimized Ref IDCT (Separable)');
+                        logger.debug('Using Optimized Ref IDCT (Separable)');
                         break;
                     case 'fastAAN':
                         decoder.setIdctMethod(idctFastAAN);
-                        console.log('Using Fast AAN IDCT');
+                        logger.debug('Using Fast AAN IDCT');
                         break;
                     case 'aan':
                         decoder.setIdctMethod(idctAAN);
-                        console.log('Using Legacy AAN IDCT');
+                        logger.debug('Using Legacy AAN IDCT');
                         break;
                     case 'naive':
                     default:
                         decoder.setIdctMethod(idctNaive);
-                        console.log('Using Legacy Naive IDCT');
+                        logger.debug('Using Legacy Naive IDCT');
                         break;
                 }
             }
@@ -61,29 +63,29 @@ export function initDecoderUI() {
             if (dequantSelect) {
                 if (dequantSelect.value === 'bypass') {
                     decoder.setDequantizationMethod(dequantizeBypass);
-                    console.log('Using Bypass Dequantization');
+                    logger.debug('Using Bypass Dequantization');
                 } else {
                     decoder.setDequantizationMethod(dequantize);
-                    console.log('Using Standard Dequantization');
+                    logger.debug('Using Standard Dequantization');
                 }
             }
 
             const huffmanSelect = document.getElementById('huffman-method');
             if (huffmanSelect && huffmanSelect.value === 'naive') {
                 HuffmanTable.setDecodeMethod('naive');
-                console.log('Using Naive Huffman Decoding');
+                logger.debug('Using Naive Huffman Decoding');
             } else {
                 HuffmanTable.setDecodeMethod('optimized');
-                console.log('Using Optimized Huffman Decoding');
+                logger.debug('Using Optimized Huffman Decoding');
             }
 
             const bitReaderSelect = document.getElementById('bitreader-method');
             if (bitReaderSelect && bitReaderSelect.value === 'naive') {
                 BitReader.setMode('naive');
-                console.log('Using Naive BitReader');
+                logger.debug('Using Naive BitReader');
             } else {
                 BitReader.setMode('optimized');
-                console.log('Using Optimized BitReader');
+                logger.debug('Using Optimized BitReader');
             }
 
             const passwordInput = document.getElementById('decrypt-password');
@@ -130,7 +132,7 @@ export function initDecoderUI() {
                 secretSection.style.display = 'none';
             }
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             decodeStatus.textContent = 'Error: ' + e.message;
         }
     });

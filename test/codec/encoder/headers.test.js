@@ -18,7 +18,7 @@ describe('JPEG Headers', () => {
         encoder.writeHeaders(null, 100, 100, defaultQTables);
         const headers = encoder.headers;
 
-        let idx = 2;
+        const idx = 2;
         expect(headers[idx]).toBe(0xFF);
         expect(headers[idx + 1]).toBe(0xE0);
 

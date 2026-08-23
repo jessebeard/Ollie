@@ -7,7 +7,7 @@ import { Encryption } from '../../src/information-theory/cryptography/aes-gcm.js
 const PASSWORD = 'wave-d-test-password';
 
 async function makeUnlockedVaultWithEntry(title) {
-    let vault = new PasswordVault([], null, true, PASSWORD);
+    const vault = new PasswordVault([], null, true, PASSWORD);
     const [next] = await vault.addEntry({
         title,
         username: 'user',

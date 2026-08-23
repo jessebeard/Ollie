@@ -1,3 +1,4 @@
+﻿// @ts-nocheck -- DOM-heavy UI; checkJs adoption pending (see tsconfig.json note)
 /**
  * Tab switching logic
  */

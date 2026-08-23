@@ -1,4 +1,4 @@
-import { BatchEmbedder } from '../../information-theory/steganography/batch-embedder.js';
+﻿import { BatchEmbedder } from '../../information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
@@ -47,6 +47,19 @@ async function importSessionKey(rawBytes) {
 }
 
 export class PasswordVault {
+    /**
+     * Hidden credential slot; installed non-enumerably in the constructor.
+     * @type {{password: string|null, sessionKey: CryptoKey|null}|null}
+     */
+    _unlock = null;
+
+    /**
+     * @param {readonly Object[]} [entries]
+     * @param {Object|null} [metadata]
+     * @param {boolean} [isUnlocked]
+     * @param {string|null} [masterPassword]
+     * @param {CryptoKey|null} [sessionKey]
+     */
     constructor(entries = [], metadata = null, isUnlocked = false, masterPassword = null, sessionKey = null) {
         // We freeze the arrays and objects to ensure true immutability
         this.entries = Object.freeze([...entries].map(e => Object.freeze(e)));
@@ -164,6 +177,11 @@ export class PasswordVault {
         const validationError = PasswordVault.validateEntryInput(entry);
         if (validationError) return [this, validationError];
 
+        if (explicitId !== null && explicitId !== undefined) {
+            const idError = PasswordVault.validateEntryId(explicitId, this.entries);
+            if (idError) return [this, idError];
+        }
+
         const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
 
@@ -242,6 +260,8 @@ export class PasswordVault {
     }
 
     search(query, tags = []) {
+        if (!this.isUnlocked) return [];
+
         const lowerQuery = (query || '').toLowerCase();
 
         return this.entries.filter(e => {
@@ -288,6 +308,11 @@ export class PasswordVault {
         return [JSON.stringify(data, null, 2), null];
     }
 
+        /**
+     * Rehydrates a vault from its serialized document.
+     * @param {Object} data - Serialized vault document
+     * @returns {[PasswordVault|null, Error|null]} Result tuple of [vault, error]
+     */
     static fromJSON(data, isUnlocked = false, masterPassword = null, sessionKey = null) {
         if (!data.metadata || data.metadata.version !== '3.0') {
             return [null, new Error('Unsupported vault version: ' + (data.metadata && data.metadata.version))];
@@ -394,6 +419,25 @@ export class PasswordVault {
         if (importErr) return [null, importErr];
 
         return PasswordVault.fromJSON(vaultJson, true, password, sessionKey);
+    }
+
+    /**
+     * Validates an externally supplied entry identifier at the trust boundary.
+     * Imported entries carry attacker-readable IDs: they must be bounded
+     * strings and must not collide with entries already in the vault.
+     *
+     * @param {string} id
+     * @param {readonly {id: string}[]} [existingEntries]
+     * @returns {Error|null} Typed error, or null when valid
+     */
+    static validateEntryId(id, existingEntries = []) {
+        if (typeof id !== 'string' || id.length === 0 || id.length > 128) {
+            return new Error('Entry "id" must be a non-empty string of at most 128 characters');
+        }
+        if (existingEntries.some(e => e && e.id === id)) {
+            return new Error(`Duplicate entry ID: ${id}`);
+        }
+        return null;
     }
 
     /**

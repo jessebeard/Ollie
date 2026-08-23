@@ -12,10 +12,83 @@
 
 import { expect } from './test-runner.js';
 
+// --- Deterministic Random Source (optional seeding) ---
+//
+// All generator randomness flows through nextRandom(). Unseeded, it delegates
+// to Math.random (historical behavior). When a seed is set via setSeed(), the
+// source becomes mulberry32 so any failing run replays byte-for-byte by
+// re-running with the same seed.
+
+let _currentSeed = null;
+let _seedState = null;
+
+function hashSeedString(str) {
+    let h = 0x811C9DC5;
+    for (let i = 0; i < str.length; i++) {
+        h = Math.imul(h ^ str.charCodeAt(i), 0x01000193) >>> 0;
+    }
+    return h >>> 0;
+}
+
+function seedFromLocation() {
+    try {
+        if (typeof location !== 'undefined' && location.search) {
+            const raw = new URLSearchParams(location.search).get('pbtSeed');
+            if (raw !== null && raw !== '' && !Number.isNaN(Number(raw))) {
+                return Number(raw) >>> 0;
+            }
+        }
+    } catch (e) {
+        // Non-browser or opaque origin: stay unseeded.
+    }
+    return null;
+}
+
+const _locationSeed = seedFromLocation();
+if (_locationSeed !== null) {
+    _currentSeed = _locationSeed;
+    _seedState = _locationSeed | 0;
+}
+
+function nextRandom() {
+    if (_seedState === null) return Math.random();
+    _seedState = (_seedState + 0x6D2B79F5) | 0;
+    let t = _seedState;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/**
+ * Enables deterministic generation for every subsequent property run.
+ * Accepts a number or any string (strings are FNV-1a hashed).
+ *
+ * @param {number|string} seed
+ */
+export function setSeed(seed) {
+    _currentSeed = typeof seed === 'number' ? (seed >>> 0) : hashSeedString(String(seed));
+    _seedState = _currentSeed | 0;
+}
+
+/**
+ * @returns {number|null} The active seed, or null when unseeded
+ */
+export function getSeed() {
+    return _currentSeed;
+}
+
+/**
+ * Restores unseeded Math.random behavior.
+ */
+export function clearSeed() {
+    _currentSeed = null;
+    _seedState = null;
+}
+
 function getRandomInt(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min) + min);
+    return Math.floor(nextRandom() * (max - min) + min);
 }
 
 // --- Shrinking Strategies ---
@@ -192,7 +265,7 @@ export const Arbitrary = {
         generate: () => {
 
             const randInt = (min, max) =>
-                Math.floor(Math.random() * (max - min + 1)) + min;
+                Math.floor(nextRandom() * (max - min + 1)) + min;
 
             const pick = arr => arr[randInt(0, arr.length - 1)];
 
@@ -257,7 +330,7 @@ export const Arbitrary = {
 
             let length = randInt(minLength, maxLength);
 
-            if (Math.random() < 0.02) {
+            if (nextRandom() < 0.02) {
                 length = randInt(maxLength, maxLength * 50);
             }
 
@@ -266,20 +339,20 @@ export const Arbitrary = {
             for (let i = 0; i < length; i++) {
 
                 const char =
-                    Math.random() < 0.2 ? pick(edgePool) : pick(pool);
+                    nextRandom() < 0.2 ? pick(edgePool) : pick(pool);
 
                 result += char;
 
-                if (Math.random() < 0.1) {
+                if (nextRandom() < 0.1) {
                     result += pick(combining);
                 }
 
-                if (Math.random() < 0.02) {
+                if (nextRandom() < 0.02) {
                     result += char.repeat(randInt(5, 50));
                 }
             }
 
-            if (Math.random() < 0.02) {
+            if (nextRandom() < 0.02) {
                 result += String.fromCharCode(randInt(0xD800, 0xDFFF));
             }
 
@@ -291,7 +364,7 @@ export const Arbitrary = {
     }),
 
     boolean: () => ({
-        generate: () => Math.random() > 0.5,
+        generate: () => nextRandom() > 0.5,
         shrink: (value) => value ? [false] : []
     }),
 
@@ -373,6 +446,14 @@ async function shrinkCounterexample(arbitraries, propertyFn, failingArgs, origin
 // --- Property Assertion ---
 
 /**
+ * Seed annotation for failure reports so any failing run can be replayed
+ * deterministically with setSeed().
+ */
+function seedSuffix() {
+    return _currentSeed === null ? '' : ` [seed=${_currentSeed}]`;
+}
+
+/**
  * Formats a value for display in counterexample output.
  * Truncates large byte arrays and deeply nested objects.
  */
@@ -431,14 +512,14 @@ export async function assertProperty(arbitraries, propertyFn, iterations = 100) 
 
                 throw new Error(
                     `Property failed. Minimal counterexample after ${shrinkRounds} shrink round(s): ` +
-                    `[${shrunkArgs.map(formatValue).join(', ')}] — ${shrunkError.message}`
+                    `[${shrunkArgs.map(formatValue).join(', ')}] — ${shrunkError.message}${seedSuffix()}`
                 );
             } else {
                 // No shrinking available — fall back to raw report
                 console.error(`\n[PBT Failure] Failed at iteration ${i + 1}/${iterations}`);
                 console.error(`Generated Inputs:`, args);
                 console.error(`Error:`, error);
-                throw new Error(`Property failed for generated inputs: ${error.message}`);
+                throw new Error(`Property failed for generated inputs: ${error.message}${seedSuffix()}`);
             }
         }
     }

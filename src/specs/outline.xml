@@ -71,16 +71,9 @@
                 <file name="chunk-manager.js" description="ChunkManager - Handles splitting large data into chunks and reassembling them" />
                 <file name="f5-syndrome.js" description="F5 Steganography Implementation Implements the F5 algorithm for hiding data in JPEG coefficients. F5 uses matrix encoding for improved embedding efficiency and correctly handles &quot;shrinkage&quot; when coefficients become 0. Key features: - Matrix encoding (k bits embedded changing at most 1 coefficient per n-group) - Permutation of coefficients for uniform change distribution - Shrinkage handling via re-embedding" />
                 <file name="index.js" description="Undocumented module" />
-                <file name="jsteg.js" description="Jsteg Steganography Implementation Implements the Jsteg algorithm for hiding data in JPEG coefficients. Jsteg embeds data in the Least Significant Bit (LSB) of non-zero quantized DCT coefficients. It skips: - DC coefficients (index 0 of each block) to preserve overall luminance/color. - Coefficients with value 0 or 1 (though some variants use 1, standard Jsteg usually skips 0 and 1 to avoid ambiguity, but simple LSB replacement on non-zeros is common. Let&#39;s stick to: skip 0s, and maybe skip 1s if it causes issues, but usually just skip 0s is the definition of &quot;non-zero&quot;. Wait, Jsteg specifically skips 0 and 1? Actually, the classic Jsteg algorithm: - Sequential embedding. - Skips DC coefficients. - Skips AC coefficients that are 0 or 1. - Replaces LSB of other coefficients. However, skipping 1s reduces capacity significantly. A simpler variant is &quot;LSB of non-zeros&quot;. Let&#39;s implement &quot;LSB of non-zeros&quot; first (skipping only 0). If we encounter issues, we can refine. Actually, let&#39;s stick to skipping 0s only for max capacity for now, unless we find a reason not to. Data Format: [Length (32-bit BE)][Data Payload]" />
-                <file name="payload-container.js" description="Container Format for Steganographic Data Storage Format: [Magic Bytes: 4]     &quot;JSTG&quot; - format identifier [Version: 1]         Format version (currently 1) [Flags: 1]           Bit flags (encrypted, compressed, chunked, etc.) [Metadata Length: 2] Length of JSON metadata in bytes [Metadata: N]        JSON metadata (filename, encryption params, etc.) [Payload Length: 4]  Actual data length [Payload: N]         The data itself [CRC32: 4]          Integrity checksum" />
             </directory>
         </directory>
         <directory name="specs">
-            <directory name="project rules">
-                <file name="code-quality.md" description="Undocumented module" />
-                <file name="constitution.md" description="Undocumented module" />
-                <file name="test-specs.md" description="Undocumented module" />
-            </directory>
             <file name="AAN-algo-spec.xml" description="Undocumented module" />
             <file name="AAN-forward-algo-spec.xml" description="Undocumented module" />
             <file name="bit-stuffing-edge-cases.md" description="Undocumented module" />

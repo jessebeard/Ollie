@@ -3,7 +3,8 @@ import { BatchEmbedder } from '../information-theory/steganography/batch-embedde
 
 /**
  * CapacityScanner - Orchestrates steganographic capacity analysis across multiple JPEGs.
- * Supports parallel processing via Worker Pool and deterministic error propagation.
+ * Concurrency is cooperative (async tasks on the main thread, `options.concurrency`);
+ * no Worker threads are involved. Deterministic error propagation throughout.
  */
 export class CapacityScanner {
     /**
@@ -56,7 +57,7 @@ export class CapacityScanner {
         let firstError = null;
 
         /**
-         * Task executor for the worker pool
+         * Processes a single file (decode + capacity math)
          */
         const processFile = async (file) => {
             if (firstError) return;
@@ -70,7 +71,7 @@ export class CapacityScanner {
                 return;
             }
 
-            // Call analyzer (either mock or real worker-shim)
+            // Run the analyzer (injected mock or the default decoder-based one)
             const [capacity, err] = await analyzer(file);
             if (err) {
                 firstError = err;
@@ -86,11 +87,11 @@ export class CapacityScanner {
             }
         };
 
-        // Parallel execution pool
+        // Cooperative async pool: N concurrent loops draining a shared queue
         const queue = [...files];
-        const workers = [];
+        const loops = [];
 
-        const workerLoop = async () => {
+        const drainQueue = async () => {
             while (queue.length > 0 && !firstError) {
                 const file = queue.shift();
                 await processFile(file);
@@ -98,10 +99,10 @@ export class CapacityScanner {
         };
 
         for (let i = 0; i < Math.min(concurrency, files.length); i++) {
-            workers.push(workerLoop());
+            loops.push(drainQueue());
         }
 
-        await Promise.all(workers);
+        await Promise.all(loops);
 
         if (firstError) {
             return [null, firstError];

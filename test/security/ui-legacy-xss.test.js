@@ -1,38 +1,33 @@
 import { it, describe, expect } from '../utils/test-runner.js';
 import { Arbitrary, assertProperty } from '../utils/pbt.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import { escapeHtml } from '../../src/utils/escape-html.js';
 
-const isNode = typeof process !== 'undefined' && process.release.name === 'node';
-
-describe('Legacy VaultUI XSS Prevention', () => {
-    it('should correctly escape HTML characters without failing on non-strings', async () => {
-        // To test this pure function without loading the whole VaultUI class and DOM,
-        // we extract its body if running in Node. In the browser, it would need VaultUI loaded,
-        // but we'll use a dynamic evaluation for Node to avoid jsdom.
-        let escapeHtmlFn;
-        if (isNode) {
-            const code = fs.readFileSync(path.join(process.cwd(), 'app/vault.js'), 'utf-8');
-            const match = code.match(/escapeHtml\(text\)\s*{([^}]+)}/);
-            if (!match) throw new Error("escapeHtml not found");
-            escapeHtmlFn = new Function('text', match[1]);
-        } else {
-            return; // Skip in browser for now to avoid complexity, or implement a simple mock
-        }
-
+describe('escapeHtml XSS Prevention', () => {
+    it('escapes HTML-special characters without failing on non-strings', async () => {
+        // The canonical escaping implementation lives in src/utils/escape-html.js
+        // and is shared by every app component; testing it directly avoids the
+        // brittle source-scraping this suite used before.
         await assertProperty(
             [Arbitrary.string(1, 100)],
             (str) => {
-                const escaped = escapeHtmlFn(str);
+                const escaped = escapeHtml(str);
                 return !escaped.includes('<') && !escaped.includes('>') && !escaped.includes('"') && !escaped.includes("'");
             }
         );
 
-        expect(escapeHtmlFn(123)).toBe("123");
-        expect(escapeHtmlFn(true)).toBe("true");
-        expect(escapeHtmlFn(null)).toBe("");
-        expect(escapeHtmlFn(undefined)).toBe("");
-        expect(escapeHtmlFn(0)).toBe("0");
-        expect(escapeHtmlFn(false)).toBe("false");
+        expect(escapeHtml(123)).toBe("123");
+        expect(escapeHtml(true)).toBe("true");
+        expect(escapeHtml(null)).toBe("");
+        expect(escapeHtml(undefined)).toBe("");
+        expect(escapeHtml(0)).toBe("0");
+        expect(escapeHtml(false)).toBe("false");
+    });
+
+    it('neutralizes a full XSS payload', () => {
+        const payload = '<img src=x onerror="alert(\'1\')">';
+        const escaped = escapeHtml(payload);
+        expect(escaped.includes('<')).toBe(false);
+        expect(escaped.includes('>')).toBe(false);
+        expect(escaped).toContain('&lt;');
     });
 });

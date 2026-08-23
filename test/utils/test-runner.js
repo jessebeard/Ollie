@@ -36,7 +36,7 @@ export function getTestResults() {
     return testResults;
 }
 
-let rootNode = {
+const rootNode = {
     name: "Root",
     suites: [],
     tests: [],

@@ -1,3 +1,6 @@
+﻿/** @typedef {import('../parsers/dht-automaton.js').HuffmanTable} HuffmanTable */
+/** @typedef {import('../bit-streams/bit-reader.js').BitReader} BitReader */
+
 /**
  * Optimized Huffman decoding implementation (O(1))
  * Uses a 16-bit lookup table (Uint16Array)

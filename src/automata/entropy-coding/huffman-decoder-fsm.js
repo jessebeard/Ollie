@@ -1,3 +1,7 @@
+﻿// Type references for JSDoc
+/** @typedef {import('../bit-streams/bit-reader.js').BitReader} BitReader */
+/** @typedef {import('../parsers/dht-automaton.js').HuffmanTable} HuffmanTable */
+
 /**
  * Huffman Decoder - Decodes Huffman-encoded bitstream into quantized coefficients
  * 

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck (JSDoc contracts)
+        run: npm run typecheck
+
+      - name: Test (seeded property-based runs for reproducibility)
+        env:
+          PBT_SEED: '20260823'
+        run: npm test
+
+      - name: Golden vectors are current
+        run: |
+          npm run vectors
+          git diff --exit-code -- test/conformance/golden-vectors.json \
+            || (echo "::error::golden-vectors.json is stale — regenerate with 'npm run vectors' and commit" && exit 1)

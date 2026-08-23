@@ -12,7 +12,7 @@ export class BatchExtractor {
      * @param {Array<File>} imageFiles - List of image files
      * @param {string} [password] - Password for decryption
      * @param {Function} [onProgress] - Callback (current, total, status)
-     * @returns {Promise<{data: Uint8Array, filename: string, metadata: Object}>}
+     * @returns {Promise<[Object|null, Error|null]>} Result tuple of [{data, filename, metadata}, error]
      */
     async extract(imageFiles, password, onProgress = null) {
         const chunks = [];
@@ -85,7 +85,7 @@ export class BatchExtractor {
 
         return [{
             data: reassembled,
-            filename: 'vault.json',
+            filename: firstMetadata?.filename || 'vault.json',
             metadata: { chunk: completeGroup[0] }
         }, null];
     }

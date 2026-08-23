@@ -1,5 +1,6 @@
-
+﻿
 import { isSafeHttpUrl } from '../../../../src/utils/url-safety.js';
+import { escapeHtml } from '../../../../src/utils/escape-html.js';
 
 export class VaultView {
     constructor(element, eventBus) {
@@ -54,7 +55,7 @@ export class VaultView {
                     <h4>${this.escape(entry.title)}</h4>
                     <span class="card-subtitle">${this.escape(entry.username)}</span>
                 </div>
-                <button class="btn-icon more-btn" aria-label="Edit ${this.escape(entry.title)}">⋮</button>
+                <button class="btn-icon more-btn" aria-label="Edit ${this.escape(entry.title)}">â‹®</button>
             </div>
             <div class="card-tags" aria-label="Tags">
                 ${(entry.tags || []).map(t => `<span class="tag">${this.escape(t)}</span>`).join('')}
@@ -75,7 +76,7 @@ export class VaultView {
             this.events.emit('copy-password', entry.id);
         });
 
-        div.querySelector('.btn-launch').addEventListener('click', (e) => {
+        div.querySelector('.btn-launch').addEventListener('click', () => {
             if (!entry.url) return;
             if (!isSafeHttpUrl(entry.url)) {
                 this.events.emit('unsafe-url-blocked', { id: entry.id, url: entry.url });
@@ -87,17 +88,12 @@ export class VaultView {
         return div;
     }
 
-    getIcon(entry) {
+    getIcon(_entry) {
         // Simple heuristic for icon
-        return '🔑';
+        return 'ðŸ”‘';
     }
 
     escape(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return escapeHtml(str);
     }
 }

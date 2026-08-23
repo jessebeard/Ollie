@@ -84,10 +84,10 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
                 }
 
                 // Mutate vault: Update 30%, Delete 20%
-                let currentEntries = vault.entries;
+                const currentEntries = vault.entries;
                 let expectedCount = currentEntries.length;
 
-                for (let entry of currentEntries) {
+                for (const entry of currentEntries) {
                     const rand = Math.random();
                     if (rand < 0.20) { // Delete
                         const [newVault, err] = await vault.deleteEntry(entry.id);

@@ -29,7 +29,7 @@ export class Encryption {
                 params.additionalData = options.additionalData;
             }
 
-            const ciphertext = await cryptoObj.subtle.encrypt(params, key, data);
+            const ciphertext = await cryptoObj.subtle.encrypt(params, key, /** @type {BufferSource} */ (data));
 
             return [{ ciphertext, iv }, null];
         } catch (e) {
@@ -57,7 +57,7 @@ export class Encryption {
                 params.additionalData = options.additionalData;
             }
 
-            const decrypted = await cryptoObj.subtle.decrypt(params, key, ciphertext);
+            const decrypted = await cryptoObj.subtle.decrypt(params, key, /** @type {BufferSource} */ (ciphertext));
 
             return [new Uint8Array(decrypted), null];
         } catch (e) {

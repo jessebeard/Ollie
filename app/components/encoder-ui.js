@@ -1,7 +1,9 @@
+﻿// @ts-nocheck -- DOM-heavy UI; checkJs adoption pending (see tsconfig.json note)
 /**
  * Encoder UI logic
  */
 import { JpegEncoder } from '../../src/codec/encoder.js';
+import { logger } from '../../../../src/utils/logger.js';
 
 export function initEncoderUI() {
     const fileInput = document.getElementById('file-input');
@@ -43,7 +45,7 @@ export function initEncoderUI() {
                 const secretFile = secretInput.files[0];
                 const buffer = await secretFile.arrayBuffer();
                 secretData = new Uint8Array(buffer);
-                console.log(`Loaded secret data: ${secretData.length} bytes`);
+                logger.debug(`Loaded secret data: ${secretData.length} bytes`);
             }
 
             const passwordInput = document.getElementById('encrypt-password');
@@ -94,7 +96,7 @@ export function initEncoderUI() {
             };
             resImg.src = url;
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             statusDiv.textContent = 'Error: ' + e.message;
         }
     });

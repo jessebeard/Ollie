@@ -6,7 +6,12 @@ import { getCrypto } from './crypto-provider.js';
 
 export class KeyDerivation {
 
-    static ITERATIONS = 100000;
+    /**
+     * OWASP-aligned default (600k SHA-256). Recorded per-vault in the KDF
+     * block, so raising this never breaks existing vaults; only new saves
+     * adopt the stronger parameter.
+     */
+    static ITERATIONS = 600000;
 
     static SALT_SIZE = 16;
 
@@ -41,7 +46,7 @@ export class KeyDerivation {
             const key = await cryptoObj.subtle.deriveKey(
                 {
                     name: 'PBKDF2',
-                    salt: salt,
+                    salt: /** @type {BufferSource} */ (salt),
                     iterations: iterations,
                     hash: 'SHA-256'
                 },

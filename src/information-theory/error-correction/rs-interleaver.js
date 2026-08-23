@@ -2,7 +2,7 @@ import {
     ReedSolomonEncoder,
     ReedSolomonDecoder,
     GenericGF_QR_CODE_FIELD_256
-} from './reedsolomon.js';
+} from './index.js';
 
 /**
  * ECC Profiles for Reed-Solomon encoding.

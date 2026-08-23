@@ -1,4 +1,4 @@
-
+﻿
 
 export class GenericGF {
     constructor(primitive, size, b) {
@@ -101,7 +101,7 @@ export class GenericGFPoly {
             while (firstNonZero < coefficientsLength && coefficients[firstNonZero] === 0) {
                 firstNonZero++;
             }
-            if (firstNonZero == coefficientsLength) {
+            if (firstNonZero === coefficientsLength) {
                 this.coefficients = GenericGFPoly.COEFFICIENTS_ZERO;
             } else {
                 this.coefficients = coefficients.subarray(firstNonZero, coefficientsLength);
@@ -136,7 +136,7 @@ export class GenericGFPoly {
         const coefficients = this.coefficients;
         const size = coefficients.length;
         let result;
-        if (a == 1) {
+        if (a === 1) {
             
             result = 0;
             for (let i = 0, len = coefficients.length; i < len; i++) {
@@ -214,7 +214,7 @@ export class GenericGFPoly {
         if (scalar === 0) {
             return this.field.zero;
         }
-        if (scalar == 1) {
+        if (scalar === 1) {
             return this;
         }
         const size = this.coefficients.length;
@@ -279,11 +279,11 @@ export class GenericGFPoly {
                         result += " + ";
                     }
                 }
-                if (degree === 0 || coefficient != 1) {
+                if (degree === 0 || coefficient !== 1) {
                     const alphaPower = this.field.log(coefficient);
                     if (alphaPower === 0) {
                         result += '1';
-                    } else if (alphaPower == 1) {
+                    } else if (alphaPower === 1) {
                         result += 'a';
                     } else {
                         result += "a^";
@@ -291,7 +291,7 @@ export class GenericGFPoly {
                     }
                 }
                 if (degree !== 0) {
-                    if (degree == 1) {
+                    if (degree === 1) {
                         result += 'x';
                     } else {
                         result += "x^";

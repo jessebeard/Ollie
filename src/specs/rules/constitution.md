@@ -18,4 +18,6 @@ Ollie is also meant to be a test bed for a Rust implementation of the same funct
 
 Ollie has a UI that is clean and modern, and easy to use. 
  
-Ollie projects should have a outline.xml file in the specs folder that outlines the project, and the rules for the project. 
+Ollie projects should have a outline.xml file in the specs folder that outlines the project, and the rules for the project.
+
+Ollie maintains a complete mermaid.js wireframe of the entire project in `WIREFRAME.md` at the repository root: directory layout, layer and module dependency graphs, runtime pipelines, the wire-format stack, and the test architecture. The wireframe is a living document and must be updated in the same change that modifies project structure or dependencies, so the whole system remains understandable from one diagram at all times.

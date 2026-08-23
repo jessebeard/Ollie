@@ -70,7 +70,7 @@ describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
                 }
 
                 // Test each carrier format separately
-                for (let carrier of carriers) {
+                for (const carrier of carriers) {
                     const mockImage = new MockFile(carrier.bytes, carrier.name);
 
                     const [savedFiles, saveErr] = await vault.save([mockImage], password);
