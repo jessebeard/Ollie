@@ -1,5 +1,5 @@
 import { JpegDecoder } from './decoder.js';
-import { F5 } from '../information-theory/steganography/f5-syndrome.js';
+import { BatchEmbedder } from '../information-theory/steganography/batch-embedder.js';
 
 /**
  * CapacityScanner - Orchestrates steganographic capacity analysis across multiple JPEGs.
@@ -22,14 +22,16 @@ export class CapacityScanner {
         const concurrency = options.concurrency || 1;
         let analyzer = options.analyzer;
         
-        // Default analyzer: Decodes JPEG and calculates F5 capacity
+        // Default analyzer: Decodes JPEG and calculates capacity via the
+        // embedder's own container-mode math (single source of truth)
         if (!analyzer) {
+            const { format, metadata, ...capacityOpts } = options.f5Options || {};
             analyzer = async (file) => {
                 const decoder = new JpegDecoder();
                 const buffer = await file.arrayBuffer();
                 const bytes = new Uint8Array(buffer);
-                
-                const [info, err] = await decoder.decode(bytes, { coefficientsOnly: true });
+
+                const [info, err] = await decoder.decode(bytes, { skipExtraction: true, coefficientsOnly: true });
                 if (err) return [null, err];
 
                 const allBlocks = [];
@@ -40,7 +42,7 @@ export class CapacityScanner {
                     }
                 }
 
-                const capacity = F5.calculateCapacity(allBlocks, options.f5Options || {});
+                const capacity = BatchEmbedder.calculateCarrierCapacity(allBlocks, capacityOpts, metadata);
                 return [capacity, null];
             };
         }

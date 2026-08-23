@@ -115,8 +115,8 @@ export function decodeValue(bits, size) {
  * @returns {[{block: Int32Array, dc: number}, null] | [null, Error]} Tuple: decoded block and DC, or error
  */
 export function decodeBlock(bitReader, dcTable, acTable, previousDC, block = null, Ss = 0, Se = 63) {
-    if (!block) {
-        block = new Int32Array(64);
+    if (!block || !(block instanceof Int32Array) || block.length !== 64) {
+        return [null, new Error('decodeBlock requires a target Int32Array(64) block')];
     }
 
     let dc = previousDC;

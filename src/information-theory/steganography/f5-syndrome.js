@@ -739,26 +739,31 @@ export class F5 {
         }
 
         if (metadata.ecc) {
-            if (metadata.eccProfile && metadata.originalLength !== undefined) {
-                const [recovered, recoverErr] = ErrorCorrection.recover(
-                    payload,
-                    metadata.eccProfile,
-                    metadata.originalLength,
-                    metadata.blockCount
-                );
-                if (recoverErr) {
-                    logger.error('F5: ECC recovery failed:', recoverErr);
-                    return null;
-                }
-                payload = recovered;
-            } else {
-                const [recovered, legacyRecoverErr] = ErrorCorrection.recover(payload);
-                if (legacyRecoverErr) {
-                    logger.error('F5: Legacy ECC recovery failed:', legacyRecoverErr);
-                    return null;
-                }
-                payload = recovered;
+            const profileName = metadata.eccProfile;
+            const originalLength = metadata.originalLength;
+            const blockCount = metadata.blockCount;
+
+            if (
+                !profileName || !ECC_PROFILES[profileName] ||
+                !Number.isInteger(originalLength) || originalLength < 0 ||
+                originalLength > 100 * 1024 * 1024 ||
+                !Number.isInteger(blockCount)
+            ) {
+                logger.warn('F5: Rejecting container with invalid or incomplete ECC parameters');
+                return null;
             }
+
+            const [recovered, recoverErr] = ErrorCorrection.recover(
+                payload,
+                profileName,
+                originalLength,
+                blockCount
+            );
+            if (recoverErr) {
+                logger.error('F5: ECC recovery failed:', recoverErr);
+                return null;
+            }
+            payload = recovered;
         }
 
         if (metadata.encrypted) {

@@ -336,8 +336,9 @@ export class JpegDecoder {
             const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
             const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
             const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
+            const compState = this.components[scanComp.selector];
             const blocksInMCU = frameComp ? frameComp.hSampling * frameComp.vSampling : 0;
-            const blocksH = this.components[scanComp.selector] ? this.components[scanComp.selector].blocksH : 0;
+            const blocksH = compState ? compState.blocksH : 0;
 
             return {
                 scanComp,
@@ -346,7 +347,8 @@ export class JpegDecoder {
                 dcTable,
                 acTable,
                 blocksInMCU,
-                blocksH
+                blocksH,
+                blocksArr: compState ? compState.blocks : null
             };
         });
 
@@ -426,14 +428,18 @@ export class JpegDecoder {
 
             for (let c = 0; c < scanComponentMetadata.length; c++) {
                 const meta = scanComponentMetadata[c];
-                const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH } = meta;
+                const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH, blocksArr } = meta;
 
                 for (let i = 0; i < blocksInMCU; i++) {
                     const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
                     const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
                     const blockIndex = blockRow * blocksH + blockCol;
 
-                    const block = this.components[scanComp.selector].blocks[blockIndex];
+                    if (!blocksArr || !Number.isInteger(blockIndex) || blockIndex < 0 || blockIndex >= blocksArr.length) {
+                        return new Error(`Block index ${blockIndex} out of range for component ${scanComp.selector} (have ${blocksArr ? blocksArr.length : 0} blocks)`);
+                    }
+
+                    const block = blocksArr[blockIndex];
 
                     const [blockResult, blockErr] = decodeBlock(
                         bitReader,

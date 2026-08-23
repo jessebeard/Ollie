@@ -120,8 +120,19 @@ export class ErrorCorrection {
         const { dataBytes, parityBytes } = profile;
         const decoder = new ReedSolomonDecoder(this.FIELD);
 
-        if (blockCount === null) {
+        if (blockCount === null || blockCount === undefined) {
             blockCount = Math.floor(encoded.length / BLOCK_SIZE);
+        }
+
+        const maxBlocks = Math.floor(encoded.length / BLOCK_SIZE);
+        if (!Number.isInteger(blockCount) || blockCount < 1 || blockCount > maxBlocks) {
+            return [null, new Error(`Invalid block count ${blockCount} for encoded payload of ${encoded.length} bytes`)];
+        }
+
+        if (originalLength !== null && originalLength !== undefined) {
+            if (!Number.isInteger(originalLength) || originalLength < 0 || originalLength > blockCount * dataBytes) {
+                return [null, new Error(`Invalid original length ${originalLength} for ${blockCount} block(s) of ${dataBytes} data bytes`)];
+            }
         }
 
         const blocks = this._deinterleave(encoded, blockCount, BLOCK_SIZE);

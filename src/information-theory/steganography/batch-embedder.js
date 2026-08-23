@@ -9,6 +9,46 @@ import { logger } from '../../utils/logger.js';
  * BatchEmbedder - Handles embedding data across multiple images
  */
 export class BatchEmbedder {
+
+    /**
+     * Upper-bound template of the per-chunk container metadata used for
+     * capacity estimation. It must never serialize smaller than the real
+     * metadata written at embed time, or estimates overshoot capacity.
+     *
+     * @returns {Object}
+     */
+    static CAPACITY_METADATA_TEMPLATE() {
+        return {
+            filename: 'vault.json',
+            chunk: { id: '0'.repeat(36), index: 999, total: 9999 },
+            checksum: 4294967295,
+            originalLength: 99999999,
+            blockCount: 999999
+        };
+    }
+
+    /**
+     * Single source of truth for carrier capacity in container mode.
+     * Both the batch embedder and the capacity scanner must use this.
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Object} [opts] - { eccProfile?, encrypted?, ecc? }
+     * @param {Object} [extraMetadata] - Caller metadata merged over the template
+     * @returns {number} Capacity in bytes available for payload
+     */
+    static calculateCarrierCapacity(blocks, opts = {}, extraMetadata = {}) {
+        const metadata = { ...BatchEmbedder.CAPACITY_METADATA_TEMPLATE(), ...extraMetadata };
+        const useEcc = opts.ecc !== false;
+        const eccProfile = opts.eccProfile || (metadata && metadata.eccProfile) || 'Medium';
+
+        return F5.calculateCapacity(blocks, {
+            format: 'container',
+            metadata,
+            ecc: useEcc,
+            eccProfile,
+            encrypted: !!opts.encrypted
+        });
+    }
     /**
      * Embeds data across multiple images with capacity-aware chunking
      * 
@@ -142,30 +182,17 @@ export class BatchEmbedder {
                 return [null, new Error(`Failed to extract blocks from ${file.name} for capacity calculation`)];
             }
 
-            const representativeMetadata = {
-                filename: options.filename || 'placeholder_filename.ext',
-                chunk: { index: 99, total: 99, start: 999999, end: 999999 },
-                checksum: '0'.repeat(32)
-            };
-
             const eccProfile = options.eccProfile || 'Medium';
             const useEcc = options.ecc !== false;
+            const capacityOpts = { ecc: useEcc, eccProfile, encrypted: !!options.password };
+            const extraMetadata = options.filename ? { filename: options.filename } : {};
 
-            let capacity = F5.calculateCapacity(allBlocks, {
-                format: 'container',
-                metadata: representativeMetadata,
-                ecc: useEcc,
-                eccProfile: eccProfile,
-                encrypted: !!options.password
-            });
+            let capacity = BatchEmbedder.calculateCarrierCapacity(allBlocks, capacityOpts, extraMetadata);
 
             if (capacity === 0 && useEcc) {
-                capacity = F5.calculateCapacity(allBlocks, {
-                    format: 'container',
-                    metadata: representativeMetadata,
-                    ecc: false,
-                    encrypted: !!options.password
-                });
+                capacity = BatchEmbedder.calculateCarrierCapacity(
+                    allBlocks, { ...capacityOpts, ecc: false }, extraMetadata
+                );
                 logger.debug(`${file.name}: ECC capacity 0, fallback to no-ECC: ${capacity} bytes`);
             }
 

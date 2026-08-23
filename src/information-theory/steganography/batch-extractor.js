@@ -68,43 +68,10 @@ export class BatchExtractor {
             return [null, new Error('No valid chunks found in provided images.')];
         }
 
-        // Group chunks by chunkId
-        const chunkGroups = new Map();
-        for (const chunk of chunks) {
-            if (!chunkGroups.has(chunk.chunkId)) {
-                chunkGroups.set(chunk.chunkId, []);
-            }
-            chunkGroups.get(chunk.chunkId).push(chunk);
-        }
-
-        // Find a complete group
-        let completeGroup = null;
-        let bestErrorMsg = 'No complete vault payload found across images.';
-
-        for (const [chunkId, groupChunks] of chunkGroups.entries()) {
-            const sorted = [...groupChunks].sort((a, b) => a.index - b.index);
-            const expectedTotal = sorted[0].total;
-
-            if (sorted.length !== expectedTotal) {
-                const presentIndices = new Set(sorted.map(c => c.index));
-                const missingIndices = [];
-                for (let i = 0; i < expectedTotal; i++) {
-                    if (!presentIndices.has(i)) missingIndices.push(i);
-                }
-                const msg = `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`;
-                logger.warn(msg);
-                bestErrorMsg = msg;
-                continue; // Try next group
-            }
-
-            // Group is complete
-            completeGroup = sorted;
-            break;
-        }
-
+        const { group: completeGroup, error: groupError } = BatchExtractor.selectCompleteGroup(chunks, total);
         if (!completeGroup) {
-            logger.error(bestErrorMsg);
-            return [null, new Error(bestErrorMsg)];
+            logger.warn(groupError.message);
+            return [null, groupError];
         }
 
         if (onProgress) {
@@ -113,19 +80,71 @@ export class BatchExtractor {
 
         const [reassembled, reassembleErr] = ChunkManager.reassemble(completeGroup);
         if (reassembleErr) {
-            logger.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
-            return null; // or perhaps return [null, reassembleErr]
+            return [null, reassembleErr];
         }
-
-        firstMetadata = chunks.find(c => c.chunkId === completeGroup[0].chunkId);
-        // Find the metadata corresponding to the complete group! But wait, `firstMetadata` in the loop was tracking the very first one which might be from a corrupted group.
-        // Actually BatchExtractor returns simply { data, filename, metadata}.
-        // We can just use the chunk metadata of the successful group.
 
         return [{
             data: reassembled,
-            filename: firstMetadata ? 'vault.json' : 'unknown',
-            metadata: { chunk: completeGroup[0] } // Mock or assemble metadata
+            filename: 'vault.json',
+            metadata: { chunk: completeGroup[0] }
         }, null];
+    }
+
+    /**
+     * Selects a complete, contiguous, duplicate-free chunk group from
+     * carrier-extracted chunk records. All metadata here originates from
+     * attacker-readable carriers, so every value is bounded before use.
+     *
+     * @param {Array<Object>} records - Extracted chunk records
+     * @param {number} maxTotal - Upper bound for any plausible total (carrier file count)
+     * @returns {{group: Array<Object>|null, error: Error|null}}
+     */
+    static selectCompleteGroup(records, maxTotal) {
+        const groups = new Map();
+        let bestError = new Error('No complete vault payload found across images.');
+
+        for (const record of records) {
+            if (!Number.isInteger(record.total) || !Number.isInteger(record.index)) continue;
+            if (record.total < 1 || record.total > maxTotal || record.index < 0 || record.index >= record.total) continue;
+
+            let group = groups.get(record.chunkId);
+            if (!group) {
+                group = [];
+                groups.set(record.chunkId, group);
+            }
+            group.push(record);
+        }
+
+        for (const [chunkId, groupChunks] of groups.entries()) {
+            const sorted = [...groupChunks].sort((a, b) => a.index - b.index);
+            const expectedTotal = sorted[0].total;
+
+            let duplicate = false;
+            const presentIndices = new Set();
+            for (const chunk of sorted) {
+                if (presentIndices.has(chunk.index)) { duplicate = true; break; }
+                presentIndices.add(chunk.index);
+            }
+
+            if (duplicate) {
+                bestError = new Error(`Duplicate chunk indices in set ${chunkId}`);
+                continue;
+            }
+
+            if (sorted.length !== expectedTotal) {
+                const missingIndices = [];
+                for (let i = 0; i < expectedTotal; i++) {
+                    if (!presentIndices.has(i)) missingIndices.push(i);
+                }
+                bestError = new Error(
+                    `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`
+                );
+                continue;
+            }
+
+            return { group: sorted, error: null };
+        }
+
+        return { group: null, error: bestError };
     }
 }

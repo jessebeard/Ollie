@@ -155,7 +155,8 @@ describe('HuffmanDecoder', () => {
         const data = new Uint8Array([0b01100000]);
         const reader = new BitReader(data);
 
-        const [result, blkErr] = decodeBlock(reader, dcTable, acTable, 0);
+        const targetBlock = new Int32Array(64);
+        const [result, blkErr] = decodeBlock(reader, dcTable, acTable, 0, targetBlock);
         expect(blkErr).toEqual(null);
 
         expect(result.dc).toBe(3);

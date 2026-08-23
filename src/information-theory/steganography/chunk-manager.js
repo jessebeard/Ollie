@@ -1,4 +1,5 @@
 import { randomUUID } from '../cryptography/crypto-provider.js';
+import { crc32 } from '../../utils/crc32.js';
 
 /**
  * ChunkManager - Handles splitting large data into chunks and reassembling them
@@ -13,6 +14,10 @@ export class ChunkManager {
      * @returns {Array<Object>} Array of chunk objects
      */
     static split(data, chunkSize, chunkId = null) {
+        if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+            throw new TypeError(`Invalid chunk size: ${chunkSize}`);
+        }
+
         const chunks = [];
         const id = chunkId || ChunkManager.generateId();
         const totalChunks = Math.ceil(data.length / chunkSize);
@@ -67,6 +72,10 @@ export class ChunkManager {
 
         let totalSize = 0;
         for (const chunk of sorted) {
+            const expected = this.calculateChecksum(chunk.data);
+            if (chunk.checksum !== expected) {
+                return [null, new Error(`Checksum mismatch in chunk index ${chunk.index}: stored ${chunk.checksum}, computed ${expected}`)];
+            }
             totalSize += chunk.data.length;
         }
 
@@ -91,16 +100,12 @@ export class ChunkManager {
     }
 
     /**
-     * Calculates a simple checksum for data
-     * 
-     * @param {Uint8Array} data 
-     * @returns {number} Checksum value
+     * Calculates a CRC32 integrity checksum for data.
+     *
+     * @param {Uint8Array} data
+     * @returns {number} Unsigned 32-bit CRC32 value
      */
     static calculateChecksum(data) {
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) {
-            sum = (sum + data[i]) & 0xFFFFFFFF;
-        }
-        return sum;
+        return crc32(data);
     }
 }
