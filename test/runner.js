@@ -191,6 +191,9 @@ async function runTests() {
         await import('./information-theory/cryptography/hmac.test.js');
         await import('./security/carrier-manifest.test.js');
         await import('./security/manifest-enforcement.test.js');
+        await import('./security/gf-shamir.test.js');
+        await import('./security/css-envelope.test.js');
+        await import('./security/threshold-vault.test.js');
 
         await import('./integration/error-correction/reed-solomon-integration.test.js');
         await import('./information-theory/error-correction/galois-field.test.js');

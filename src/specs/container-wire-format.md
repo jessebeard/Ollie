@@ -130,8 +130,35 @@ depend on. Deviations here break every bit-exact vector.
     enc.iterations integer   MUST be within [50000, 10000000]
 
     Producers SHOULD emit keys in this order: filename?, chunk?, checksum?,
-    ecc, eccProfile?, originalLength?, blockCount?, enc?  (JSON key order is
-    not semantic but IS covered by the CRC; byte-exact vectors pin one order.)
+    ecc, eccProfile?, originalLength?, blockCount?, enc?, manifest?
+    (JSON key order is not semantic but IS covered by the CRC; byte-exact
+    vectors pin one order.)
+
+3.2.1 Manifest block (optional since Wave H). When present, `manifest` is an
+    authenticated summary of the carrier set:
+
+        manifest: {
+            format: 'ollie-manifest'   (exact string)
+            version: 1
+            chunkSetId: string (1..64 chars)
+            total: integer >= 1 (== entries.length)
+            revision: integer >= 0 (vault document revision at save time)
+            created: ISO-8601 string
+            entries: [{index, checksum}] - ascending, indices 0..total-1,
+                     checksum = CRC32 of that chunk's payload bytes
+            share?: { index 1..total, threshold >= 1, data: base64 }
+                    (per-carrier key share, threshold mode only)
+            kdf: { algo:'PBKDF2-SHA256', iterations in [50000,10000000],
+                   salt: base64 (16 bytes) }
+            mac: base64 - HMAC-SHA256 over canonicalManifestBytes(manifest),
+                 where canonical order is fixed and the mac field excludes
+                 itself from MAC input
+        }
+
+    Readers MUST verify each carrier's manifest under the password-derived
+    key, require agreement across carriers on all fields except `share`
+    and `mac`, and bind every extracted chunk to its manifest entry.
+    Sets without manifests fail closed (re-save required).
 
 3.3 CRC32: standard IEEE reflected CRC-32, polynomial 0xEDB88320, initial
     0xFFFFFFFF, final XOR 0xFFFFFFFF (zlib/PNG compatible). The check value of
@@ -240,6 +267,26 @@ embedded per carrier image.
     exactly `total` records with distinct indices covering 0..total-1; verify
     each chunk checksum; concatenate in index order. Any violation fails the
     whole load - there is no partial recovery across chunk sets.
+
+6.4 Threshold recovery mode (CSS, optional). When the manifest carries a
+    `share` envelope, the payload is sealed under a fresh random 256-bit DEK
+    (AES-256-GCM) and the DEK is Shamir-split over GF(256):
+
+        - Every carrier replicates the SAME sealed envelope as its single
+          chunk: payload = iv(12) || ciphertext(payload + 16-byte GCM tag),
+          manifest.total == 1, manifest.entries = [{index:0, checksum}]
+        - Each carrier's manifest.share holds its unique key share
+          {index in 1..n, threshold, data(base64)}; shares are MAC-covered
+          by their own carrier's manifest
+        - Load requires >= `threshold` carriers with DISTINCT share indices;
+          file copies of an already-present index count once
+        - Replicated envelopes MUST be byte-identical across provided
+          carriers (mixed or rolled-back sets fail closed)
+        - Reconstruction = combineShares(shares) -> DEK -> AES-GCM open;
+          authentication failure fails closed with no partial output
+
+    Security note: below-threshold share sets reveal nothing beyond the
+    AES layer's computational bounds. The DEK is never stored in the clear.
 
 --------------------------------------------------------------------------------
 7. Layer 6 - Vault Document & Export Envelope

@@ -149,6 +149,7 @@ export function validateManifestStructure(m) {
  * @param {string} spec.password - Master password (MAC key source)
  * @param {string} [spec.created] - ISO timestamp override (tests)
  * @param {{index: number, threshold: number, data: string}} [spec.share] - CSS envelope (H2)
+ * @param {{algo: string, iterations: number, salt: string}} [spec.kdf] - Reuse one KDF block across a carrier set
  * @returns {Promise<[Object|null, Error|null]>}
  */
 export async function createManifest(spec) {
@@ -172,14 +173,22 @@ export async function createManifest(spec) {
             return [null, new Error('manifest: password required for signing')];
         }
 
-        const [salt, saltErr] = await KeyDerivation.generateSalt();
+        const [salt, saltErr] = spec.kdf
+            ? [base64ToBytes(spec.kdf.salt), null]
+            : await KeyDerivation.generateSalt();
         if (saltErr) return [null, saltErr];
 
-        const kdf = {
-            algo: 'PBKDF2-SHA256',
-            iterations: KeyDerivation.ITERATIONS,
-            salt: bytesToBase64(salt)
-        };
+        const kdf = spec.kdf
+            ? {
+                algo: 'PBKDF2-SHA256',
+                iterations: spec.kdf.iterations,
+                salt: spec.kdf.salt
+            }
+            : {
+                algo: 'PBKDF2-SHA256',
+                iterations: KeyDerivation.ITERATIONS,
+                salt: bytesToBase64(salt)
+            };
 
         const [macKey, keyErr] = await deriveMacKey(spec.password, kdf);
         if (keyErr) return [null, keyErr];

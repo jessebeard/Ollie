@@ -1,9 +1,9 @@
-# Ollie — Project Wireframe
+﻿# Ollie â€” Project Wireframe
 
 Complete mermaid.js map of the codebase: layers, module dependencies,
 runtime pipelines, the wire-format stack, vault flows, and test architecture.
 
-> **Living document** — see `src/specs/rules/code-quality.md` rule 15.
+> **Living document** â€” see `src/specs/rules/code-quality.md` rule 15.
 > Any change that adds/removes/renames/moves a module or changes a
 > cross-layer dependency MUST update this file in the same change.
 >
@@ -16,56 +16,58 @@ runtime pipelines, the wire-format stack, vault flows, and test architecture.
 
 ```text
 Ollie/
-├── app/                          # Browser UI (ES modules, no framework)
-│   ├── index.html / debug.html / test.html / vault.html
-│   ├── main.js                   # Demo entry point (encoder/decoder tabs)
-│   ├── vault.js                  # Vault page bootstrap
-│   └── components/
-│       ├── encoder-ui.js         # Encode tab (quality, ECC options)
-│       ├── decoder-ui.js         # Decode tab (IDCT/bitreader switching)
-│       ├── tabs.js               # Tab shell
-│       └── vault/
-│           ├── vault-ui.js       # Vault orchestrator (save/load/search)
-│           └── components/
-│               ├── drop-zone.js      # File drop (folder traversal)
-│               ├── modal-manager.js  # Confirm/prompt dialogs
-│               └── vault-view.js     # Entry list + URL safety gate
-├── scripts/
-│   ├── cli.mjs                   # Headless vault save/load/verify
-│   ├── dev-server.js             # Local dev server
-│   ├── generate-golden-vectors.mjs  # Regenerates conformance vectors
-│   └── debug-rs-limit.js         # RS debugging aid
-├── src/
-│   ├── algebraic/                # Pure math transforms (no I/O)
-│   │   ├── colorspace/           # rgb-to-ycbcr
-│   │   ├── discrete-cosine/      # forward-dct, inverse-dct (+spec variants)
-│   │   ├── mappings/             # blocks, zigzag, up/downsampling, assembly
-│   │   └── quantization/         # forward/inverse quantization
-│   ├── automata/                 # Bit-level state machines
-│   │   ├── bit-streams/          # bit-reader(s), bit-writer, bit-core
-│   │   ├── entropy-coding/       # huffman encoder/decoder FSMs
-│   │   └── parsers/              # marker/dht/dqt/sof/sos/spiff automata
-│   ├── codec/                    # High-level orchestrators
-│   │   ├── encoder.js  decoder.js  transcoder.js
-│   │   ├── capacity-scanner.js  file-scanner.js
-│   ├── information-theory/
-│   │   ├── cryptography/         # pbkdf2, aes-gcm, crypto-provider
-│   │   ├── error-correction/     # galois-field, reed-solomon-codec, rs-interleaver
-│   │   └── steganography/        # f5-syndrome, batch-embedder/-extractor, chunk-manager
-│   ├── structures/vault/         # immutable-vault, secure-record
-│   ├── utils/                    # crc32, encoding, logger, url-safety,
-│   │                             # escape-html, atomic-writer
-│   └── specs/                    # Normative specs and project rules
-├── test/                         # Node runner + browser suite (see §7)
-├── docs/audits/                  # Historical audit reports (archived)
-└── WIREFRAME.md                  # This file
+â”œâ”€â”€ app/                          # Browser UI (ES modules, no framework)
+â”‚   â”œâ”€â”€ index.html / debug.html / test.html / vault.html
+â”‚   â”œâ”€â”€ main.js                   # Demo entry point (encoder/decoder tabs)
+â”‚   â”œâ”€â”€ vault.js                  # Vault page bootstrap
+â”‚   â””â”€â”€ components/
+â”‚       â”œâ”€â”€ encoder-ui.js         # Encode tab (quality, ECC options)
+â”‚       â”œâ”€â”€ decoder-ui.js         # Decode tab (IDCT/bitreader switching)
+â”‚       â”œâ”€â”€ tabs.js               # Tab shell
+â”‚       â””â”€â”€ vault/
+â”‚           â”œâ”€â”€ vault-ui.js       # Vault orchestrator (save/load/search)
+â”‚           â””â”€â”€ components/
+â”‚               â”œâ”€â”€ drop-zone.js      # File drop (folder traversal)
+â”‚               â”œâ”€â”€ modal-manager.js  # Confirm/prompt dialogs
+â”‚               â””â”€â”€ vault-view.js     # Entry list + URL safety gate
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ cli.mjs                   # Headless vault save/load/verify
+â”‚   â”œâ”€â”€ dev-server.js             # Local dev server
+â”‚   â”œâ”€â”€ generate-golden-vectors.mjs  # Regenerates conformance vectors
+â”‚   â””â”€â”€ debug-rs-limit.js         # RS debugging aid
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ algebraic/                # Pure math transforms (no I/O)
+â”‚   â”‚   â”œâ”€â”€ colorspace/           # rgb-to-ycbcr
+â”‚   â”‚   â”œâ”€â”€ discrete-cosine/      # forward-dct, inverse-dct (+spec variants)
+â”‚   â”‚   â”œâ”€â”€ mappings/             # blocks, zigzag, up/downsampling, assembly
+â”‚   â”‚   â””â”€â”€ quantization/         # forward/inverse quantization
+â”‚   â”œâ”€â”€ automata/                 # Bit-level state machines
+â”‚   â”‚   â”œâ”€â”€ bit-streams/          # bit-reader(s), bit-writer, bit-core
+â”‚   â”‚   â”œâ”€â”€ entropy-coding/       # huffman encoder/decoder FSMs
+â”‚   â”‚   â””â”€â”€ parsers/              # marker/dht/dqt/sof/sos/spiff automata
+â”‚   â”œâ”€â”€ codec/                    # High-level orchestrators
+â”‚   â”‚   â”œâ”€â”€ encoder.js  decoder.js  transcoder.js
+â”‚   â”‚   â”œâ”€â”€ capacity-scanner.js  file-scanner.js
+â”‚   â”œâ”€â”€ information-theory/
+â”‚   â”‚   â”œâ”€â”€ cryptography/         # pbkdf2, aes-gcm, hmac, crypto-provider
+â”‚   â”‚   â”œâ”€â”€ error-correction/     # galois-field, reed-solomon-codec, rs-interleaver
+â”‚   â”‚   â”œâ”€â”€ secret-sharing/       # gf-shamir (k-of-n), css-envelope
+â”‚   â”‚   â””â”€â”€ steganography/        # f5-syndrome, batch-embedder/-extractor,
+â”‚   â”‚                             # chunk-manager, carrier-manifest
+â”‚   â”œâ”€â”€ structures/vault/         # immutable-vault, secure-record
+â”‚   â”œâ”€â”€ utils/                    # crc32, encoding, logger, url-safety,
+â”‚   â”‚                             # escape-html, atomic-writer
+â”‚   â””â”€â”€ specs/                    # Normative specs and project rules
+â”œâ”€â”€ test/                         # Node runner + browser suite (see Â§7)
+â”œâ”€â”€ docs/audits/                  # Historical audit reports (archived)
+â””â”€â”€ WIREFRAME.md                  # This file
 ```
 
 ---
 
 ## 2. Layered Architecture
 
-Strict downward dependencies only — no upward imports anywhere in the codebase.
+Strict downward dependencies only â€” no upward imports anywhere in the codebase.
 
 ```mermaid
 flowchart TB
@@ -75,7 +77,7 @@ flowchart TB
         CLI["scripts/cli.mjs<br/>headless save/load/verify"]
     end
 
-    subgraph APP["app/components — Browser UI"]
+    subgraph APP["app/components â€” Browser UI"]
         ENCUI["encoder-ui"]
         DECUI["decoder-ui"]
         VUI["vault-ui<br/>+ drop-zone / modal / vault-view"]
@@ -87,9 +89,11 @@ flowchart TB
     end
 
     subgraph IT["information-theory"]
-        STEGO["steganography<br/>F5 · BatchEmbedder · BatchExtractor · ChunkManager"]
-        ECC["error-correction<br/>rs-interleaver · reed-solomon-codec · galois-field"]
-        CRYPTO["cryptography<br/>pbkdf2 · aes-gcm · crypto-provider"]
+        STEGO["steganography<br/>F5 Â· BatchEmbedder Â· BatchExtractor Â· ChunkManager"]
+        MANIFEST["carrier-manifest<br/>HMAC-authenticated set summaries"]
+        CSS["secret-sharing<br/>gf-shamir Â· css-envelope"]
+        ECC["error-correction<br/>rs-interleaver Â· reed-solomon-codec Â· galois-field"]
+        CRYPTO["cryptography<br/>pbkdf2 Â· aes-gcm Â· hmac Â· crypto-provider"]
     end
 
     subgraph CODEC["codec"]
@@ -100,20 +104,20 @@ flowchart TB
         FSC["FileScanner"]
     end
 
-    subgraph MATH["algebraic — pure transforms"]
+    subgraph MATH["algebraic â€” pure transforms"]
         DCT["DCT / IDCT"]
         QUANT["quantization"]
-        MAPS["zigzag · blocks · sampling"]
+        MAPS["zigzag Â· blocks Â· sampling"]
         COLOR["colorspace"]
     end
 
-    subgraph AUTO["automata — bit-level FSMs"]
-        BITS["bit-streams<br/>BitReader · BitWriter"]
+    subgraph AUTO["automata â€” bit-level FSMs"]
+        BITS["bit-streams<br/>BitReader Â· BitWriter"]
         HUF["huffman FSMs"]
         PARSERS["JPEG marker parsers"]
     end
 
-    UTILS["utils<br/>crc32 · encoding · logger · url-safety"]
+    UTILS["utils<br/>crc32 Â· encoding Â· logger Â· url-safety"]
     WEBGPU["WebCrypto<br/>platform boundary"]
 
     MAIN --> ENCUI
@@ -180,11 +184,16 @@ flowchart LR
         bem["batch-embedder.js"]
         bex["batch-extractor.js"]
         cm["chunk-manager.js"]
+        cman["carrier-manifest.js"]
+    end
+
+    subgraph ss
+        shamir["gf-shamir.js"]
+        env["css-envelope.js"]
     end
 
     subgraph ecc
         rsi["rs-interleaver.js"]
-        shim["reedsolomon.js"]
         rsc["reed-solomon-codec.js"]
         gf["galois-field.js"]
     end
@@ -192,6 +201,7 @@ flowchart LR
     subgraph crypto
         pbkdf["pbkdf2.js"]
         aes["aes-gcm.js"]
+        hmack["hmac.js"]
         cprov["crypto-provider.js"]
     end
 
@@ -227,10 +237,12 @@ flowchart LR
     bem --> cm
     bem --> trans
     bem --> f5
+    bem --> cman
     bex --> cm
     bex --> dec
+    bex --> cman
+    bex --> env
     cm --> cprov
-    cm --> crc["utils/crc32.js"]
 
     f5 --> rsi
     f5 --> aes
@@ -238,10 +250,14 @@ flowchart LR
     f5 --> cprov
     f5 --> crc
 
-    rsi --> shim
-    shim --> idx["error-correction/index.js"]
-    idx --> rsc
-    rsc --> gf
+    rsi --> eidx["error-correction/index.js"]
+    eidx --> rsc
+    eidx --> gf
+
+    cman --> hmack
+    cman --> pbkdf
+    env --> shamir
+    env --> aes
 
     enc --> alg["algebraic/*"]
     enc --> huffenc["huffman-encoder-fsm"]
@@ -309,13 +325,13 @@ Byte-exact conformance vectors: `test/conformance/golden-vectors.json`.
 
 ```mermaid
 flowchart TB
-    L6["Layer 6 — Vault document / export envelope<br/>JSON v3.0 · session-key wrap · ollie-export v1"]
-    L5["Layer 5 — Multi-carrier chunking<br/>chunk id UUID · index/total · CRC32 per chunk"]
-    L4["Layer 4 — Encryption envelope<br/>PBKDF2-SHA256 (50k-10M iter) + AES-256-GCM<br/>salt16 + iv12 + ct+tag16"]
-    L3["Layer 3 — ECC framing<br/>RS(255,k) GF(256) poly 0x11D · Low..Extreme<br/>column-major interleave"]
-    L2["Layer 2 — Container framing v2<br/>F5SG | ver=2 | flags | k | metaLen | metadata JSON | len | payload | CRC32"]
-    L1["Layer 1 — F5 embedding<br/>matrix encoding · shrinkage retry · seeded permutation"]
-    L0["Layer 0 — Carrier mapping<br/>JPEG blocks -> flat AC index space (63/block)"]
+    L6["Layer 6 â€” Vault document / export envelope<br/>JSON v3.0 Â· session-key wrap Â· ollie-export v1"]
+    L5["Layer 5 â€” Multi-carrier chunking<br/>chunk id UUID Â· index/total Â· CRC32 per chunk"]
+    L4["Layer 4 â€” Encryption envelope<br/>PBKDF2-SHA256 (50k-10M iter) + AES-256-GCM<br/>salt16 + iv12 + ct+tag16"]
+    L3["Layer 3 â€” ECC framing<br/>RS(255,k) GF(256) poly 0x11D Â· Low..Extreme<br/>column-major interleave"]
+    L2["Layer 2 â€” Container framing v2<br/>F5SG | ver=2 | flags | k | metaLen | metadata JSON | len | payload | CRC32"]
+    L1["Layer 1 â€” F5 embedding<br/>matrix encoding Â· shrinkage retry Â· seeded permutation"]
+    L0["Layer 0 â€” Carrier mapping<br/>JPEG blocks -> flat AC index space (63/block)"]
 
     L6 --> L5
     L5 --> L4
@@ -369,20 +385,20 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    RUNNER["test/runner.js<br/>Node orchestrator · PBT seed log"]
+    RUNNER["test/runner.js<br/>Node orchestrator Â· PBT seed log"]
 
     subgraph UNIT["Unit suites"]
         ALGT["algebraic/*"]
         AUTT["automata/*"]
-        CODECT["codec/*<br/>incl. format-v2 · result-contracts"]
-        ITT["information-theory/*<br/>stego · ECC · crypto"]
+        CODECT["codec/*<br/>incl. format-v2 Â· result-contracts"]
+        ITT["information-theory/*<br/>stego Â· ECC Â· crypto"]
         STRUCTT["structures/vault/*"]
     end
 
     subgraph SEC["Security suites test/security"]
         FORGED["forged-metadata"]
         PROBE["probe-regressions"]
-        XSS["xss · url-safety"]
+        XSS["xss Â· url-safety"]
         HARD["decoder/vault hardening"]
     end
 
@@ -397,7 +413,7 @@ flowchart TB
         OTHERPBT["capacity-scanner.pbt.js<br/>+.pbt properties across suites"]
     end
 
-    INTEG["integration/*<br/>roundtrip · vault e2e · ECC"]
+    INTEG["integration/*<br/>roundtrip Â· vault e2e Â· ECC"]
     BROWSER["app/test.html<br/>browser suite"]
 
     RUNNER --> UNIT
@@ -418,10 +434,10 @@ flowchart TB
 
 Tracked by `src/specs/rules/code-quality.md` rule 15 (the canonical spec tree):
 
-1. Add/remove/rename/move a module -> update §1 tree, §2 layer graph, §3 edges.
-2. Change a cross-module import edge -> update §3 only.
-3. Change a runtime pipeline or wire-format layer -> update §4/§5.
-4. Add a test suite family or vector source -> update §7.
+1. Add/remove/rename/move a module -> update Â§1 tree, Â§2 layer graph, Â§3 edges.
+2. Change a cross-module import edge -> update Â§3 only.
+3. Change a runtime pipeline or wire-format layer -> update Â§4/Â§5.
+4. Add a test suite family or vector source -> update Â§7.
 5. Regenerate golden vectors after any *intentional* format change, never to
    make a failing suite pass.
 

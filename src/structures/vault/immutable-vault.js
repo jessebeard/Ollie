@@ -344,7 +344,7 @@ export class PasswordVault {
      *
      * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Tuple of [results, error]
      */
-    async save(imageFiles, password, onProgress = null) {
+    async save(imageFiles, password, onProgress = null, options = {}) {
         const [, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [null, keyErr];
 
@@ -360,15 +360,18 @@ export class PasswordVault {
         const vaultBytes = new TextEncoder().encode(vaultData);
 
         const embedder = new BatchEmbedder();
-        const options = {
+        const embedOptions = {
             password: password,
             filename: 'vault.json',
             eccProfile: 'Extreme',
             ecc: true,
             manifest: { revision: this.metadata.revision }
         };
+        if (options.threshold !== undefined) {
+            embedOptions.threshold = options.threshold;
+        }
 
-        const [results, embedErr] = await embedder.embed(vaultBytes, imageFiles, options, onProgress);
+        const [results, embedErr] = await embedder.embed(vaultBytes, imageFiles, embedOptions, onProgress);
         if (embedErr) return [null, embedErr];
         return [results, null];
     }

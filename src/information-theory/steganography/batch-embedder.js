@@ -1,5 +1,7 @@
 ﻿import { ChunkManager } from './chunk-manager.js';
 import { createManifest } from './carrier-manifest.js';
+import { KeyDerivation } from '../cryptography/pbkdf2.js';
+import { bytesToBase64 } from '../../utils/encoding.js';
 import { JpegTranscoder } from '../../codec/transcoder.js';
 
 /** Fraction of a carrier's scanned capacity actually used for payload. */
@@ -64,6 +66,7 @@ export class BatchEmbedder {
      * @param {string} [options.eccProfile='Medium'] - ECC profile: 'Low', 'Medium', 'High', 'Ultra', 'Extreme'
      * @param {boolean} [options.ecc=true] - Enable error correction
      * @param {{revision: number}} [options.manifest] - When present, sign and stamp an authenticated carrier manifest
+     * @param {number} [options.threshold] - CSS mode: required unique carriers k of n; replicates sealed payload per carrier
      * @param {Function} [onProgress] - Callback (current, total, status)
      * @returns {Promise<[Array<{name: string, data: Uint8Array}>|null, Error|null]>} Result tuple of [outputFiles, error]
      */
@@ -224,28 +227,111 @@ export class BatchEmbedder {
             )];
         }
 
-        const [chunks, allocErr] = this.allocateDataToImages(data, imageCapacities);
-        if (allocErr) return [null, allocErr];
+        // Threshold mode (CSS): seal the payload once under a random DEK and
+        // replicate the sealed envelope into EVERY carrier together with a
+        // distinct key share. Any `threshold` carriers recover the payload;
+        // the envelope alone reveals nothing.
+        let chunks;
+        let shares = null;
+
+        if (options.threshold) {
+            const { sealPayload } = await import('../secret-sharing/css-envelope.js');
+            const [sealed, sealErr] = await sealPayload(data, {
+                threshold: options.threshold,
+                total: imageCapacities.length
+            });
+            if (sealErr) return [null, new Error(`Threshold sealing failed: ${sealErr.message}`)];
+
+            const envelopeBytes = new Uint8Array(sealed.envelope.iv.length + sealed.envelope.ciphertext.length);
+            envelopeBytes.set(sealed.envelope.iv, 0);
+            envelopeBytes.set(sealed.envelope.ciphertext, sealed.envelope.iv.length);
+
+            const shortfalls = [];
+            for (const cap of imageCapacities) {
+                if (cap.capacity < envelopeBytes.length) {
+                    shortfalls.push(`${cap.file.name} (${cap.capacity}/${envelopeBytes.length} bytes)`);
+                }
+            }
+            if (shortfalls.length > 0) {
+                return [null, new Error(
+                    `Threshold mode replicates the full payload into every carrier. Insufficient capacity: ${shortfalls.join(', ')}`
+                )];
+            }
+
+            const chunkId = ChunkManager.generateId();
+            shares = sealed.shares;
+            chunks = imageCapacities.map((info, i) => ({
+                imageInfo: info,
+                chunkData: envelopeBytes,
+                chunkMeta: { id: chunkId, index: 0, total: 1 },
+                share: sealed.shares[i]
+            }));
+        } else {
+            const [allocated, allocErr] = this.allocateDataToImages(data, imageCapacities);
+            if (allocErr) return [null, allocErr];
+            chunks = allocated;
+        }
+
+        if (!chunks || chunks.length === 0) {
+            return [null, new Error('Nothing to embed')];
+        }
 
         // Signed manifest: one block shared verbatim by every carrier so any
-        // surviving subset authenticates the whole chunk set on load.
-        let manifestBlock = null;
+        // surviving subset authenticates the whole chunk set on load. In
+        // threshold mode each carrier's manifest additionally carries its own
+        // MAC-covered key share, so manifests differ per carrier by design.
+        let manifestBlocks = null;
         if (options.manifest) {
             if (!options.password) {
                 return [null, new Error('Manifest signing requires a password')];
             }
-            const records = chunks.map(c => ({
-                index: c.chunkMeta.index,
-                checksum: ChunkManager.calculateChecksum(c.chunkData)
-            }));
-            const [manifest, manifestErr] = await createManifest({
-                chunkSetId: chunks[0].chunkMeta.id,
-                records,
-                revision: options.manifest.revision,
-                password: options.password
-            });
-            if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
-            manifestBlock = manifest;
+            const records = options.threshold
+                ? [{ index: 0, checksum: ChunkManager.calculateChecksum(chunks[0].chunkData) }]
+                : chunks.map(c => ({
+                    index: c.chunkMeta.index,
+                    checksum: ChunkManager.calculateChecksum(c.chunkData)
+                }));
+
+            if (options.threshold) {
+                // One shared KDF block + timestamp across the carrier set so
+                // manifests differ ONLY by their per-carrier share envelope.
+                const [setSalt, setSaltErr] = await KeyDerivation.generateSalt();
+                if (setSaltErr) return [null, setSaltErr];
+                const sharedKdf = {
+                    algo: 'PBKDF2-SHA256',
+                    iterations: KeyDerivation.ITERATIONS,
+                    salt: bytesToBase64(setSalt)
+                };
+                const created = new Date().toISOString();
+
+                manifestBlocks = [];
+                for (let i = 0; i < chunks.length; i++) {
+                    const [manifest, manifestErr] = await createManifest({
+                        chunkSetId: chunks[0].chunkMeta.id,
+                        records,
+                        revision: options.manifest.revision,
+                        password: options.password,
+                        created,
+                        kdf: sharedKdf,
+                        share: {
+                            index: /** @type {any} */ (chunks[i]).share.index,
+                            threshold: options.threshold,
+                            data: bytesToBase64(/** @type {any} */ (chunks[i]).share.data)
+                        }
+                    });
+                    if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
+                    manifestBlocks.push(manifest);
+                }
+            } else {
+                const [manifest, manifestErr] = await createManifest({
+                    chunkSetId: chunks[0].chunkMeta.id,
+                    records,
+                    revision: options.manifest.revision,
+                    password: options.password
+                });
+                if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
+                manifestBlocks = chunks.map(() => manifest);
+            }
         }
 
         const results = [];
@@ -267,8 +353,16 @@ export class BatchEmbedder {
                     ecc: options.ecc !== false,
                     eccProfile: options.eccProfile || 'Medium'
                 };
-                if (manifestBlock) {
-                    metadata.manifest = manifestBlock;
+                if (manifestBlocks) {
+                    metadata.manifest = manifestBlocks[i];
+                }
+                const carrierShare = /** @type {any} */ (chunks[i]).share;
+                if (carrierShare) {
+                    metadata.share = {
+                        index: carrierShare.index,
+                        threshold: options.threshold,
+                        data: bytesToBase64(carrierShare.data)
+                    };
                 }
 
                 const [encodedBytes, transErr] = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {

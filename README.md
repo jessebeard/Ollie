@@ -315,6 +315,17 @@ Encrypted export/import (`exportEncrypted` / `importEncrypted`) uses the same
 single-password envelope format, so the browser UI and the CLI interchange
 vaults freely.
 
+### Tamper-evident, threshold-recoverable carriers
+
+Every vault save now stamps an HMAC-authenticated manifest into each carrier,
+so swapped, rolled-back, or tampered photo sets **fail closed on load**.
+Carriers saved before this feature must be re-saved once.
+
+Passing `threshold` (e.g. `save(images, password, null, { threshold: 2 })`)
+switches to CSS recovery mode: the vault is sealed under a random key that is
+Shamir-split across carriers — any `threshold` of them reopen the vault, and
+fewer reveal nothing.
+
 ---
 
 ## 🧪 Testing
