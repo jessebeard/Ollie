@@ -4,6 +4,10 @@ import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
 import { Encryption } from '../../information-theory/cryptography/aes-gcm.js';
 import { randomUUID, getCrypto } from '../../information-theory/cryptography/crypto-provider.js';
+import { utf8ToBytes } from '../../utils/encoding.js';
+
+const EXPORT_FORMAT = 'ollie-export';
+const EXPORT_VERSION = 1;
 
 const KDF_ALGO = 'PBKDF2-SHA256';
 const SESSION_KEY_BYTES = 32;
@@ -436,6 +440,109 @@ export class PasswordVault {
         }
 
         return null;
+    }
+
+    /**
+     * Serializes the vault into a password-encrypted, self-contained JSON
+     * envelope. The envelope password doubles as the inner wrap password,
+     * so a single secret opens the whole artifact.
+     *
+     * @param {string} [password] - Defaults to the vault's own credential
+     * @returns {Promise<[string|null, Error|null]>} Tuple of [envelopeJson, error]
+     */
+    async exportEncrypted(password = null) {
+        const masterPassword = password || this._password();
+        if (!masterPassword) return [null, new Error('Vault is locked')];
+
+        const [, kdfBlock, keyErr] = await this._resolveSessionKey();
+        if (keyErr) return [null, keyErr];
+
+        const doc = {
+            metadata: { ...this.metadata, ...(kdfBlock ? { kdf: kdfBlock } : {}) },
+            entries: this.entries.map(e => e.toJSON())
+        };
+        const docBytes = utf8ToBytes(JSON.stringify(doc));
+
+        const [salt, saltErr] = await KeyDerivation.generateSalt();
+        if (saltErr) return [null, saltErr];
+
+        const [key, deriveErr] = await KeyDerivation.deriveKey(masterPassword, salt);
+        if (deriveErr) return [null, deriveErr];
+
+        const bindingData = utf8ToBytes(`${EXPORT_FORMAT}/v${EXPORT_VERSION}`);
+        const [enc, encErr] = await Encryption.encrypt(docBytes, key, { additionalData: bindingData });
+        if (encErr) return [null, encErr];
+
+        const envelope = {
+            format: EXPORT_FORMAT,
+            version: EXPORT_VERSION,
+            kdf: {
+                algo: KDF_ALGO,
+                iterations: KeyDerivation.ITERATIONS,
+                salt: bytesToBase64(salt),
+                iv: bytesToBase64(enc.iv),
+                ciphertext: bytesToBase64(new Uint8Array(enc.ciphertext))
+            }
+        };
+        return [JSON.stringify(envelope), null];
+    }
+
+    /**
+     * Rehydrates a vault from an encrypted export envelope.
+     *
+     * @param {string} envelopeJson
+     * @param {string} password
+     * @returns {Promise<[PasswordVault|null, Error|null]>}
+     */
+    static async importEncrypted(envelopeJson, password) {
+        if (typeof envelopeJson !== 'string') {
+            return [null, new Error('Invalid export envelope: expected a JSON string')];
+        }
+
+        let envelope;
+        try {
+            envelope = JSON.parse(envelopeJson);
+        } catch (e) {
+            return [null, new Error('Invalid export envelope: not valid JSON')];
+        }
+
+        if (!envelope || envelope.format !== EXPORT_FORMAT || envelope.version !== EXPORT_VERSION) {
+            return [null, new Error(`Invalid export envelope: expected ${EXPORT_FORMAT} v${EXPORT_VERSION}`)];
+        }
+
+        const k = envelope.kdf;
+        if (!k || typeof k !== 'object' || k.algo !== KDF_ALGO || !Number.isInteger(k.iterations) ||
+            typeof k.salt !== 'string' || typeof k.iv !== 'string' || typeof k.ciphertext !== 'string') {
+            return [null, new Error('Invalid export envelope: malformed KDF block')];
+        }
+
+        const [saltBytes] = base64ToBytes(k.salt);
+        const [ivBytes] = base64ToBytes(k.iv);
+        const [cipherBytes] = base64ToBytes(k.ciphertext);
+
+        const [key, deriveErr] = await KeyDerivation.deriveKey(password, saltBytes, { iterations: k.iterations });
+        if (deriveErr) return [null, deriveErr];
+
+        const bindingData = utf8ToBytes(`${EXPORT_FORMAT}/v${EXPORT_VERSION}`);
+        const [docBytes, decErr] = await Encryption.decrypt(cipherBytes, key, ivBytes, { additionalData: bindingData });
+        if (decErr) {
+            return [null, new Error('Import failed: wrong password or corrupted envelope')];
+        }
+
+        let doc;
+        try {
+            doc = JSON.parse(new TextDecoder().decode(docBytes));
+        } catch (e) {
+            return [null, new Error('Invalid export payload: not valid JSON')];
+        }
+
+        const [vault, vaultErr] = PasswordVault.fromJSON(doc, true, password, null);
+        if (vaultErr) return [null, vaultErr];
+
+        const [sessionKey, , skErr] = await vault._resolveSessionKey();
+        if (skErr) return [null, skErr];
+
+        return [new PasswordVault(vault.entries, vault.metadata, true, password, sessionKey), null];
     }
 
     static generateId() {

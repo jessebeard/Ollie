@@ -205,10 +205,13 @@ async function runTests() {
         await import('./security/capacity-consistency.test.js');
         await import('./security/vault-hardening.test.js');
         await import('./security/url-safety.test.js');
+        await import('./security/probe-regressions.test.js');
         await import('./security/ui-legacy-xss.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/immutable-vault.test.js');
         await import('./structures/vault/revision-tracking.test.js');
+        await import('./structures/vault/encrypted-export.test.js');
+        await import('./scripts/cli.test.js');
         await import('./integration/vault/vault-e2e.test.js');
         await import('./integration/vault/vault-e2e-crud.test.js');
         await import('./integration/vault/vault-e2e-carriers.test.js');

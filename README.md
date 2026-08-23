@@ -289,6 +289,32 @@ Open **`index.html`** in a browser to try the interactive demo:
 - **Decode** any JPEG file into raw pixel data  
 - Inspect intermediate stages if you're exploring how JPEG works
 
+### Password Vault
+
+The vault stores entries AES-GCM-encrypted twice over: per-entry keys wrap
+under a random per-vault session key (itself wrapped by PBKDF2 of your master
+password with a per-vault salt), and the whole document encrypts again inside
+each stego container. Every content change bumps `metadata.revision`; the
+status line reports `Rev N · <date>` after load so replayed older backups
+announce themselves.
+
+Headless operations (Node 22+):
+
+```bash
+# Embed a vault (from an encrypted export envelope) into carrier photos:
+node scripts/cli.mjs save --fromExport vault.json --imagesDir ./photos --outDir ./stego --password "pw"
+
+# Integrity check + identity report (revision, entry count):
+node scripts/cli.mjs verify --imagesDir ./stego --password "pw"
+
+# Recover carriers back into a portable encrypted envelope:
+node scripts/cli.mjs load --imagesDir ./stego --password "pw" --outExport restored.json
+```
+
+Encrypted export/import (`exportEncrypted` / `importEncrypted`) uses the same
+single-password envelope format, so the browser UI and the CLI interchange
+vaults freely.
+
 ---
 
 ## 🧪 Testing
