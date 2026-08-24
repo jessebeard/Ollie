@@ -142,6 +142,7 @@
             <file name="forged-metadata.test.js" description="Forged metadata rejection at extraction boundaries." />
             <file name="gf-shamir.test.js" description="Shamir secret sharing over GF(256): splitting, combination, bijection." />
             <file name="manifest-enforcement.test.js" description="Manifest enforcement across batch pipeline: stamping, legacy rejection, swap detection." />
+            <file name="vault-save-permission.test.js" description="Save flow acquires FileSystemHandle write permission under fresh user activation, before encrypt/embed; declined permission aborts cleanly." />
             <file name="probe-regressions.test.js" description="Regressions promoted from root evidence scripts." />
             <file name="secure-id-generation.test.js" description="Secure UUID generation." />
             <file name="threshold-vault.test.js" description="Threshold vault recovery: distinct coded stripes, subset recovery, unique-share counting." />

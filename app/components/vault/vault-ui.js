@@ -294,7 +294,30 @@ export class VaultUI {
                 return;
             }
 
-            // 3. Prepare Files (buffering originals so a failed write can be rolled back)
+            // 3. Secure write permissions NOW, while the confirm-click user
+            // activation is still valid. FileSystemHandle.requestPermission()
+            // requires transient activation; asking after the slow encrypt +
+            // embed phase throws "User activation is required".
+            this.showLoading(true, 'Requesting write access...');
+            for (const h of handles) {
+                const options = { mode: 'readwrite' };
+                try {
+                    const current = typeof h.queryPermission === 'function'
+                        ? await h.queryPermission(options)
+                        : 'prompt';
+                    if (current === 'granted') continue;
+                    const requested = await h.requestPermission(options);
+                    if (requested !== 'granted') {
+                        throw new Error(`Write permission denied for ${h.name}. No images were modified.`);
+                    }
+                } catch (permError) {
+                    this.showLoading(false);
+                    this.modals.showAlert('Error', 'Save aborted: ' + permError.message, 'error');
+                    return;
+                }
+            }
+
+            // 4. Prepare Files (buffering originals so a failed write can be rolled back)
             this.showLoading(true, 'Reading images...');
             const fileObjs = [];
             const handleMap = new Map(); // name -> handle
@@ -318,8 +341,8 @@ export class VaultUI {
             );
             if (saveErr) throw saveErr;
 
-            // 5. Write back to disk â€” pre-flight permissions so no carrier is
-            // half-written when a permission prompt is declined mid-batch.
+            // 5. Write back to disk - permissions were pre-flighted in step 3,
+            // so no carrier can be left half-written by a mid-batch prompt.
             this.showLoading(true, 'Writing files to disk...');
             const writeTargets = [];
 
@@ -337,13 +360,6 @@ export class VaultUI {
                     continue;
                 }
 
-                const options = { mode: 'readwrite' };
-                if ((await handle.queryPermission(options)) !== 'granted') {
-                    const perm = await handle.requestPermission(options);
-                    if (perm !== 'granted') {
-                        throw new Error(`Write permission denied for ${handle.name}. No images were modified.`);
-                    }
-                }
                 writeTargets.push({ handle, result });
             }
 
