@@ -33,7 +33,7 @@ escapeHtml, vault structures, algebraic transforms, huffman encoder.
 - [ ] codec: encode/decode roundtrip fuzzing (random dimensions/quality/
       subsampling/restart intervals); MRs - decode-after-encode stability,
       quality-vs-size monotonicity, dimension preservation
-- [ ] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
+- [x] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
       generator (truncation, marker injection, lying length fields); MR -
       valid files unchanged, hostile input always fails closed
 - [x] bit-streams: differential testing across BitReader variants on random

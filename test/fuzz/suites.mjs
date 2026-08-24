@@ -10,12 +10,14 @@ import { runCliFuzz } from './cli-fuzz.mjs';
 import { runCryptoFuzz } from './crypto-fuzz.mjs';
 import { runBitstreamsFuzz } from './bitstreams-fuzz.mjs';
 import { runEccEdgeFuzz } from './ecc-fuzz.mjs';
+import { runParserFuzz } from './parser-fuzz.mjs';
 
 export const FUZZ_SUITES = {
     cli: { description: 'CLI argument parsing + typed error tuples', run: runCliFuzz },
     crypto: { description: 'SHA-256 KATs, AES-GCM structure, PBKDF2 bounds, HMAC', run: runCryptoFuzz },
     bitstreams: { description: 'BitReader differential across read strategies and stuffed streams', run: runBitstreamsFuzz },
-    ecc: { description: 'RS tolerance-edge corruption distribution properties', run: runEccEdgeFuzz }
+    ecc: { description: 'RS tolerance-edge corruption distribution properties', run: runEccEdgeFuzz },
+    parsers: { description: 'Mutated-JPEG parser fuzz with hang/bomb isolation (Node workers)', run: runParserFuzz }
 };
 
 export function getSuiteNames() {
