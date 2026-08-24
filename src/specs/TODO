@@ -22,16 +22,6 @@ Grover's algorithm provides only quadratic speedup). Adding Ed25519 would have
 introduced the sole quantum-vulnerable component into an otherwise PQ-safe
 system. The design goal is purely symmetric cryptography throughout.
 
-## 2026-08-22 � Whole-container ECC framing (format v2.1 candidate)
-F5.extractContainer parses header/metadata BEFORE Reed-Solomon recovery;
-ErrorCorrection currently covers only the payload. Corrupted coefficients that
-cascade through F5 matrix encoding can therefore kill metadata parsing
-(JSON parse failures) even when the RS budget would have absorbed them.
-Required redesign: two-layer framing (RS-coded fixed header carrying
-eccProfile/lengths + RS-coded body), capacity-math update, and migration of
-hand-crafted container tests. Tracked from vault-e2e-ecc skip note.
-
-
 ## 2026-08-23 - Full fuzzing + metamorphic testing coverage (all layers)
 
 Goal: every module owned by seeded, structure-aware fuzzing plus explicit
@@ -63,6 +53,5 @@ escapeHtml, vault structures, algebraic transforms, huffman encoder.
       determinism, capacity-bound enforcement
 - [x] scripts/cli.mjs: argument fuzzing, fail-closed exit codes
 - [x] harness: npm run fuzz driver landed (CI smoke + scalable local runs); full corpus
-Related: 2026-08-22 whole-container ECC framing entry (its redesigned
-framing must ship with its own fuzz slice).
+Related: RESOLVED whole-container ECC framing entry (see top of file).
 
