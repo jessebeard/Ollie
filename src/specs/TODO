@@ -30,7 +30,7 @@ fuzz script exercises them without finding open counterexamples.
 Current: wire-format L0-L3 (conformance + 12 PBT), capacity scanner,
 escapeHtml, vault structures, algebraic transforms, huffman encoder.
 
-- [ ] codec: encode/decode roundtrip fuzzing (random dimensions/quality/
+- [x] codec: encode/decode roundtrip fuzzing (random dimensions/quality/
       subsampling/restart intervals); MRs - decode-after-encode stability,
       quality-vs-size monotonicity, dimension preservation
 - [x] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
