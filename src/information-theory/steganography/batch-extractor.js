@@ -114,19 +114,9 @@ export class BatchExtractor {
             }
         }
 
-        // Cross-carrier swap defense: records from other saves fail binding.
-        // (Threshold mode binds via envelope identity + MAC + GCM instead.)
-        if (!verifiedManifest.share) {
-            const recordsForBinding = chunks.map(c => ({ index: c.index, checksum: c.checksum }));
-            const [, bindErr] = bindChunkRecords(recordsForBinding, verifiedManifest);
-            if (bindErr) {
-                return [null, bindErr];
-            }
-        }
-
         // Threshold (CSS + erasure) mode: distinct coded stripes + key shares.
         // Replaces chunk reassembly with stripe reconstruction, DEK
-        // recombination, and GCM opening.
+        // recombination, and GCM opening. This is now the ONLY extraction path.
         if (verifiedManifest.share) {
             const threshold = verifiedManifest.share.threshold;
             const ec = verifiedManifest.ec;

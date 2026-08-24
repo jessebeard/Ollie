@@ -17,8 +17,8 @@ class MockFile {
 }
 
 async function makeCarriers(count) {
-    const width = 192;
-    const height = 192;
+    const width = 320;
+    const height = 320;
     const data = new Uint8ClampedArray(width * height * 4);
     let seed = 1234567;
     for (let i = 0; i < data.length; i += 4) {
@@ -74,10 +74,12 @@ describe('manifest enforcement across batch pipeline', () => {
             seen.push(m);
         }
 
-        const first = JSON.stringify(seen[0]);
+        const strip = (x) => { const c = { ...x }; delete c.share; delete c.mac; return JSON.stringify(c); };
         for (const m of seen.slice(1)) {
-            if (JSON.stringify(m) !== first) throw new Error('manifests differ across carriers');
+            if (strip(seen[0]) !== strip(m)) throw new Error('manifests disagree on non-share fields');
         }
+        const shareIdx = new Set(seen.map(m => m.share && m.share.index));
+        if (shareIdx.size !== seen.length) throw new Error(`share indices must be distinct ( vs )`);
         if (seen[0].total !== stego.length || seen[0].entries.length !== stego.length) {
             throw new Error('manifest does not describe the full carrier set');
         }

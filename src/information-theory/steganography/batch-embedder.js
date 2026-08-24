@@ -227,64 +227,55 @@ export class BatchEmbedder {
             )];
         }
 
-        // Threshold mode (CSS + erasure coding): seal the payload once under
-        // a random DEK, then Cauchy-erasure-code the sealed envelope into n
-        // coded stripes distributed across carriers by capacity. Any
-        // `threshold` distinct stripes (plus their key shares) recover the
-        // payload; the envelope alone reveals nothing.
-        let chunks;
-        let envelopeSize = 0;
+        // CSS + erasure coding: seal the payload once under a random DEK,
+        // then Cauchy-erasure-code the sealed envelope into n coded stripes
+        // distributed across carriers by capacity. Any `threshold` distinct
+        // stripes (plus their key shares) recover the payload; the envelope
+        // alone reveals nothing.
+        const k = options.threshold || Math.ceil(imageCapacities.length / 2);
+        const n = imageCapacities.length;
 
-        if (options.threshold) {
-            const k = options.threshold;
-            const n = imageCapacities.length;
+        const { sealPayload } = await import('../secret-sharing/css-envelope.js');
+        const [sealed, sealErr] = await sealPayload(data, { threshold: k, total: n });
+        if (sealErr) return [null, new Error(`Threshold sealing failed: ${sealErr.message}`)];
 
-            const { sealPayload } = await import('../secret-sharing/css-envelope.js');
-            const [sealed, sealErr] = await sealPayload(data, { threshold: k, total: n });
-            if (sealErr) return [null, new Error(`Threshold sealing failed: ${sealErr.message}`)];
+        const envelopeBytes = new Uint8Array(sealed.envelope.iv.length + sealed.envelope.ciphertext.length);
+        envelopeBytes.set(sealed.envelope.iv, 0);
+        envelopeBytes.set(sealed.envelope.ciphertext, sealed.envelope.iv.length);
+        const envelopeSize = envelopeBytes.length;
 
-            const envelopeBytes = new Uint8Array(sealed.envelope.iv.length + sealed.envelope.ciphertext.length);
-            envelopeBytes.set(sealed.envelope.iv, 0);
-            envelopeBytes.set(sealed.envelope.ciphertext, sealed.envelope.iv.length);
-            envelopeSize = envelopeBytes.length;
-
-            const capacities = imageCapacities.map(c => c.capacity);
-            const { planErasureAllocation } = await import('../secret-sharing/cauchy-ec.js');
-            const [plan, planErr] = planErasureAllocation(capacities, { threshold: k });
-            if (planErr) {
-                return [null, new Error(
-                    `Carrier set cannot host a threshold-${k} vault (${data.length}-byte document). ` +
-                    `Planner said: ${planErr.message}`
-                )];
-            }
-
-            const { encodeErasure } = await import('../secret-sharing/cauchy-ec.js');
-            const [codedChunks, codeErr] = encodeErasure(envelopeBytes, { k, n: plan.n });
-            if (codeErr) return [null, new Error(`Erasure coding failed: ${codeErr.message}`)];
-
-            const chunkId = ChunkManager.generateId();
-            chunks = [];
-            let idx = 0;
-            imageCapacities.forEach((info, i) => {
-                for (let c = 0; c < plan.counts[i]; c++) {
-                    chunks.push({
-                        imageInfo: info,
-                        chunkData: codedChunks[idx].data,
-                        chunkMeta: { id: chunkId, index: codedChunks[idx].index, total: plan.n },
-                        share: sealed.shares[i]
-                    });
-                    idx++;
-                }
-            });
-
-            logger.debug(
-                `Threshold plan: k=${k} n=${plan.n} stripeSize=${plan.stripeSize} maxPayload=${plan.maxPayload}`
-            );
-        } else {
-            const [allocated, allocErr] = this.allocateDataToImages(data, imageCapacities);
-            if (allocErr) return [null, allocErr];
-            chunks = allocated;
+        const capacities = imageCapacities.map(c => c.capacity);
+        const { planErasureAllocation } = await import('../secret-sharing/cauchy-ec.js');
+        const [plan, planErr] = planErasureAllocation(capacities, { threshold: k });
+        if (planErr) {
+            return [null, new Error(
+                `Carrier set cannot host a threshold-${k} vault (${data.length}-byte document). ` +
+                `Planner said: ${planErr.message}`
+            )];
         }
+
+        const { encodeErasure } = await import('../secret-sharing/cauchy-ec.js');
+        const [codedChunks, codeErr] = encodeErasure(envelopeBytes, { k, n: plan.n });
+        if (codeErr) return [null, new Error(`Erasure coding failed: ${codeErr.message}`)];
+
+        const chunkId = ChunkManager.generateId();
+        let chunks = [];
+        let idx = 0;
+        imageCapacities.forEach((info, i) => {
+            for (let c = 0; c < plan.counts[i]; c++) {
+                chunks.push({
+                    imageInfo: info,
+                    chunkData: codedChunks[idx].data,
+                    chunkMeta: { id: chunkId, index: codedChunks[idx].index, total: plan.n },
+                    share: sealed.shares[i]
+                });
+                idx++;
+            }
+        });
+
+        logger.debug(
+            `Threshold plan: k=${k} n=${plan.n} stripeSize=${plan.stripeSize} maxPayload=${plan.maxPayload}`
+        );
 
         if (!chunks || chunks.length === 0) {
             return [null, new Error('Nothing to embed')];
@@ -304,46 +295,39 @@ export class BatchEmbedder {
                 checksum: ChunkManager.calculateChecksum(c.chunkData)
             }));
 
-            if (options.threshold) {
-                // One shared KDF block + timestamp across the carrier set so
-                // manifests differ ONLY by their per-carrier share envelope.
-                const [setSalt, setSaltErr] = await KeyDerivation.generateSalt();
-                if (setSaltErr) return [null, setSaltErr];
-                const sharedKdf = {
-                    algo: 'PBKDF2-SHA256',
-                    iterations: KeyDerivation.ITERATIONS,
-                    salt: bytesToBase64(setSalt)
-                };
-                const created = new Date().toISOString();
+            // One shared KDF block + timestamp across the carrier set so
+            // manifests differ ONLY by their per-carrier share envelope.
+            const [setSalt, setSaltErr] = await KeyDerivation.generateSalt();
+            if (setSaltErr) return [null, setSaltErr];
+            const sharedKdf = {
+                algo: 'PBKDF2-SHA256',
+                iterations: KeyDerivation.ITERATIONS,
+                salt: bytesToBase64(setSalt)
+            };
+            const created = new Date().toISOString();
 
-                manifestBlocks = [];
-                for (let i = 0; i < chunks.length; i++) {
-                    const [manifest, manifestErr] = await createManifest({
-                        chunkSetId: chunks[0].chunkMeta.id,
-                        records,
-                        revision: options.manifest.revision,
-                        password: options.password,
-                        created,
-                        kdf: sharedKdf,
-                        ec: { k: options.threshold, n: chunks[0].chunkMeta.total, size: envelopeSize },
-                        share: {
-                            index: /** @type {any} */ (chunks[i]).share.index,
-                            threshold: options.threshold,
-                            data: bytesToBase64(/** @type {any} */ (chunks[i]).share.data)
-                        }
-                    });
-                    if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
-                    manifestBlocks.push(manifest);
-                }
-            } else {
-                const [manifest, manifestErr] = await createManifest({
+            manifestBlocks = [];
+            for (let i = 0; i < chunks.length; i++) {
+                const manifestSpec = {
                     chunkSetId: chunks[0].chunkMeta.id,
                     records,
                     revision: options.manifest.revision,
-                    password: options.password
-                });
+                    password: options.password,
+                    created,
+                    kdf: sharedKdf,
+                    ec: { k, n: plan.n, size: envelopeSize }
+                };
+                const carrierShare = /** @type {any} */ (chunks[i]).share;
+                if (carrierShare) {
+                    manifestSpec.share = {
+                        index: carrierShare.index,
+                        threshold: options.threshold || Math.ceil(imageCapacities.length / 2),
+                        data: bytesToBase64(carrierShare.data)
+                    };
+                }
+                const [manifest, manifestErr] = await createManifest(manifestSpec);
                 if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
-                manifestBlocks = chunks.map(() => manifest);
+                manifestBlocks.push(manifest);
             }
         }
 
@@ -362,20 +346,10 @@ export class BatchEmbedder {
                 const metadata = {
                     filename: options.filename || 'unknown',
                     chunk: chunkMeta,
-                    checksum: ChunkManager.calculateChecksum(chunkData),
-                    ecc: options.ecc !== false,
-                    eccProfile: options.eccProfile || 'Medium'
+                    checksum: ChunkManager.calculateChecksum(chunkData)
                 };
                 if (manifestBlocks) {
                     metadata.manifest = manifestBlocks[i];
-                }
-                const carrierShare = /** @type {any} */ (chunks[i]).share;
-                if (carrierShare) {
-                    metadata.share = {
-                        index: carrierShare.index,
-                        threshold: options.threshold,
-                        data: bytesToBase64(carrierShare.data)
-                    };
                 }
 
                 const [encodedBytes, transErr] = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {

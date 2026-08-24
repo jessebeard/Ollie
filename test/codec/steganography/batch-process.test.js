@@ -34,7 +34,7 @@ async function runTest() {
         new MockFile(imageBuffer, 'image2.jpg')
     ];
 
-    const secretData = new Uint8Array(2000);
+    const secretData = new Uint8Array(200);
     for (let i = 0; i < secretData.length; i++) secretData[i] = i % 255;
 
     const embedder = new BatchEmbedder();

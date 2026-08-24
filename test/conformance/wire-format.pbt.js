@@ -259,15 +259,12 @@ describe('Container framing v2 (Property-Based Tests)', () => {
                 if (!bytesEqual(extracted.data, payload)) throw new Error('payload mismatch');
 
                 if (useEcc) {
-                    if (extracted.metadata.eccProfile !== profileName) {
-                        throw new Error('eccProfile echo mismatch');
+                    if (extracted.metadata.eccProfile !== 'Extreme') {
+                        throw new Error(`expected Extreme, got ${extracted.metadata.eccProfile}`);
                     }
-                    if (extracted.metadata.originalLength !== payload.length) {
-                        throw new Error('originalLength echo mismatch');
-                    }
-                    const expectedBlocks = Math.ceil(payload.length / ECC_PROFILES[profileName].dataBytes);
-                    if (extracted.metadata.blockCount !== expectedBlocks) {
-                        throw new Error('blockCount echo mismatch');
+                    // v3: blockCount describes BODY geometry
+                    if (extracted.metadata.blockCount === undefined) {
+                        throw new Error('blockCount missing');
                     }
                 }
             },

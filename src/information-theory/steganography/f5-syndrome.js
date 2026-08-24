@@ -524,8 +524,7 @@ export class F5 {
         // regions. The profile governs the coded body; the control codeword
         // always uses High-strength parameters. Profile authority lives in
         // the control header - extractContainer annotates decoded metadata.
-        const eccProfile = options.eccProfile
-            || (metadata.ecc === false ? 'Low' : (metadata.eccProfile || 'Medium'));
+        const eccProfile = 'Extreme';
 
         const metaBytes = new TextEncoder().encode(JSON.stringify(metadata));
         const metaLen = metaBytes.length;
@@ -796,11 +795,11 @@ export class F5 {
         if (options.format === 'container') {
             // v3 whole-container framing: control codeword (255 flat) plus
             // RS-coded body covering metadata + payload + CRC tail.
+            // v3 whole-container framing: control codeword (255 flat) plus
+            // RS-coded body covering metadata + payload + CRC tail.
+            // Extreme profile is mandatory (Wave N).
             const metaLen = new TextEncoder().encode(JSON.stringify(options.metadata || {})).length;
-
-            const profileName = options.eccProfile
-                || (options.ecc === false ? 'Low' : 'Medium');
-            const dataBytes = ECC_PROFILES[profileName].dataBytes;
+            const dataBytes = ECC_PROFILES['Extreme'].dataBytes;
             const encryptionOverhead = options.encrypted ? 28 : 0;
 
             const usableForBodyBlocks = capacityBytes - 255 /* control codeword */;

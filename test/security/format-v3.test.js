@@ -83,7 +83,7 @@ describe('container format v3 (whole-container framing)', () => {
             if (fields.metaLen !== 2) throw new Error(`metaLen ${fields.metaLen} != 2 ('{}')`);
             if (fields.payloadLen !== payload.length) throw new Error('payloadLen mismatch');
             if (fields.k !== tryK) throw new Error('stored k mismatch');
-            if (fields.profileName !== 'Medium') throw new Error('default profile must be Medium');
+            if (fields.profileName !== 'Extreme') throw new Error('default profile must be Extreme');
 
             // Body geometry must cover metadata + payload + CRC tail.
             const bodyLen = fields.metaLen + fields.payloadLen + 4;

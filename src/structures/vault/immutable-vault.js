@@ -371,6 +371,9 @@ export class PasswordVault {
             embedOptions.threshold = options.threshold;
         }
 
+        if (embedOptions.threshold === undefined && imageFiles.length >= 2) {
+            embedOptions.threshold = Math.ceil(imageFiles.length / 2);
+        }
         const [results, embedErr] = await embedder.embed(vaultBytes, imageFiles, embedOptions, onProgress);
         if (embedErr) return [null, embedErr];
         return [results, null];

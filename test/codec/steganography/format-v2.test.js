@@ -27,7 +27,7 @@ describe('Container Format v2', () => {
     });
 
     it('rejects foreign-format frames instead of mis-reading them', async () => {
-        const blocks = createMockBlocks(90);
+        const blocks = createMockBlocks(300);
         // Raw pre-v3 style frame: no RS-coded control plane.
         const v1Bytes = new Uint8Array([
             0x46, 0x35, 0x53, 0x47, // 'F5SG'
@@ -44,7 +44,7 @@ describe('Container Format v2', () => {
     });
 
     it('extracts a valid version 3 container', async () => {
-        const blocks = createMockBlocks(90);
+        const blocks = createMockBlocks(300);
         const v3Bytes = buildV3Container({ metadataObj: { filename: 'new.bin' }, payload: new Uint8Array([1, 2, 3]) });
         const result = F5.embedRaw(blocks, v3Bytes, { seed: 'plain-seed', k: 1 });
         expect(result.success).toBe(true);
@@ -55,7 +55,7 @@ describe('Container Format v2', () => {
     });
 
     it('records KDF parameters in container metadata when a password is used', async () => {
-        const blocks = createMockBlocks(80);
+        const blocks = createMockBlocks(300);
         const data = new Uint8Array([9, 8, 7, 6]);
         const metadata = { filename: 'secret.bin', ecc: false };
 
@@ -77,7 +77,7 @@ describe('Container Format v2', () => {
 describe('KDF parameter validation (attacker-controlled metadata)', () => {
 
     it('rejects iterations far outside the sane range before doing any key derivation', async () => {
-        const blocks = createMockBlocks(90);
+        const blocks = createMockBlocks(300);
         const forgedPayload = new Uint8Array(28);
         const v3Bytes = buildV3Container({
             metadataObj: {
@@ -98,7 +98,7 @@ describe('KDF parameter validation (attacker-controlled metadata)', () => {
     });
 
     it('rejects an encrypted container whose metadata lacks an enc block', async () => {
-        const blocks = createMockBlocks(90);
+        const blocks = createMockBlocks(300);
         const v3Bytes = buildV3Container({
             metadataObj: { encrypted: true },
             payload: new Uint8Array(28)
