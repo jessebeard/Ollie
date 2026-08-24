@@ -210,7 +210,9 @@ async function runTests() {
         await import('./fuzz/parser-fuzz.test.js');
         await import('./fuzz/codec-mr.test.js');
         await import('./fuzz/vault-batch.test.js');
+        await import('./utils/base32.test.js');
         await import('./security/coded-header.test.js');
+        await import('./security/totp.test.js');
         await import('./security/format-v3.test.js');
         await import('./security/cauchy-ec.test.js');
 
