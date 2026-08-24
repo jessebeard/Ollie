@@ -201,6 +201,7 @@ async function runTests() {
         await import('./security/ecc-edges.test.js');
         await import('./fuzz/parser-fuzz.test.js');
         await import('./fuzz/codec-mr.test.js');
+        await import('./fuzz/vault-batch.test.js');
         await import('./security/cauchy-ec.test.js');
 
         await import('./integration/error-correction/reed-solomon-integration.test.js');

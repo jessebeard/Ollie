@@ -394,7 +394,7 @@ const MAX_SHRINK_ROUNDS = 50;
  * @param {Array<{generate, shrink}>} arbitraries - The generators (with shrink functions)
  * @param {Function} propertyFn - The property function
  * @param {Array} failingArgs - The original failing arguments
- * @returns {Promise<{args: Array, error: Error}>} The smallest counterexample found
+ * @returns {Promise<{args: Array, error: Error, shrinkRounds: number}>} The smallest counterexample found
  */
 async function shrinkCounterexample(arbitraries, propertyFn, failingArgs, originalError) {
     let smallestArgs = failingArgs;
@@ -480,10 +480,16 @@ function formatValue(value) {
  * @param {Function} propertyFn - The function defining the invariant property. Should throw or return false on failure.
  * @param {number} iterations - How many random samples to generate and test.
  */
+/**
+ * Runs a property test with automatic counterexample shrinking.
+ * @param {any} arbitraries - Array of generator objects from the `Arbitrary` namespace.
+ * @param {Function} propertyFn - The function defining the invariant property. Should throw or return false on failure.
+ * @param {number} [iterations] - How many random samples to generate and test.
+ */
 export async function assertProperty(arbitraries, propertyFn, iterations = 100) {
     for (let i = 0; i < iterations; i++) {
         const args = arbitraries.map(arb =>
-            typeof arb.generate === 'function' ? arb.generate() : arb()
+            typeof arb.generate === 'function' ? arb.generate() : (typeof arb === 'function' ? arb() : arb)
         );
 
         try {

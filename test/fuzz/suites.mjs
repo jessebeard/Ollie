@@ -12,6 +12,7 @@ import { runBitstreamsFuzz } from './bitstreams-fuzz.mjs';
 import { runEccEdgeFuzz } from './ecc-fuzz.mjs';
 import { runParserFuzz } from './parser-fuzz.mjs';
 import { runCodecMrfuzz } from './codec-mr.mjs';
+import { runVaultModelFuzz, runZeroizationChecks, runBatchSubsetFuzz } from './vault-batch-fuzz.mjs';
 
 export const FUZZ_SUITES = {
     cli: { description: 'CLI argument parsing + typed error tuples', run: runCliFuzz },
@@ -19,7 +20,10 @@ export const FUZZ_SUITES = {
     bitstreams: { description: 'BitReader differential across read strategies and stuffed streams', run: runBitstreamsFuzz },
     ecc: { description: 'RS tolerance-edge corruption distribution properties', run: runEccEdgeFuzz },
     parsers: { description: 'Mutated-JPEG parser fuzz with hang/bomb isolation (Node workers)', run: runParserFuzz },
-    codec: { description: 'Codec metamorphic MRs: dimensions, determinism, monotonicity, fidelity, stego survival', run: runCodecMrfuzz }
+    codec: { description: 'Codec metamorphic MRs: dimensions, determinism, monotonicity, fidelity, stego survival', run: runCodecMrfuzz },
+    vault: { description: 'Model-based op-sequence fuzzing against vault invariants', run: runVaultModelFuzz },
+    zeroize: { description: 'DEK zeroization + lock hygiene checks', run: runZeroizationChecks },
+    batch: { description: 'EC carrier-subset recovery MRs over randomized (k,n) grids', run: runBatchSubsetFuzz }
 };
 
 export function getSuiteNames() {

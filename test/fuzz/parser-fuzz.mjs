@@ -26,7 +26,7 @@ function runInWorker(bytes, timeoutMs) {
             worker.terminate();
             resolve({ kind: msg.kind === 'done' ? 'done' : 'unknown', outcome: msg.outcome });
         });
-        worker.once('error', (e) => {
+        worker.once('error', (/** @type {Error} */ e) => {
             clearTimeout(timer);
             resolve({ kind: 'WORKER-ERROR', detail: e.message });
         });

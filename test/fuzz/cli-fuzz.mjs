@@ -63,7 +63,8 @@ export async function runCliFuzz(scale = 1) {
             fromExport: path.join(workDir, 'does-not-exist.json'),
             imagesDir: workDir,
             outDir: workDir,
-            password: 'x'
+            password: 'x',
+            threshold: undefined
         });
         if (!(report.error instanceof Error)) throw new Error('missing envelope accepted');
     }

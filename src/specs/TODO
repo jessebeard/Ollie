@@ -43,13 +43,13 @@ escapeHtml, vault structures, algebraic transforms, huffman encoder.
       interleave permutation-invariance MRs
 - [x] cryptography: AES-GCM/PBKDF2/HMAC roundtrip + AAD-binding properties
       (structural; CSPRNG prevents byte vectors)
-- [ ] vault layer: operation-sequence fuzzing against invariants (locked
+- [x] vault layer: operation-sequence fuzzing against invariants (locked
       never decrypts, revision strictly increases, freeze holds); MR -
       clone chains equivalent to batch operations
-- [ ] batch embedder/extractor: carrier-subset selection MRs, allocation
+- [x] batch embedder/extractor: carrier-subset selection MRs, allocation
       determinism, capacity-bound enforcement
 - [x] scripts/cli.mjs: argument fuzzing, fail-closed exit codes
-- [~] harness: npm run fuzz driver + CI smoke landed; corpus grows per wave
+- [x] harness: npm run fuzz driver landed (CI smoke + scalable local runs); full corpus
 Related: 2026-08-22 whole-container ECC framing entry (its redesigned
 framing must ship with its own fuzz slice).
 

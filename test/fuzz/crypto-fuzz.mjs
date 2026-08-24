@@ -79,14 +79,14 @@ export async function runCryptoFuzz(scale = 1) {
         const seen = new Set();
         for (let i = 0; i < 100; i++) {
             const [enc] = await Encryption.encrypt(new Uint8Array(1), key);
-            const s = hex(enc.iv);
+            const s = hex(/** @type {Uint8Array} */ (enc.iv));
             if (seen.has(s)) throw new Error('IV collision within sample');
             seen.add(s);
         }
     }
 
     // -- PBKDF2 bounds --
-    for (const bad of [-1, 0, 1.5, 'x']) {
+    for (const bad of /** @type {any} */ ([-1, 0, 1.5, 'x'])) {
         const [, err] = await KeyDerivation.deriveRawBits('pw', new Uint8Array(16), { iterations: bad });
         if (!(err instanceof Error)) throw new Error(`accepted iterations=${bad}`);
     }
