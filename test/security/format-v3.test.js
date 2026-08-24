@@ -57,7 +57,7 @@ describe('container format v3 (whole-container framing)', () => {
     });
 
     it('writes a decodable coded-control header with authoritative sizes', async () => {
-        const blocks = createMockBlocks(90);
+        const blocks = createMockBlocks(100);
         const payload = new TextEncoder().encode('v3 control-plane payload');
         const [ok, err] = await F5.embedContainer(blocks, payload, {}, { seed: 'k2-seed' });
         expect(err).toBe(null);
@@ -96,7 +96,7 @@ describe('container format v3 (whole-container framing)', () => {
     });
 
     it('roundtrips payload and metadata through the coded frame', async () => {
-        const blocks = createMockBlocks(80);
+        const blocks = createMockBlocks(100);
         const payload = new TextEncoder().encode('roundtrip body bytes');
         const metadata = { filename: 'r.bin', note: 'meta survives too' };
 
@@ -143,7 +143,7 @@ describe('container format v3 (whole-container framing)', () => {
     });
 
     it('rejects legacy v2 containers with re-save guidance', async () => {
-        const blocks = createMockBlocks(60);
+        const blocks = createMockBlocks(100);
         const legacy = buildLegacyV2Bytes({ note: 'old world' }, new TextEncoder().encode('legacy'));
         const res = F5.embedRaw(blocks, legacy, { seed: 'v2-reject', k: 2 });
         expect(res.success).toBe(true);
@@ -153,7 +153,7 @@ describe('container format v3 (whole-container framing)', () => {
     });
 
     it('capacity math covers the whole coded frame', async () => {
-        const blocks = createMockBlocks(80);
+        const blocks = createMockBlocks(100);
         const payload = new TextEncoder().encode('capacity probe');
         const [ok, err] = await F5.embedContainer(
             blocks, payload,

@@ -42,7 +42,6 @@ export function encodeQR(data) {
     if (version === 0) throw new Error(`qr: ${data.length} bytes exceeds max capacity`);
     const { total, ec } = VERSION_DATA[version];
     const dataLen = total - ec;
-    const size = 17 + version * 4;
 
     // Build data bit stream
     const bits = [];

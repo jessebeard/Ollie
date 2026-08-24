@@ -259,7 +259,7 @@ export class BatchEmbedder {
         if (codeErr) return [null, new Error(`Erasure coding failed: ${codeErr.message}`)];
 
         const chunkId = ChunkManager.generateId();
-        let chunks = [];
+        const chunks = [];
         let idx = 0;
         imageCapacities.forEach((info, i) => {
             for (let c = 0; c < plan.counts[i]; c++) {

@@ -34,20 +34,6 @@ function createMockBlocks(count) {
     return blocks;
 }
 
-function countAC(blockArr) {
-    let nonZero = 0;
-    let ones = 0;
-    for (const block of blockArr) {
-        for (let c = 1; c < 64; c++) {
-            if (block[c] !== 0) {
-                nonZero++;
-                if (block[c] === 1 || block[c] === -1) ones++;
-            }
-        }
-    }
-    return { nonZero, ones };
-}
-
 function diffCoefficients(before, after) {
     const changes = [];
     for (let b = 0; b < before.length; b++) {
@@ -144,7 +130,7 @@ vectors.ecc = { profiles: {}, multiblock: null };
     const payload = utf8('CONTAINER-PAYLOAD-0123456789ABCDEF');
     const metadataObj = {};
 
-    const [ok, embedErr] = await F5.embedContainer(blocks, payload, metadataObj, { seed: 'conformance-container' });
+    const [ok] = await F5.embedContainer(blocks, payload, metadataObj, { seed: 'conformance-container' });
     if (!ok) throw new Error('container vector embedding failed');
 
     // Recover the frame by scanning k, then pin the raw bytes.
