@@ -166,12 +166,16 @@ Ollie is designed to be audited. Here's how to approach it:
 
 ## Testing
 
+> **Language convention:** Ollie is 100% vanilla JavaScript with JSDoc type annotations.
+> No TypeScript source exists. The optional `typecheck` script runs `tsc --checkJs`
+> purely as a JSDoc linter — it validates annotations, compiles nothing, and emits nothing.
+
 ```bash
 npm test               # Full suite: 675 tests
 PBT_SEED=N npm test   # Reproducible property-based runs
 npm run fuzz           # Long-run fuzz driver (all suites, scalable iterations)
 npm run lint           # ESLint
-npm run typecheck      # TypeScript checkJs over library core
+npm run typecheck      # Validates JSDoc type annotations (no TypeScript)
 ```
 
 Test families:
@@ -186,7 +190,7 @@ Test families:
 | Fuzz | ~20 | Structure-aware mutation, differential testing, model-based sequences |
 | UI | ~15 | Vault UI interactions |
 
-CI runs lint + typecheck + seeded tests + fuzz smoke + stale-vector guard on every push.
+CI runs lint + JSDoc validation + seeded tests + fuzz smoke + stale-vector guard on every push.
 
 ---
 
@@ -194,7 +198,7 @@ CI runs lint + typecheck + seeded tests + fuzz smoke + stale-vector guard on eve
 
 These are codified in [`src/specs/rules/`](src/specs/rules/) and enforced by convention:
 
-1. **Zero runtime dependencies.** Dev tooling (ESLint, TypeScript) is documented exception.
+1. **Zero runtime dependencies.** Dev tooling (ESLint, JSDoc type validation) is documented exception.
 2. **Result tuples everywhere.** `[value|null, error|null]` — never throw for predictable failures.
 3. **Post-quantum symmetric-only crypto.** No asymmetric primitives (see constitution).
 4. **Fail closed.** Invalid input, corruption, or tampering produces an explicit error, never partial output.
