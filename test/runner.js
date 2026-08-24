@@ -215,6 +215,7 @@ async function runTests() {
         await import('./security/coded-header.test.js');
         await import('./security/totp.test.js');
         await import('./security/extreme-universal.test.js');
+        await import('./security/encrypted-container.test.js');
         await import('./security/qr-encoder.test.js');
         await import('./security/format-v3.test.js');
         await import('./security/cauchy-ec.test.js');
