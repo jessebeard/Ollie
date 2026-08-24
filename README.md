@@ -8,26 +8,27 @@ Everything is pure JavaScript: no dependencies, no WebAssembly, no build step.
 Every algorithm is hand-implemented in readable modules with exhaustive tests,
 so the entire security envelope can be audited end-to-end by one person in an afternoon.
 
----
+Ollie implements the following published standards natively:
 
-## Why Ollie exists
-
-Password managers are single points of failure: one encrypted blob on one disk or server.
-Lose it, forget it, or get locked out of your account, and every password inside is gone.
-
-Ollie takes a different approach:
-
-1. Your passwords are encrypted into a vault document.
-2. The vault document is hidden inside ordinary JPEG photos using F5 steganography.
-3. The photos are erasure-coded so you can lose some of them and still recover.
-4. Each photo is cryptographically authenticated so tampering is detected.
-5. You upload the photos anywhere — Flickr, Google Photos, a public GitHub repo.
-   They're just pictures to everyone else.
-
-Recovery requires a minimum number of surviving photos plus your master password.
-No server, no account, no trust in a third party.
+| Standard | What we implement |
+|----------|------------------|
+| ITU-T T.81 / ISO/IEC 10918-1 | Baseline sequential DCT JPEG encoder and decoder |
+| FIPS 197 | AES-256-GCM authenticated encryption |
+| FIPS 180-4 | SHA-256 secure hash algorithm |
+| RFC 2104 | HMAC-SHA-256 message authentication |
+| RFC 2898 (PKCS #5 v2.1) | PBKDF2-HMAC-SHA-256 key derivation |
+| NIST SP 800-38D | GCM authenticated encryption mode |
+| RFC 4226 | HMAC-based one-time password (HOTP) |
+| **RFC 6238** | **Time-based one-time password (TOTP)** |
+| RFC 4648 | Base32 data encoding |
+| ISO/IEC 18004 | QR Code bar code symbology |
 
 ---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions, TDD workflow,
+and how to get oriented in the codebase.
 
 ## Security model
 
@@ -135,7 +136,7 @@ app/                    # Browser UI (vault page)
 scripts/                # CLI, dev server, golden-vector generator, fuzz driver
 test/                   # 675+ tests: unit, integration, security, conformance, PBT
 docs/audits/            # Historical audit reports
-WIREFRAME.md            # Complete mermaid.js architecture diagram
+src/specs/WIREFRAME.md # Complete mermaid.js architecture diagram
 ```
 
 ---

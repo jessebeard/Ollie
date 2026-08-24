@@ -49,7 +49,7 @@ Ollie/
 â”‚   â”‚   â”œâ”€â”€ encoder.js  decoder.js  transcoder.js
 â”‚   â”‚   â”œâ”€â”€ capacity-scanner.js  file-scanner.js
 â”‚   â”œâ”€â”€ information-theory/
-â”‚   â”‚   â”œâ”€â”€ cryptography/         # pbkdf2, aes-gcm, hmac, crypto-provider
+â”‚   â”‚   â”œâ”€â”€ cryptography/         # pbkdf2, aes-gcm, hmac, totp, crypto-provider
 â”‚   â”‚   â”œâ”€â”€ error-correction/     # galois-field, reed-solomon-codec, rs-interleaver
 â”‚   â”‚   â”œâ”€â”€ secret-sharing/       # gf-shamir (k-of-n), css-envelope
 â”‚   â”‚   â””â”€â”€ steganography/        # f5-syndrome, batch-embedder/-extractor,
@@ -192,6 +192,7 @@ flowchart LR
         env["css-envelope.js"]
         gf["gf256.js"]
         cauchy["cauchy-ec.js"]
+        qr["qr-encoder.js"]
     end
 
     subgraph ecc
@@ -205,6 +206,7 @@ flowchart LR
         aes["aes-gcm.js"]
         hmack["hmac.js"]
         cprov["crypto-provider.js"]
+        totpmod["totp.js"]
     end
 
     subgraph codec
@@ -250,6 +252,8 @@ flowchart LR
     f5 --> aes
     f5 --> pbkdf
     f5 --> cprov
+    f5 --> totpmod
+    totpmod --> hmack
     f5 --> crc
 
     rsi --> eidx["error-correction/index.js"]
@@ -259,6 +263,7 @@ flowchart LR
     cman --> hmack
     cman --> pbkdf
     env --> shamir
+    qr --> gf
     env --> aes
     shamir --> gf
     cauchy --> gf

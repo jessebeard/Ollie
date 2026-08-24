@@ -65,6 +65,7 @@
             <file name="decoder.test.js" description="Main decoder integration tests." />
             <file name="encoder.test.js" description="JpegEncoder integration tests." />
             <file name="transcoder.test.js" description="Lossless coefficient roundtrip validation." />
+            <file name="qr-encoder.test.js" description="QR encoder structural tests: dimensions, finder patterns, timing patterns, determinism." />
         </directory>
         <directory name="conformance">
             <file name="golden-vectors.json" description="Bit-exact golden vectors for wire format layers 0-3." />
@@ -91,6 +92,7 @@
                 <file name="aes-gcm.test.js" description="AES-GCM encryption/decryption tests." />
                 <file name="hmac.test.js" description="HMAC-SHA256 signing/verification tests." />
                 <file name="pbkdf2.test.js" description="PBKDF2 key derivation tests including deriveRawBits." />
+                <file name="totp.test.js" description="RFC 6238 TOTP: Annex B vectors, drift-window verification, otpauth URI roundtrip." />
             </directory>
             <directory name="error-correction">
                 <file name="galois-field.test.js" description="GF(256) field arithmetic tests." />
@@ -144,6 +146,7 @@
             <file name="threshold-vault.test.js" description="Threshold vault recovery: distinct coded stripes, subset recovery, unique-share counting." />
             <file name="ui-legacy-xss.test.js" description="escapeHtml XSS prevention." />
             <file name="url-safety.test.js" description="URL scheme whitelist enforcement." />
+            <file name="base32.test.js" description="RFC 4648 Base32 encode/decode tests." />
             <file name="vault-hardening.test.js" description="Vault hardening: import ID validation, lock guard, session-key wrapping." />
             <file name="xss.test.js" description="XSS prevention in prompts and views." />
         </directory>

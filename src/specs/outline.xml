@@ -49,7 +49,8 @@
             <file name="decoder.js" description="JpegDecoder: full decode pipeline with stego extraction, fail-loud bounds checking." />
             <file name="encoder.js" description="JpegEncoder: baseline sequential DCT encoder with F5 steganography embedding." />
             <file name="file-scanner.js" description="FileScanner: directory scanning via File System Access API." />
-            <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
+                <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
+                <file name="qr-encoder.js" description="ISO/IEC 18004 QR encoder: byte-mode data encoding, RS error correction via GF(256), matrix construction with masking." />
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">
@@ -57,6 +58,7 @@
                 <file name="crypto-provider.js" description="Single source of truth for Web Crypto access across browser and Node." />
                 <file name="hmac.js" description="HMAC-SHA256 signing/verification for carrier manifest authentication." />
                 <file name="pbkdf2.js" description="PBKDF2-HMAC-SHA-256 key derivation with OWASP-aligned defaults (600k iterations)." />
+                <file name="totp.js" description="RFC 6238 TOTP: hotp/totp/verifyTotp with SHA-1/SHA-256/SHA-512, drift-window verification, otpauth:// URI parse/build." />
             </directory>
             <directory name="error-correction">
                 <file name="galois-field.js" description="GF(2^8) field arithmetic over poly 0x11D with exp/log tables and field element classes." />
@@ -92,6 +94,7 @@
             <file name="escape-html.js" description="Canonical HTML escaping for safe interpolation." />
             <file name="logger.js" description="Leveled logger (debug/info/warn/error) with env-var override." />
             <file name="url-safety.js" description="URL scheme whitelist for safe link opening." />
+            <file name="base32.js" description="RFC 4648 Base32 encoding/decoding." />
         </directory>
     </structure>
 </project>
