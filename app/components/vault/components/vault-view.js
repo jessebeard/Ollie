@@ -48,6 +48,7 @@ export class VaultView {
         const div = document.createElement('div');
         div.className = 'password-card';
         div.setAttribute('role', 'article');
+        div.setAttribute('data-entry-id', entry.id);
         div.innerHTML = `
             <div class="card-header">
                 <div class="card-icon" aria-hidden="true">${this.getIcon(entry)}</div>
@@ -55,8 +56,9 @@ export class VaultView {
                     <h4>${this.escape(entry.title)}</h4>
                     <span class="card-subtitle">${this.escape(entry.username)}</span>
                 </div>
-                <button class="btn-icon more-btn" aria-label="Edit ${this.escape(entry.title)}">â‹®</button>
+                <button class="btn-icon more-btn" aria-label="Edit ${this.escape(entry.title)}">⋯</button>
             </div>
+            <div class="totp-slot"></div>
             <div class="card-tags" aria-label="Tags">
                 ${(entry.tags || []).map(t => `<span class="tag">${this.escape(t)}</span>`).join('')}
             </div>

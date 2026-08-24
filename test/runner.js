@@ -17,6 +17,7 @@ global.document = {
             const element = {
                 tagName: match[1],
                 style: {},
+                dataset: {},
                 addEventListener: () => { },
                 removeEventListener: () => { },
                 classList: {

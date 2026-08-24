@@ -7,6 +7,7 @@ import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 import { logger } from '../../../src/utils/logger.js';
 import { writeAllWithRollback } from '../../../src/utils/atomic-writer.js';
+import { totp, parseOtpauthUri } from '../../../src/information-theory/cryptography/totp.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -541,8 +542,32 @@ export class VaultUI {
                 ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
                 : 'unknown';
             statusText.textContent = `Unlocked Â· Rev ${this.vault.metadata.revision} Â· ${savedDate} UTC`;
+
+            this.populateTotpCodes(filteredResults);
         } else {
             statusText.textContent = 'Locked';
+        }
+    }
+
+    async populateTotpCodes(entries) {
+        if (!this.vault || !this.vault.isUnlocked) return;
+        const [sessionKey] = await this.vault._getSessionKey();
+        if (!sessionKey) return;
+        for (const entry of entries) {
+            if (!entry.decrypt) continue;
+            const [plain] = await entry.decrypt(sessionKey);
+            if (!plain || !plain.totp) continue;
+            try {
+                const [params] = parseOtpauthUri(plain.totp);
+                if (!params) continue;
+                const secretBytes = new TextEncoder().encode(params.secret);
+                const [code] = await totp(secretBytes, { algorithm: params.algorithm, digits: params.digits, period: params.period });
+                if (!code) continue;
+                const card = document.querySelector(`[data-entry-id="${entry.id}"] .totp-slot`);
+                if (card) {
+                    card.innerHTML = `<span class="totp-code">${code.slice(0, 3)} ${code.slice(3)}</span>`;
+                }
+            } catch { /* non-fatal */ }
         }
     }
 

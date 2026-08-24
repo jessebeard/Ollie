@@ -94,6 +94,43 @@ export async function cliLoad({ imagesDir, password, outExport }) {
 }
 
 /**
+ * Generates current TOTP codes for all entries that have a totp field.
+ */
+export async function cliTotp({ imagesDir, password }) {
+    try {
+        const [files, filesErr] = await readCarrierFiles(imagesDir);
+        if (filesErr) return { error: filesErr };
+
+        const [vault, loadErr] = await PasswordVault.load(files, password);
+        if (loadErr) return { error: loadErr };
+
+        const [sessionKey] = await vault._getSessionKey();
+        if (!sessionKey) return { error: new Error('Cannot derive session key') };
+
+        const codes = [];
+        for (const entry of vault.entries) {
+            const [plain, decErr] = await entry.decrypt(sessionKey);
+            if (decErr || !plain.totp) continue;
+            const { parseOtpauthUri } = await import('../src/information-theory/cryptography/totp.js');
+            const [params] = parseOtpauthUri(plain.totp);
+            if (!params) continue;
+            const secretBytes = new TextEncoder().encode(params.secret);
+            const { totp: genTotp } = await import('../src/information-theory/cryptography/totp.js');
+            const [code] = await genTotp(secretBytes, {
+                algorithm: params.algorithm, digits: params.digits, period: params.period
+            });
+            if (!code) continue;
+            codes.push({ label: params.label || plain.title || entry.id, code });
+        }
+
+        if (codes.length === 0) return { error: new Error('No TOTP-enabled entries found.') };
+        return { error: null, codes };
+    } catch (e) {
+        return { error: e instanceof Error ? e : new Error(String(e)) };
+    }
+}
+
+/**
  * Non-destructive integrity and identity check against carriers.
  */
 export async function cliVerify({ imagesDir, password }) {
@@ -175,8 +212,19 @@ if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
                 password: args.password
             });
             break;
+        case 'totp':
+            report = await cliTotp({
+                imagesDir: args.imagesDir,
+                password: args.password
+            });
+            if (!report.error) {
+                for (const c of report.codes) {
+                    console.log(`${c.label}: ${c.code}`);
+                }
+            }
+            break;
         default:
-            console.error('Usage: node scripts/cli.mjs <save|load|verify> --help for flags');
+            console.error('Usage: node scripts/cli.mjs <save|load|verify|totp> --help for flags');
             process.exit(1);
     }
 
