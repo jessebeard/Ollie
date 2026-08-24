@@ -30,6 +30,9 @@ jobs:
           PBT_SEED: '20260823'
         run: npm test
 
+      - name: Fuzz smoke pass (fixed seed)
+        run: node scripts/fuzz.mjs --seed=20260823 --scale=1
+
       - name: Golden vectors are current
         run: |
           npm run vectors

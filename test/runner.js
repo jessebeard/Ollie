@@ -195,6 +195,8 @@ async function runTests() {
         await import('./security/css-envelope.test.js');
         await import('./security/threshold-vault.test.js');
         await import('./security/gf256.test.js');
+        await import('./fuzz/cli-fuzz.test.js');
+        await import('./fuzz/crypto-fuzz.test.js');
         await import('./security/cauchy-ec.test.js');
 
         await import('./integration/error-correction/reed-solomon-integration.test.js');

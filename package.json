@@ -9,7 +9,8 @@
     "serve": "node scripts/dev-server.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
-    "vectors": "node scripts/generate-golden-vectors.mjs"
+    "vectors": "node scripts/generate-golden-vectors.mjs",
+    "fuzz": "node scripts/fuzz.mjs"
   },
   "engines": {
     "node": ">=22"

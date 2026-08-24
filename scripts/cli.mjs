@@ -111,12 +111,21 @@ export async function cliVerify({ imagesDir, password }) {
     }
 }
 
-function parseArgs(argv) {
+/**
+ * Parses CLI flag pairs into an options object. Flags without a following
+ * value become `true`; a token starting with `--` is always treated as the
+ * next flag, never as a value.
+ *
+ * @param {string[]} argv
+ * @returns {Object<string, string|boolean>}
+ */
+export function parseArgs(argv) {
     const args = {};
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg.startsWith('--')) {
             const key = arg.slice(2);
+            if (key === '') break;   // bare "--" ends option parsing
             const next = argv[i + 1];
             if (next !== undefined && !next.startsWith('--')) {
                 args[key] = next;
