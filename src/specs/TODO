@@ -9,6 +9,11 @@ o comprehensive end to end testing
 - allow resetting the master password
 
 
+## RESOLVED 2026-08-24 - Whole-container ECC framing (format v3)
+Implemented in Wave K: RS(255,191) coded control header carrying all
+self-describing fields + RS-coded body covering metadata + payload + CRC.
+v2 containers fail closed. See container-wire-format.md section 3.
+
 ## 2026-08-22 � Whole-container ECC framing (format v2.1 candidate)
 F5.extractContainer parses header/metadata BEFORE Reed-Solomon recovery;
 ErrorCorrection currently covers only the payload. Corrupted coefficients that

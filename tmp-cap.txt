@@ -1,0 +1,32 @@
+
+
+        if (options.format === 'container') {
+            const metaStr = JSON.stringify(options.metadata || {});
+            const eccMetadataOverhead = options.ecc ? 70 : 0;
+            const metaLen = new TextEncoder().encode(metaStr).length + eccMetadataOverhead;
+            // Container overhead: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) + PayloadLen(4) + CRC(4)
+            const containerOverhead = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + 4;
+            const encryptionOverhead = options.encrypted ? 28 : 0;
+
+            if (options.ecc) {
+                const eccProfile = options.eccProfile || 'Medium';
+                const profile = ECC_PROFILES[eccProfile];
+                const minEncodedSize = 255;
+                const availableForECC = capacityBytes - containerOverhead;
+
+                if (availableForECC < minEncodedSize) {
+                    return 0;
+                }
+
+                const maxBlocks = Math.floor(availableForECC / 255);
+                const maxPayloadWithECC = maxBlocks * profile.dataBytes;
+                return Math.max(0, maxPayloadWithECC - encryptionOverhead);
+            } else {
+                const availableForPayload = capacityBytes - containerOverhead - encryptionOverhead;
+                return Math.max(0, availableForPayload);
+            }
+        } else {
+            return Math.max(0, capacityBytes - 4); // Legacy header
+        }
+    }
+}

@@ -21,8 +21,7 @@ export const FUZZ_SUITES = {
     ecc: { description: 'RS tolerance-edge corruption distribution properties', run: runEccEdgeFuzz },
     parsers: { description: 'Mutated-JPEG parser fuzz with hang/bomb isolation (Node workers)', run: runParserFuzz },
     codec: { description: 'Codec metamorphic MRs: dimensions, determinism, monotonicity, fidelity, stego survival', run: runCodecMrfuzz },
-    vault: { description: 'Model-based op-sequence fuzzing against vault invariants', run: runVaultModelFuzz },
-    zeroize: { description: 'DEK zeroization + lock hygiene checks', run: runZeroizationChecks },
+    vault: { description: 'Model-based op-sequence fuzzing against vault invariants', run: runVaultModelFuzz },    zeroize: { description: 'DEK zeroization + lock hygiene checks', run: runZeroizationChecks },
     batch: { description: 'EC carrier-subset recovery MRs over randomized (k,n) grids', run: runBatchSubsetFuzz }
 };
 

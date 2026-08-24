@@ -188,7 +188,7 @@ export async function runBatchSubsetFuzz(scale = 1) {
 
         const carriers = [];
         for (let c = 0; c < n; c++) {
-            const size = 128;
+            const size = 160;
             const data = new Uint8ClampedArray(size * size * 4);
             let s = seedBase + c;
             for (let px = 0; px < data.length; px += 4) {

@@ -1,7 +1,9 @@
-Ollie Container Wire Format — Reference Specification (v2, frozen)
+Ollie Container Wire Format — Reference Specification (v3, frozen)
 
 Status:     Frozen for the Rust port. Implementations MUST match this document
             bit-for-bit for layers 0-3 and structurally for layers 4-6.
+            v3 supersedes v2: the ENTIRE container frame (control header +
+            body) is RS-coded. v2 containers fail closed (re-save required).
 Normative:  test/conformance/golden-vectors.json + wire-format-conformance.test.js
 Related:    f5-steganography.md (matrix-encoding algorithm core)
 
@@ -19,7 +21,7 @@ a reader unwraps in reverse order.
   Layer 5  Multi-carrier chunk framing           (split/reassemble across JPEGs)
   Layer 4  Encryption envelope                   (PBKDF2 + AES-256-GCM)
   Layer 3  ECC framing                           (RS(255,k) interleaved blocks)
-  Layer 2  Container framing v2                  (magic/version/flags/k/meta/crc)
+  Layer 2  Container framing v3                  (coded control header + coded body)
   Layer 1  F5 embedding                          (matrix encoding over AC coeffs)
   Layer 0  Carrier mapping                       (JPEG blocks -> flat index space)
 

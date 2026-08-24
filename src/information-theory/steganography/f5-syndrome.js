@@ -11,6 +11,12 @@
  * - Shrinkage handling via re-embedding
  */
 import { ErrorCorrection, ECC_PROFILES } from '../error-correction/rs-interleaver.js';
+import {
+    packControlHeader,
+    encodeControlCodeword,
+    decodeControlCodeword,
+    unpackControlHeader
+} from './coded-header.js';
 import { Encryption } from '../cryptography/aes-gcm.js';
 import { KeyDerivation } from '../cryptography/pbkdf2.js';
 import { sha256 } from '../cryptography/crypto-provider.js';
@@ -19,7 +25,7 @@ import { logger } from '../../utils/logger.js';
 
 export class F5 {
     static MAGIC = 'F5SG';
-    static VERSION = 2;
+    static VERSION = 3;
 
     /**
      * Seed used only for containers embedded WITHOUT a password and WITHOUT
@@ -490,10 +496,6 @@ export class F5 {
      * @returns {Promise<[boolean|null, Error|null]>} Tuple of [success, error]
      */
     static async embedContainer(blocks, data, metadata, options = {}) {
-        const magic = new TextEncoder().encode(this.MAGIC);
-        const version = this.VERSION;
-        const flags = 0;
-
         let payloadToEmbed = data;
         if (options.password) {
             metadata.encrypted = true;
@@ -518,26 +520,31 @@ export class F5 {
             payloadToEmbed = encryptedPayload;
         }
 
-        let protectedPayload = payloadToEmbed;
-        if (metadata.ecc) {
-            const eccProfile = metadata.eccProfile || 'Medium';
-            const [eccResult, eccErr] = ErrorCorrection.protect(payloadToEmbed, eccProfile);
-            if (eccErr) {
-                return [null, eccErr];
-            }
-            protectedPayload = eccResult.encoded;
+        // v3: the ENTIRE container (metadata + payload) lives inside RS-coded
+        // regions. The profile governs the coded body; the control codeword
+        // always uses High-strength parameters. Profile authority lives in
+        // the control header - extractContainer annotates decoded metadata.
+        const eccProfile = options.eccProfile
+            || (metadata.ecc === false ? 'Low' : (metadata.eccProfile || 'Medium'));
 
-            metadata.eccProfile = eccProfile;
-            metadata.originalLength = eccResult.originalLength;
-            metadata.blockCount = eccResult.blockCount;
-        }
-        const payloadLen = protectedPayload.length;
-
-        const metaStr = JSON.stringify(metadata);
-        const metaBytes = new TextEncoder().encode(metaStr);
+        const metaBytes = new TextEncoder().encode(JSON.stringify(metadata));
         const metaLen = metaBytes.length;
 
-        // Count non-zero coefficients AND ones for k selection
+        const crcInput = new Uint8Array(metaLen + payloadToEmbed.length);
+        crcInput.set(metaBytes, 0);
+        crcInput.set(payloadToEmbed, metaLen);
+        const bodyCRC32 = crc32(crcInput);
+
+        const body = new Uint8Array(metaLen + payloadToEmbed.length + 4);
+        body.set(metaBytes, 0);
+        body.set(payloadToEmbed, metaLen);
+        new DataView(body.buffer).setUint32(body.length - 4, bodyCRC32, false);
+
+        const [eccResult, eccErr] = ErrorCorrection.protect(body, eccProfile);
+        if (eccErr) {
+            return [null, new Error(`F5: body coding failed: ${eccErr.message}`)];
+        }
+
         let nonZeroCount = 0;
         let onesCount = 0;
         for (let b = 0; b < blocks.length; b++) {
@@ -550,33 +557,32 @@ export class F5 {
             }
         }
         const p1 = nonZeroCount > 0 ? onesCount / nonZeroCount : 0.5;
-        const totalBits = (4 + 1 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4) * 8;
+
+        const frameLength = 255 + eccResult.encoded.length;
+        const totalBits = frameLength * 8;
         const k = this.selectK(nonZeroCount, totalBits, p1);
 
-        // Container: [Magic:4][Version:1][Flags:1][K:1][MetaLen:2][Metadata][PayloadLen:4][Payload][CRC:4]
-        const totalSize = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4;
+        const [controlPlane, packErr] = packControlHeader({
+            k,
+            metaLen,
+            payloadLen: payloadToEmbed.length,
+            bodyCRC32,
+            profileName: eccProfile,
+            originalLength: body.length,
+            blockCount: eccResult.blockCount
+        });
+        if (packErr) return [null, packErr];
 
-        const container = new Uint8Array(totalSize);
-        const view = new DataView(container.buffer);
-        let offset = 0;
+        const [codeword, codeErr] = encodeControlCodeword(controlPlane);
+        if (codeErr) return [null, codeErr];
 
-        container.set(magic, offset); offset += 4;
-        view.setUint8(offset, version); offset += 1;
-        view.setUint8(offset, flags); offset += 1;
-        view.setUint8(offset, k); offset += 1;  // Store k for extraction
-        view.setUint16(offset, metaLen, false); offset += 2;
-        container.set(metaBytes, offset); offset += metaLen;
-        view.setUint32(offset, payloadLen, false); offset += 4;
-        container.set(protectedPayload, offset); offset += payloadLen;
-
-        const dataToCrc = container.subarray(0, offset);
-        const crcVal = crc32(dataToCrc);
-        view.setUint32(offset, crcVal, false); offset += 4;
+        const frame = new Uint8Array(codeword.length + eccResult.encoded.length);
+        frame.set(codeword, 0);
+        frame.set(eccResult.encoded, codeword.length);
 
         const seed = await this.resolveSeed(options);
 
-        // Pass k to embedRaw to ensure consistency
-        const result = this.embedRaw(blocks, container, { seed, k });
+        const result = this.embedRaw(blocks, frame, { seed, k });
         if (!result.success) {
             return [null, new Error('F5: Insufficient capacity to embed container payload')];
         }
@@ -622,75 +628,61 @@ export class F5 {
     static async extractContainer(blocks, options = {}) {
         const seed = await this.resolveSeed(options);
 
-        // Read fixed header: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) = 9 bytes = 72 bits
-        // We must use the SAME k that was used to find the magic bytes!
-        // If we came from extractAuto, we might know it. If not, we have to search again?
-        // For now, let's assume we need to search or use the provided options.k if set.
-
-        let headerBytes = null;
-        let usedK = options.k;
-
-        if (usedK) {
-            headerBytes = this.extractRaw(blocks, 72, { seed, k: usedK });
-        } else {
-            // Search for k if not provided
-            for (let tryK = 1; tryK <= 4; tryK++) {
-                const bytes = this.extractRaw(blocks, 72, { seed, k: tryK });
-                if (bytes) {
-                    const magic = new TextDecoder().decode(bytes.subarray(0, 4));
-                    if (magic === this.MAGIC) {
-                        headerBytes = bytes;
-                        usedK = tryK;
-                        break;
-                    }
-                }
-            }
+        // v3 detection: decode the RS-coded control codeword at k=1..4 and
+        // look for the magic/version identity. No raw bytes exist outside
+        // coded regions in format v3.
+        let ctl = null;
+        let usedK = null;
+        for (let tryK = 1; tryK <= 4; tryK++) {
+            const head = this.extractRaw(blocks, 255 * 8, { seed, k: tryK });
+            if (!head) continue;
+            const [plane, decErr] = decodeControlCodeword(head);
+            if (decErr) continue;
+            const [fields, unpackErr] = unpackControlHeader(plane);
+            if (unpackErr) continue;
+            ctl = fields;
+            usedK = tryK;
+            break;
         }
 
-        if (!headerBytes) return null;
+        if (!ctl) return null;
 
-        const view = new DataView(headerBytes.buffer);
-        let offset = 0;
+        // Read the full frame: control codeword + coded body.
+        const bodyCodedLen = ctl.blockCount * 255;
+        const full = this.extractRaw(blocks, (255 + bodyCodedLen) * 8, { seed, k: usedK });
+        if (!full) return null;
+        const bodyCoded = full.slice(255);
 
-        const magic = new TextDecoder().decode(headerBytes.subarray(0, 4)); offset += 4;
-        if (magic !== this.MAGIC) return null;
-
-        const version = view.getUint8(offset); offset += 1;
-        if (version !== this.VERSION) return null;
-
-        // Flags byte is reserved; skipped without binding.
-        view.getUint8(offset); offset += 1;
-        const storedK = view.getUint8(offset); offset += 1;
-
-        // Verify that the k we used to read the header matches the k stored IN the header
-        // If they mismatch, it's weird but we should trust the stored k for the rest of the payload?
-        // Actually, if we read the header successfully with usedK, then the whole container
-        // was likely embedded with usedK. The storedK is redundant but good for verification.
-        if (storedK !== usedK) {
-            logger.warn(`F5: Warning: Extracted k (${usedK}) differs from stored k (${storedK})`);
+        // RS-recover the body (metadata ‖ payload ‖ bodyCRC32).
+        const [body, recErr] = ErrorCorrection.recover(
+            bodyCoded, ctl.profileName, ctl.originalLength, ctl.blockCount
+        );
+        if (recErr) {
+            logger.warn('F5: body recovery failed:', recErr.message);
+            return null;
         }
 
-        // Use the k that successfully decoded the header for the rest
-        const k = usedK;
-        const metaLen = view.getUint16(offset, false); offset += 2;
+        const metaBytes = body.slice(0, ctl.metaLen);
+        const payloadStart = ctl.metaLen;
+        const payloadEnd = body.length - 4;
+        let payload = /** @type {Uint8Array} */ (body.slice(payloadStart, payloadEnd));
+        const storedCrc = new DataView(body.buffer, body.byteOffset, body.byteLength)
+            .getUint32(body.length - 4, false);
 
-        // Now extract full container up to metadata + payloadLen
-        const headerSize = 4 + 1 + 1 + 1 + 2 + metaLen + 4;
-        const partialContainer = this.extractRaw(blocks, headerSize * 8, { seed, k });
-        if (!partialContainer) return null;
-
-        const partialView = new DataView(partialContainer.buffer);
-        offset = 9; // After fixed header
-
-        const metaBytes = partialContainer.subarray(offset, offset + metaLen);
-        offset += metaLen;
+        const crcInput = new Uint8Array(ctl.metaLen + ctl.payloadLen);
+        crcInput.set(metaBytes, 0);
+        crcInput.set(payload, ctl.metaLen);
+        const actualCrc = crc32(crcInput);
+        if (actualCrc !== storedCrc) {
+            logger.warn('F5: body CRC mismatch after recovery');
+            return null;
+        }
 
         let metadata;
         try {
-            const jsonString = new TextDecoder().decode(metaBytes);
-            metadata = JSON.parse(jsonString);
+            metadata = JSON.parse(new TextDecoder().decode(metaBytes));
         } catch (e) {
-            logger.error('F5: Failed to parse metadata:', e);
+            logger.error('F5: failed to parse metadata:', e);
             return null;
         }
 
@@ -707,64 +699,6 @@ export class F5 {
                 logger.warn('F5: Rejecting container with invalid or missing enc KDF parameters');
                 return null;
             }
-        }
-
-        const payloadLen = partialView.getUint32(offset, false);
-        offset += 4;
-
-        if (payloadLen > 100 * 1024 * 1024) {
-            logger.warn('F5: Invalid payload length:', payloadLen);
-            return null;
-        }
-
-        // Extract full container including payload and CRC
-        const fullSize = headerSize + payloadLen + 4;
-        const fullContainer = this.extractRaw(blocks, fullSize * 8, { seed, k });
-        if (!fullContainer) return null;
-
-        const fullView = new DataView(fullContainer.buffer);
-
-        offset = headerSize;
-        let payload = fullContainer.subarray(offset, offset + payloadLen);
-        offset += payloadLen;
-
-        const expectedCrc = fullView.getUint32(offset, false);
-        const actualCrc = crc32(fullContainer.subarray(0, offset));
-
-        if (actualCrc !== expectedCrc) {
-            if (!metadata.ecc) {
-                logger.warn('F5: CRC mismatch');
-                return null;
-            }
-            logger.warn('F5: CRC mismatch, attempting ECC recovery...');
-        }
-
-        if (metadata.ecc) {
-            const profileName = metadata.eccProfile;
-            const originalLength = metadata.originalLength;
-            const blockCount = metadata.blockCount;
-
-            if (
-                !profileName || !ECC_PROFILES[profileName] ||
-                !Number.isInteger(originalLength) || originalLength < 0 ||
-                originalLength > 100 * 1024 * 1024 ||
-                !Number.isInteger(blockCount)
-            ) {
-                logger.warn('F5: Rejecting container with invalid or incomplete ECC parameters');
-                return null;
-            }
-
-            const [recovered, recoverErr] = ErrorCorrection.recover(
-                payload,
-                profileName,
-                originalLength,
-                blockCount
-            );
-            if (recoverErr) {
-                logger.error('F5: ECC recovery failed:', recoverErr);
-                return null;
-            }
-            payload = recovered;
         }
 
         if (metadata.encrypted) {
@@ -792,8 +726,15 @@ export class F5 {
                 logger.error('F5: Decryption failed:', decErr);
                 return null;
             }
-            payload = decryptedPayload;
+            payload = /** @type {Uint8Array} */ (decryptedPayload);
         }
+
+        // Annotate decoded metadata with control-header authority (v2 parity:
+        // consumers read eccProfile/originalLength/blockCount from metadata).
+        metadata.ecc = true;
+        metadata.eccProfile = ctl.profileName;
+        metadata.originalLength = ctl.originalLength - ctl.metaLen - 4;
+        metadata.blockCount = ctl.blockCount;
 
         return {
             data: payload,
@@ -853,30 +794,22 @@ export class F5 {
         const capacityBytes = Math.floor(bestCapacityBits / 8);
 
         if (options.format === 'container') {
-            const metaStr = JSON.stringify(options.metadata || {});
-            const eccMetadataOverhead = options.ecc ? 70 : 0;
-            const metaLen = new TextEncoder().encode(metaStr).length + eccMetadataOverhead;
-            // Container overhead: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) + PayloadLen(4) + CRC(4)
-            const containerOverhead = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + 4;
+            // v3 whole-container framing: control codeword (255 flat) plus
+            // RS-coded body covering metadata + payload + CRC tail.
+            const metaLen = new TextEncoder().encode(JSON.stringify(options.metadata || {})).length;
+
+            const profileName = options.eccProfile
+                || (options.ecc === false ? 'Low' : 'Medium');
+            const dataBytes = ECC_PROFILES[profileName].dataBytes;
             const encryptionOverhead = options.encrypted ? 28 : 0;
 
-            if (options.ecc) {
-                const eccProfile = options.eccProfile || 'Medium';
-                const profile = ECC_PROFILES[eccProfile];
-                const minEncodedSize = 255;
-                const availableForECC = capacityBytes - containerOverhead;
+            const usableForBodyBlocks = capacityBytes - 255 /* control codeword */;
+            if (usableForBodyBlocks <= 0) return 0;
 
-                if (availableForECC < minEncodedSize) {
-                    return 0;
-                }
-
-                const maxBlocks = Math.floor(availableForECC / 255);
-                const maxPayloadWithECC = maxBlocks * profile.dataBytes;
-                return Math.max(0, maxPayloadWithECC - encryptionOverhead);
-            } else {
-                const availableForPayload = capacityBytes - containerOverhead - encryptionOverhead;
-                return Math.max(0, availableForPayload);
-            }
+            const maxBlocks = Math.floor(usableForBodyBlocks / 255);
+            // body = metaLen + P + crc(4) must fit into maxBlocks * dataBytes
+            const maxPayload = maxBlocks * dataBytes - metaLen - 4 - encryptionOverhead;
+            return Math.max(0, maxPayload);
         } else {
             return Math.max(0, capacityBytes - 4); // Legacy header
         }

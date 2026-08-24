@@ -245,7 +245,7 @@ describe('Container framing v2 (Property-Based Tests)', () => {
                 Arbitrary.boolean(),
                 oneOf(PROFILES),
                 Arbitrary.string(1, 24),
-                Arbitrary.integer(50, 61)
+                Arbitrary.integer(110, 141)
             ],
             async (payload, useEcc, profileName, seed, blockCount) => {
                 const blocks = createMockBlocks(blockCount);

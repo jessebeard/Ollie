@@ -17,8 +17,8 @@ class MockFile {
 }
 
 async function makeCarriers(count) {
-    const width = 128;
-    const height = 128;
+    const width = 192;
+    const height = 192;
     const data = new Uint8ClampedArray(width * height * 4);
     let seed = 1234567;
     for (let i = 0; i < data.length; i += 4) {
@@ -47,7 +47,7 @@ async function savedVault(carriers, password = 'test-pw') {
             username: 'user@example.com',
             password: 'secret-password-value',
             url: 'https://example.com/entry/path',
-            notes: 'n'.repeat(60)
+            notes: 'n'.repeat(600)
         });
     }
     const [results, err] = await vault.save(carriers, password);

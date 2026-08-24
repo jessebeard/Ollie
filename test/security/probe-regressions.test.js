@@ -1,6 +1,6 @@
 import { describe, it, expect } from '../utils/test-runner.js';
 import { F5 } from '../../src/information-theory/steganography/f5-syndrome.js';
-import { crc32 } from '../../src/utils/crc32.js';
+import { buildV3Container } from '../utils/container-builder.mjs';
 
 const MAGIC = 'F5SG';
 
@@ -17,32 +17,14 @@ function createMockBlocks(count) {
     return blocks;
 }
 
-function buildContainerBytes(metadataObj) {
-    const metaBytes = new TextEncoder().encode(JSON.stringify(metadataObj || {}));
-    const totalSize = 4 + 1 + 1 + 1 + 2 + metaBytes.length + 4 + 0 + 4;
-    const buf = new Uint8Array(totalSize);
-    const view = new DataView(buf.buffer);
-    let offset = 0;
-
-    buf.set(new TextEncoder().encode(MAGIC), offset); offset += 4;
-    view.setUint8(offset, 2); offset += 1;
-    view.setUint8(offset, 0); offset += 1;
-    view.setUint8(offset, 1); offset += 1;
-    view.setUint16(offset, metaBytes.length, false); offset += 2;
-    buf.set(metaBytes, offset); offset += metaBytes.length;
-    view.setUint32(offset, 134217728, false); offset += 4;
-    view.setUint32(offset, crc32(buf.subarray(0, offset)), false);
-
-    return buf;
-}
 
 describe('Probe regressions (promoted from root evidence scripts)', () => {
 
     it('forged 128MB payloadLen is rejected before any long coefficient walk', async () => {
-        const blocks = createMockBlocks(60);
-        const forged = buildContainerBytes({});
+        const blocks = createMockBlocks(90);
+        const forged = buildV3Container({ metadataObj: {}, override: { payloadLen: 134217728, originalLength: 134217728 } });
         const result = F5.embedRaw(blocks, forged, { seed: 'len-attack', k: 1 });
-        expect(result.success).toBe(true);
+        expect(result.success).toBe(true); // forged control still embeds (it is just bits)
 
         const started = Date.now();
         const extracted = await F5.extractAuto(blocks, { seed: 'len-attack' });

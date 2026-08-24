@@ -1,0 +1,182 @@
+    static async extractContainer(blocks, options = {}) {
+        const seed = await this.resolveSeed(options);
+
+        // Read fixed header: Magic(4) + Version(1) + Flags(1) + K(1) + MetaLen(2) = 9 bytes = 72 bits
+        // We must use the SAME k that was used to find the magic bytes!
+        // If we came from extractAuto, we might know it. If not, we have to search again?
+        // For now, let's assume we need to search or use the provided options.k if set.
+
+        let headerBytes = null;
+        let usedK = options.k;
+
+        if (usedK) {
+            headerBytes = this.extractRaw(blocks, 72, { seed, k: usedK });
+        } else {
+            // Search for k if not provided
+            for (let tryK = 1; tryK <= 4; tryK++) {
+                const bytes = this.extractRaw(blocks, 72, { seed, k: tryK });
+                if (bytes) {
+                    const magic = new TextDecoder().decode(bytes.subarray(0, 4));
+                    if (magic === this.MAGIC) {
+                        headerBytes = bytes;
+                        usedK = tryK;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!headerBytes) return null;
+
+        const view = new DataView(headerBytes.buffer);
+        let offset = 0;
+
+        const magic = new TextDecoder().decode(headerBytes.subarray(0, 4)); offset += 4;
+        if (magic !== this.MAGIC) return null;
+
+        const version = view.getUint8(offset); offset += 1;
+        if (version !== this.VERSION) return null;
+
+        // Flags byte is reserved; skipped without binding.
+        view.getUint8(offset); offset += 1;
+        const storedK = view.getUint8(offset); offset += 1;
+
+        // Verify that the k we used to read the header matches the k stored IN the header
+        // If they mismatch, it's weird but we should trust the stored k for the rest of the payload?
+        // Actually, if we read the header successfully with usedK, then the whole container
+        // was likely embedded with usedK. The storedK is redundant but good for verification.
+        if (storedK !== usedK) {
+            logger.warn(`F5: Warning: Extracted k (${usedK}) differs from stored k (${storedK})`);
+        }
+
+        // Use the k that successfully decoded the header for the rest
+        const k = usedK;
+        const metaLen = view.getUint16(offset, false); offset += 2;
+
+        // Now extract full container up to metadata + payloadLen
+        const headerSize = 4 + 1 + 1 + 1 + 2 + metaLen + 4;
+        const partialContainer = this.extractRaw(blocks, headerSize * 8, { seed, k });
+        if (!partialContainer) return null;
+
+        const partialView = new DataView(partialContainer.buffer);
+        offset = 9; // After fixed header
+
+        const metaBytes = partialContainer.subarray(offset, offset + metaLen);
+        offset += metaLen;
+
+        let metadata;
+        try {
+            const jsonString = new TextDecoder().decode(metaBytes);
+            metadata = JSON.parse(jsonString);
+        } catch (e) {
+            logger.error('F5: Failed to parse metadata:', e);
+            logger.warn(`[DBG] ctl=${JSON.stringify(ctl)} metaHex=${Array.from(metaBytes.slice(0, 24)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+            return null;
+        }
+
+        if (metadata.encrypted) {
+            const enc = metadata.enc;
+            const valid =
+                enc &&
+                typeof enc === 'object' &&
+                enc.kdf === 'PBKDF2-SHA256' &&
+                Number.isInteger(enc.iterations) &&
+                enc.iterations >= this.MIN_KDF_ITERATIONS &&
+                enc.iterations <= this.MAX_KDF_ITERATIONS;
+            if (!valid) {
+                logger.warn('F5: Rejecting container with invalid or missing enc KDF parameters');
+                return null;
+            }
+        }
+
+        const payloadLen = partialView.getUint32(offset, false);
+        offset += 4;
+
+        if (payloadLen > 100 * 1024 * 1024) {
+            logger.warn('F5: Invalid payload length:', payloadLen);
+            return null;
+        }
+
+        // Extract full container including payload and CRC
+        const fullSize = headerSize + payloadLen + 4;
+        const fullContainer = this.extractRaw(blocks, fullSize * 8, { seed, k });
+        if (!fullContainer) return null;
+
+        const fullView = new DataView(fullContainer.buffer);
+
+        offset = headerSize;
+        let payload = fullContainer.subarray(offset, offset + payloadLen);
+        offset += payloadLen;
+
+        const expectedCrc = fullView.getUint32(offset, false);
+        const actualCrc = crc32(fullContainer.subarray(0, offset));
+
+        if (actualCrc !== expectedCrc) {
+            if (!metadata.ecc) {
+                logger.warn('F5: CRC mismatch');
+                return null;
+            }
+            logger.warn('F5: CRC mismatch, attempting ECC recovery...');
+        }
+
+        if (metadata.ecc) {
+            const profileName = metadata.eccProfile;
+            const originalLength = metadata.originalLength;
+            const blockCount = metadata.blockCount;
+
+            if (
+                !profileName || !ECC_PROFILES[profileName] ||
+                !Number.isInteger(originalLength) || originalLength < 0 ||
+                originalLength > 100 * 1024 * 1024 ||
+                !Number.isInteger(blockCount)
+            ) {
+                logger.warn('F5: Rejecting container with invalid or incomplete ECC parameters');
+                return null;
+            }
+
+            const [recovered, recoverErr] = ErrorCorrection.recover(
+                payload,
+                profileName,
+                originalLength,
+                blockCount
+            );
+            if (recoverErr) {
+                logger.error('F5: ECC recovery failed:', recoverErr);
+                return null;
+            }
+            payload = recovered;
+        }
+
+        if (metadata.encrypted) {
+            if (!options.password) {
+                logger.warn('F5: Data is encrypted but no password provided');
+                return null;
+            }
+
+            const salt = payload.slice(0, 16);
+            const iv = payload.slice(16, 28);
+            const ciphertext = payload.slice(28);
+
+            const [key, keyErr] = await KeyDerivation.deriveKey(
+                options.password,
+                salt,
+                { iterations: metadata.enc.iterations }
+            );
+            if (keyErr) {
+                logger.error('F5: Key derivation failed:', keyErr);
+                return null;
+            }
+
+            const [decryptedPayload, decErr] = await Encryption.decrypt(ciphertext, key, iv);
+            if (decErr) {
+                logger.error('F5: Decryption failed:', decErr);
+                return null;
+            }
+            payload = decryptedPayload;
+        }
+
+        return {
+            data: payload,
+            metadata: metadata
+        };
+    }

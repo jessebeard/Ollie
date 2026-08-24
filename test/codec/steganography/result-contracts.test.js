@@ -20,7 +20,7 @@ function createMockBlocks(count) {
 describe('Result-Tuple Contracts', () => {
 
     it('F5.embedContainer resolves [true, null] on success', async () => {
-        const blocks = createMockBlocks(8);
+        const blocks = createMockBlocks(120);
         const data = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
         const result = await F5.embedContainer(blocks, data, { ecc: false }, {});
@@ -31,8 +31,8 @@ describe('Result-Tuple Contracts', () => {
     });
 
     it('F5.embedContainer resolves [null, Error] when data exceeds capacity', async () => {
-        const blocks = createMockBlocks(1);
-        const data = new Uint8Array(256).fill(0xAB);
+        const blocks = createMockBlocks(120);
+        const data = new Uint8Array(800).fill(0xAB);
 
         const result = await F5.embedContainer(blocks, data, { ecc: false }, {});
 

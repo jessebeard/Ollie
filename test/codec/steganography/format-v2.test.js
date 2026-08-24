@@ -2,7 +2,7 @@ import { describe, it, expect } from '../../utils/test-runner.js';
 import { F5 } from '../../../src/information-theory/steganography/f5-syndrome.js';
 import { KeyDerivation } from '../../../src/information-theory/cryptography/pbkdf2.js';
 import { Encryption } from '../../../src/information-theory/cryptography/aes-gcm.js';
-import { crc32 } from '../../../src/utils/crc32.js';
+import { buildV3Container } from '../../utils/container-builder.mjs';
 
 const MAGIC = 'F5SG';
 
@@ -19,35 +19,23 @@ function createMockBlocks(count) {
     return blocks;
 }
 
-function buildContainerBytes({ version, metadataObj, payload = new Uint8Array(0) }) {
-    const meta = new TextEncoder().encode(JSON.stringify(metadataObj || {}));
-    const totalSize = 4 + 1 + 1 + 1 + 2 + meta.length + 4 + payload.length + 4;
-    const buf = new Uint8Array(totalSize);
-    const view = new DataView(buf.buffer);
-    let offset = 0;
-
-    buf.set(new TextEncoder().encode(MAGIC), offset); offset += 4;
-    view.setUint8(offset, version); offset += 1;
-    view.setUint8(offset, 0); offset += 1;
-    view.setUint8(offset, 1); offset += 1;
-    view.setUint16(offset, meta.length, false); offset += 2;
-    buf.set(meta, offset); offset += meta.length;
-    view.setUint32(offset, payload.length, false); offset += 4;
-    buf.set(payload, offset); offset += payload.length;
-    view.setUint32(offset, crc32(buf.subarray(0, offset)), false);
-
-    return buf;
-}
 
 describe('Container Format v2', () => {
 
-    it('declares format version 2', () => {
-        expect(F5.VERSION).toBe(2);
+    it('declares format version 3', () => {
+        expect(F5.VERSION).toBe(3);
     });
 
-    it('rejects version 1 containers instead of mis-reading them', async () => {
-        const blocks = createMockBlocks(50);
-        const v1Bytes = buildContainerBytes({ version: 1, metadataObj: { filename: 'old.bin' } });
+    it('rejects foreign-format frames instead of mis-reading them', async () => {
+        const blocks = createMockBlocks(90);
+        // Raw pre-v3 style frame: no RS-coded control plane.
+        const v1Bytes = new Uint8Array([
+            0x46, 0x35, 0x53, 0x47, // 'F5SG'
+            1, 0, 2,
+            0, 5,
+            104, 101, 108, 108, 111,
+            0, 0, 0, 9
+        ]);
         const result = F5.embedRaw(blocks, v1Bytes, { seed: 'v1-carrier', k: 1 });
         expect(result.success).toBe(true);
 
@@ -55,14 +43,10 @@ describe('Container Format v2', () => {
         expect(extracted).toEqual(null);
     });
 
-    it('extracts a valid version 2 container', async () => {
-        const blocks = createMockBlocks(50);
-        const v2Bytes = buildContainerBytes({
-            version: 2,
-            metadataObj: { filename: 'new.bin', seed: 'plain-seed' },
-            payload: new Uint8Array([1, 2, 3])
-        });
-        const result = F5.embedRaw(blocks, v2Bytes, { seed: 'plain-seed', k: 1 });
+    it('extracts a valid version 3 container', async () => {
+        const blocks = createMockBlocks(90);
+        const v3Bytes = buildV3Container({ metadataObj: { filename: 'new.bin' }, payload: new Uint8Array([1, 2, 3]) });
+        const result = F5.embedRaw(blocks, v3Bytes, { seed: 'plain-seed', k: 1 });
         expect(result.success).toBe(true);
 
         const extracted = await F5.extractAuto(blocks, { seed: 'plain-seed' });
@@ -79,6 +63,7 @@ describe('Container Format v2', () => {
             blocks, data, metadata, { password: 'hunter2', iterations: 50000 }
         );
         expect(embedErr).toEqual(null);
+        if (embedErr) throw embedErr;
         expect(embedded).toBe(true);
 
         const extracted = await F5.extractContainer(blocks, { password: 'hunter2' });
@@ -92,17 +77,16 @@ describe('Container Format v2', () => {
 describe('KDF parameter validation (attacker-controlled metadata)', () => {
 
     it('rejects iterations far outside the sane range before doing any key derivation', async () => {
-        const blocks = createMockBlocks(50);
+        const blocks = createMockBlocks(90);
         const forgedPayload = new Uint8Array(28);
-        const v2Bytes = buildContainerBytes({
-            version: 2,
+        const v3Bytes = buildV3Container({
             metadataObj: {
                 encrypted: true,
                 enc: { kdf: 'PBKDF2-SHA256', iterations: 1000000000 }
             },
             payload: forgedPayload
         });
-        const result = F5.embedRaw(blocks, v2Bytes, { seed: 'evil', k: 1 });
+        const result = F5.embedRaw(blocks, v3Bytes, { seed: 'evil', k: 1 });
         expect(result.success).toBe(true);
 
         const started = Date.now();
@@ -114,13 +98,12 @@ describe('KDF parameter validation (attacker-controlled metadata)', () => {
     });
 
     it('rejects an encrypted container whose metadata lacks an enc block', async () => {
-        const blocks = createMockBlocks(50);
-        const v2Bytes = buildContainerBytes({
-            version: 2,
+        const blocks = createMockBlocks(90);
+        const v3Bytes = buildV3Container({
             metadataObj: { encrypted: true },
             payload: new Uint8Array(28)
         });
-        F5.embedRaw(blocks, v2Bytes, { seed: 'evil2', k: 1 });
+        F5.embedRaw(blocks, v3Bytes, { seed: 'evil2', k: 1 });
 
         const extracted = await F5.extractAuto(blocks, { seed: 'evil2', password: 'x' });
         expect(extracted).toEqual(null);

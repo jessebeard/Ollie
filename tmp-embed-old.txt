@@ -1,0 +1,92 @@
+    static async embedContainer(blocks, data, metadata, options = {}) {
+        const magic = new TextEncoder().encode(this.MAGIC);
+        const version = this.VERSION;
+        const flags = 0;
+
+        let payloadToEmbed = data;
+        if (options.password) {
+            metadata.encrypted = true;
+            const iterations = options.iterations || KeyDerivation.ITERATIONS;
+            const [salt, saltErr] = KeyDerivation.generateSalt();
+            if (saltErr) return [null, saltErr];
+
+            metadata.enc = { kdf: 'PBKDF2-SHA256', iterations: iterations };
+
+            const [key, keyErr] = await KeyDerivation.deriveKey(options.password, salt, { iterations });
+            if (keyErr) return [null, keyErr];
+
+            const [encResult, encErr] = await Encryption.encrypt(data, key);
+            if (encErr) return [null, encErr];
+            const { ciphertext, iv } = encResult;
+
+            const encryptedPayload = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
+            encryptedPayload.set(salt, 0);
+            encryptedPayload.set(iv, salt.length);
+            encryptedPayload.set(new Uint8Array(ciphertext), salt.length + iv.length);
+
+            payloadToEmbed = encryptedPayload;
+        }
+
+        let protectedPayload = payloadToEmbed;
+        if (metadata.ecc) {
+            const eccProfile = metadata.eccProfile || 'Medium';
+            const [eccResult, eccErr] = ErrorCorrection.protect(payloadToEmbed, eccProfile);
+            if (eccErr) {
+                return [null, eccErr];
+            }
+            protectedPayload = eccResult.encoded;
+
+            metadata.eccProfile = eccProfile;
+            metadata.originalLength = eccResult.originalLength;
+            metadata.blockCount = eccResult.blockCount;
+        }
+        const payloadLen = protectedPayload.length;
+
+        const metaStr = JSON.stringify(metadata);
+        const metaBytes = new TextEncoder().encode(metaStr);
+        const metaLen = metaBytes.length;
+
+        // Count non-zero coefficients AND ones for k selection
+        let nonZeroCount = 0;
+        let onesCount = 0;
+        for (let b = 0; b < blocks.length; b++) {
+            for (let c = 1; c < 64; c++) {
+                const val = blocks[b][c];
+                if (val !== 0) {
+                    nonZeroCount++;
+                    if (val === 1 || val === -1) onesCount++;
+                }
+            }
+        }
+        const p1 = nonZeroCount > 0 ? onesCount / nonZeroCount : 0.5;
+        const totalBits = (4 + 1 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4) * 8;
+        const k = this.selectK(nonZeroCount, totalBits, p1);
+
+        // Container: [Magic:4][Version:1][Flags:1][K:1][MetaLen:2][Metadata][PayloadLen:4][Payload][CRC:4]
+        const totalSize = 4 + 1 + 1 + 1 + 2 + metaLen + 4 + payloadLen + 4;
+
+        const container = new Uint8Array(totalSize);
+        const view = new DataView(container.buffer);
+        let offset = 0;
+
+        container.set(magic, offset); offset += 4;
+        view.setUint8(offset, version); offset += 1;
+        view.setUint8(offset, flags); offset += 1;
+        view.setUint8(offset, k); offset += 1;  // Store k for extraction
+        view.setUint16(offset, metaLen, false); offset += 2;
+        container.set(metaBytes, offset); offset += metaLen;
+        view.setUint32(offset, payloadLen, false); offset += 4;
+        container.set(protectedPayload, offset); offset += payloadLen;
+
+        const dataToCrc = container.subarray(0, offset);
+        const crcVal = crc32(dataToCrc);
+        view.setUint32(offset, crcVal, false); offset += 4;
+
+        const seed = await this.resolveSeed(options);
+
+        // Pass k to embedRaw to ensure consistency
+        const result = this.embedRaw(blocks, container, { seed, k });
+        if (!result.success) {
+            return [null, new Error('F5: Insufficient capacity to embed container payload')];
+        }
+        return [true, null];

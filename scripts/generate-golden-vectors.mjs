@@ -2,6 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { F5 } from '../src/information-theory/steganography/f5-syndrome.js';
+import {
+    decodeControlCodeword,
+    unpackControlHeader,
+    CONTROL_VERSION
+} from '../src/information-theory/steganography/coded-header.js';
 import { ErrorCorrection } from '../src/information-theory/error-correction/rs-interleaver.js';
 import { crc32 } from '../src/utils/crc32.js';
 
@@ -135,46 +140,45 @@ vectors.ecc = { profiles: {}, multiblock: null };
 }
 
 {
-    const blocks = createMockBlocks(40);
+    const blocks = createMockBlocks(140);
     const payload = utf8('CONTAINER-PAYLOAD-0123456789ABCDEF');
-    const metadataStr = '{}';
-    const metaBytes = utf8(metadataStr);
-    const { nonZero, ones } = countAC(blocks);
-    const p1 = nonZero > 0 ? ones / nonZero : 0.5;
-    const totalBits = (17 + metaBytes.length + payload.length) * 8;
-    const k = F5.selectK(nonZero, totalBits, p1);
+    const metadataObj = {};
 
-    const totalSize = 17 + metaBytes.length + payload.length;
-    const container = new Uint8Array(totalSize);
-    const view = new DataView(container.buffer);
-    let off = 0;
-    container.set(utf8('F5SG'), off); off += 4;
-    view.setUint8(off, 2); off += 1;
-    view.setUint8(off, 0); off += 1;
-    view.setUint8(off, k); off += 1;
-    view.setUint16(off, metaBytes.length, false); off += 2;
-    container.set(metaBytes, off); off += metaBytes.length;
-    view.setUint32(off, payload.length, false); off += 4;
-    container.set(payload, off); off += payload.length;
-    view.setUint32(off, crc32(container.subarray(0, off)), false);
+    const [ok, embedErr] = await F5.embedContainer(blocks, payload, metadataObj, { seed: 'conformance-container' });
+    if (!ok) throw new Error('container vector embedding failed');
 
-    const result = F5.embedRaw(blocks, container, { seed: 'conformance-container', k });
-    if (!result.success) throw new Error('container vector embedding failed');
+    // Recover the frame by scanning k, then pin the raw bytes.
+    let frame = null;
+    let storedK = null;
+    let control = null;
+    for (let tryK = 1; tryK <= 4; tryK++) {
+        const head = F5.extractRaw(blocks, 255 * 8, { seed: 'conformance-container', k: tryK });
+        if (!head) continue;
+        const decoded = decodeControlCodeword(head);
+        if (decoded[1]) continue;
+        const fields = unpackControlHeader(decoded[0])[0];
+        if (!fields || fields.magic !== 'F5SG') continue;
+        storedK = tryK;
+        control = fields;
+        frame = F5.extractRaw(blocks, (255 + fields.blockCount * 255) * 8, { seed: 'conformance-container', k: tryK });
+        break;
+    }
+    if (!frame) throw new Error('container vector frame recovery failed');
 
     const extracted = await F5.extractAuto(blocks, { seed: 'conformance-container' });
     if (!extracted || !extracted.metadata) throw new Error('container vector extraction failed');
 
     vectors.container = {
         seed: 'conformance-container',
-        carrier_blocks: 40,
+        carrier_blocks: 140,
         payload_hex: toHex(payload),
-        stored_k: k,
-        version: 2,
+        stored_k: storedK,
+        version: CONTROL_VERSION,
         flags: 0,
-        meta_json: metadataStr,
+        meta_json: JSON.stringify(metadataObj),
         payload_length: payload.length,
-        crc32: view.getUint32(totalSize - 4, false),
-        container_hex: toHex(container),
+        control_fields: control,
+        container_hex: toHex(frame),
         extracts_payload_hex: toHex(extracted.data),
         extracts_metadata: extracted.metadata
     };

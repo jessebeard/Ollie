@@ -150,7 +150,7 @@ describe('F5 Steganography', () => {
     describe('Container Format', () => {
         it('should embed and extract container without encryption', async () => {
             const blocks = [];
-            for (let i = 0; i < 50; i++) {
+            for (let i = 0; i < 200; i++) {
                 const block = new Int32Array(64);
                 for (let j = 1; j < 64; j++) {
                     block[j] = (j % 20) + 2;
@@ -159,7 +159,7 @@ describe('F5 Steganography', () => {
             }
 
             const data = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // "Hello"
-            const metadata = { filename: 'test.txt', ecc: false };
+            const metadata = { filename: 'test.txt' };
 
             const [embedded, embedErr] = await F5.embedContainer(blocks, data, metadata, { seed: 'containertest' });
             expect(embedErr).toEqual(null);
