@@ -3,106 +3,95 @@
     <structure>
         <directory name="algebraic">
             <directory name="colorspace">
-                <file name="rgb-to-ycbcr.js" description="Converts RGB to YCbCr. Ranges: R, G, B: [0, 255] Y: [0, 255] Cb, Cr: [0, 255] (centered at 128)" />
+                <file name="rgb-to-ycbcr.js" description="Converts RGB to YCbCr. Ranges: R,G,B [0,255]; Y [0,255]; Cb,Cr [0,255] centered at 128." />
             </directory>
             <directory name="discrete-cosine">
-                <file name="forward-dct.js" description="Discrete Cosine Transform (DCT) The DCT is the heart of JPEG compression. It converts a block of spatial data (pixels) into the frequency domain. - Low frequencies (large features, background) end up in the top-left corner. - High frequencies (fine details, noise) end up in the bottom-right corner. This allows us to later discard (quantize) the high-frequency data which the human eye is less sensitive to, achieving compression." />
-                <file name="inverse-dct-spec.js" description="IDCT Implementations from JPEG T.81 Specification This file contains three IDCT implementations: 1. idctPureRef - Pure reference from spec (no optimizations) 2. idctOptimizedRef - Separable transform optimization 3. idctFastAAN - Fast AAN algorithm" />
-                <file name="inverse-dct.js" description="Inverse Discrete Cosine Transform (IDCT) Converts frequency domain coefficients back to spatial domain pixel values. This implementation matches the encoder&#39;s forward DCT using the same cosine table approach. JPEG spec Annex A describes the DCT/IDCT mathematics." />
+                <file name="forward-dct.js" description="Forward DCT: converts 8x8 spatial blocks to frequency-domain coefficients. Returns Result tuple." />
+                <file name="inverse-dct-spec.js" description="IDCT implementations from JPEG T.81: pure reference, optimized reference, fast AAN." />
+                <file name="inverse-dct.js" description="Inverse DCT: frequency coefficients back to pixel values. Exports idct (tuple), idctNaive, idctAAN." />
             </directory>
             <directory name="mappings">
-                <file name="block-assembly.js" description="Block Assembly - Assemble decoded 8x8 blocks into full image This module handles: - Placing blocks in correct positions - MCU interleaving - Cropping to actual image dimensions - Converting to RGBA ImageData format" />
-                <file name="blocks.js" description="Pads dimensions to a multiple of 16 for 4:2:0 subsampling. In 4:2:0, MCUs are 16x16 pixels (2x2 luma blocks + 1 Cb + 1 Cr)." />
-                <file name="downsampling.js" description="Chroma Downsampling - Downsample chroma components for 4:2:0 encoding For 4:2:0 subsampling, chroma (Cb/Cr) is sampled at half the resolution of luma in both horizontal and vertical directions." />
-                <file name="forward-zigzag.js" description="Undocumented module" />
-                <file name="inverse-zigzag.js" description="Inverse ZigZag - Converts 1D coefficient array to 8x8 2D block The inverse of the zigzag reordering used during encoding. JPEG spec lines 149-158 define the zigzag order." />
-                <file name="upsampling.js" description="Chroma Upsampling - Upsample subsampled chroma components to match luma resolution JPEG commonly uses chroma subsampling (4:2:0, 4:2:2) to reduce file size. This module upsamples Cb and Cr components back to full resolution." />
+                <file name="block-assembly.js" description="Assembles decoded blocks into full image; MCU interleaving; RGBA conversion." />
+                <file name="blocks.js" description="Dimension padding and block extraction for encoding." />
+                <file name="downsampling.js" description="4:2:0 chroma downsampling for encoding." />
+                <file name="forward-zigzag.js" description="Zigzag reordering of quantized DCT coefficients for encoding." />
+                <file name="inverse-zigzag.js" description="Inverse zigzag reordering for decoding." />
+                <file name="upsampling.js" description="Chroma upsampling for decoding (nearest neighbor and bilinear)." />
             </directory>
             <directory name="quantization">
-                <file name="forward-quantization.js" description="Quantizes a block of DCT coefficients." />
-                <file name="inverse-quantization.js" description="Dequantization - Multiply quantized coefficients by quantization table values This reverses the quantization step from encoding. JPEG spec lines 135-141 describe the dequantization process." />
+                <file name="forward-quantization.js" description="Quantization of DCT coefficients using scaled tables." />
+                <file name="inverse-quantization.js" description="Dequantization: multiply by quant table values." />
             </directory>
         </directory>
         <directory name="automata">
             <directory name="bit-streams">
-                <file name="bit-core.js" description="Pure functional core for Bit Reading operations. Return tuple format: [value, newByteOffset, newBitOffset, error]" />
-                <file name="bit-reader-optimized.js" description="Stateful wrapper for BitReader operations. Delegates all logic to pure functional primitives in bit-core.js." />
-                <file name="bit-reader.js" description="BitReader Wrapper Delegates to the Optimized implementation" />
-                <file name="bit-writer.js" description="Writes a 2-byte marker (e.g. 0xFFDA) ensuring alignment and NO byte stuffing." />
+                <file name="bit-core.js" description="Pure functional core for bit reading. Tuple format: [value, newByteOffset, newBitOffset, error]." />
+                <file name="bit-reader-optimized.js" description="Stateful wrapper delegating to pure primitives in bit-core.js." />
+                <file name="bit-reader.js" description="Public BitReader wrapper delegating to optimized implementation." />
+                <file name="bit-writer.js" description="Writes bits and bytes with dynamic buffer growth." />
             </directory>
             <directory name="entropy-coding">
-                <file name="huffman-decoder-fsm.js" description="Huffman Decoder - Decodes Huffman-encoded bitstream into quantized coefficients Implements DC differential decoding and AC run-length decoding as specified in JPEG spec lines 119-134" />
-                <file name="huffman-encoder-fsm.js" description="Encodes a single 8x8 block of quantized DCT coefficients." />
-                <file name="huffman-optimized-fsm.js" description="Optimized Huffman decoding implementation (O(1)) Uses a 16-bit lookup table (Uint16Array)" />
+                <file name="huffman-decoder-fsm.js" description="Huffman decoder FSM: DC differential + AC run-length decoding per JPEG spec." />
+                <file name="huffman-encoder-fsm.js" description="Huffman encoder FSM with standard luminance tables." />
+                <file name="huffman-optimized-fsm.js" description="Optimized Huffman decoding via 16-bit lookup table (Uint16Array)." />
             </directory>
             <directory name="parsers">
-                <file name="dht-automaton.js" description="Huffman Table Parser - Parses DHT (Define Huffman Table) segments DHT segment format (JPEG spec lines 79-86): - Lh (16 bits): Segment length - Loop while bytes remaining: - Tc_Th (8 bits): Table class (high 4 bits: 0=DC, 1=AC) | Table ID (low 4 bits) - BITS[1..16] (16 bytes): Number of codes of each length - HUFFVAL (variable): Symbol values" />
-                <file name="dqt-automaton.js" description="Quantization Table Parser - Parses DQT (Define Quantization Table) segments DQT segment format (JPEG spec lines 71-77): - Lq (16 bits): Segment length - Loop while bytes remaining: - Pq_Tq (8 bits): Precision (high 4 bits) | Table ID (low 4 bits) - Elements (64 × 8 or 16 bits): Quantization values in zigzag order" />
-                <file name="marker-scanner.js" description="MarkerParser - Parses JPEG file structure and extracts segments JPEG files consist of markers (0xFFxx) followed by optional segment data. This module provides functions to locate markers and extract their payloads." />
-                <file name="sof-automaton.js" description="Frame Header Parser - Parses SOF0 (Start of Frame, Baseline DCT) segment SOF0 segment format (JPEG spec lines 42-55): - Lf (16 bits): Frame header length - P (8 bits): Sample precision (8 for baseline) - Y (16 bits): Number of lines (height) - X (16 bits): Number of samples per line (width) - Nf (8 bits): Number of components (1=grayscale, 3=color) - For each component: - C (8 bits): Component identifier - H_V (8 bits): Sampling factors (high 4 bits: H, low 4 bits: V) - Tq (8 bits): Quantization table selector" />
-                <file name="sos-automaton.js" description="Scan Header Parser - Parses SOS (Start of Scan) segment SOS segment format (JPEG spec lines 57-69): - Ls (16 bits): Scan header length - Ns (8 bits): Number of components in scan - For each component: - Cs (8 bits): Component selector - Td_Ta (8 bits): DC/AC table selectors (high 4: DC, low 4: AC) - Ss (8 bits): Start of spectral selection (0 for sequential) - Se (8 bits): End of spectral selection (63 for sequential) - Ah_Al (8 bits): Successive approximation (0 for sequential)" />
-                <file name="spiff-parser.js" description="SPIFF Parser Parses SPIFF (Still Picture Interchange File Format) headers from APP8 markers. Based on ISO/IEC 10918-3." />
+                <file name="dht-automaton.js" description="DHT segment parser with HuffmanTable class and optimized lookup support." />
+                <file name="dqt-automaton.js" description="DQT segment parser." />
+                <file name="marker-scanner.js" description="JPEG file structure parser: locates markers and extracts segment payloads." />
+                <file name="sof-automaton.js" description="SOF0 frame header parser with duplicate component ID rejection." />
+                <file name="sos-automaton.js" description="SOS scan header parser." />
+                <file name="spiff-parser.js" description="SPIFF header parser from APP8 markers (ISO/IEC 10918-3)." />
             </directory>
         </directory>
         <directory name="codec">
-            <file name="capacity-scanner.js" description="CapacityScanner - Orchestrates steganographic capacity analysis across multiple JPEGs." />
-            <file name="decoder.js" description="JPEG Decoder - Main class that orchestrates the complete decoding pipeline Decodes baseline sequential DCT JPEG files with Huffman coding. Supports grayscale and color images with various chroma subsampling (4:4:4, 4:2:2, 4:2:0)." />
-            <file name="encoder.js" description="JpegEncoder This class implements a basic JPEG encoder." />
-            <file name="file-scanner.js" description="FileScanner - Handles directory scanning using File System Access API" />
-            <file name="transcoder.js" description="JpegTranscoder Updates steganography data in JPEG files WITHOUT generation loss. Implementation: Uses direct DCT coefficient manipulation (lossless). This prevents quality degradation when updating the password vault repeatedly." />
+            <file name="capacity-scanner.js" description="CapacityScanner: cooperative async capacity analysis across multiple JPEGs." />
+            <file name="decoder.js" description="JpegDecoder: full decode pipeline with stego extraction, fail-loud bounds checking." />
+            <file name="encoder.js" description="JpegEncoder: baseline sequential DCT encoder with F5 steganography embedding." />
+            <file name="file-scanner.js" description="FileScanner: directory scanning via File System Access API." />
+            <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">
-                <file name="aes-gcm.js" description="Encryption - Handles AES-GCM encryption/decryption" />
-                <file name="crypto-compat.js" description="Undocumented module" />
-                <file name="index.js" description="Undocumented module" />
-                <file name="pbkdf2.js" description="KeyDerivation - Handles password-based key derivation Uses PBKDF2 with SHA-256" />
+                <file name="aes-gcm.js" description="AES-256-GCM encryption/decryption with optional AAD binding." />
+                <file name="crypto-provider.js" description="Single source of truth for Web Crypto access across browser and Node." />
+                <file name="hmac.js" description="HMAC-SHA256 signing/verification for carrier manifest authentication." />
+                <file name="pbkdf2.js" description="PBKDF2-HMAC-SHA-256 key derivation with OWASP-aligned defaults (600k iterations)." />
             </directory>
             <directory name="error-correction">
-                <file name="galois-field.js" description="Undocumented module" />
-                <file name="index.js" description="Undocumented module" />
-                <file name="reed-solomon-codec.js" description="Undocumented module" />
-                <file name="reedsolomon.js" description="Undocumented module" />
-                <file name="rs-interleaver.js" description="ECC Profiles for Reed-Solomon encoding. All profiles use RS(255, k) over GF(256). | Profile  | Data (k) | Parity | Overhead | Correctable Symbols | |----------|----------|--------|----------|---------------------| | Low      | 251      | 4      | 1.6%     | 2                   | | Medium   | 223      | 32     | 14%      | 16                  | | High     | 191      | 64     | 33%      | 32                  | | Ultra    | 127      | 128    | 100%     | 64                  | | Extreme  | 85       | 170    | 200%     | 85                  |" />
+                <file name="galois-field.js" description="GF(2^8) field arithmetic over poly 0x11D with exp/log tables and field element classes." />
+                <file name="index.js" description="Barrel re-exporting ReedSolomonEncoder/Decoder and GF constants." />
+                <file name="reed-solomon-codec.js" description="Core RS encoder/decoder: syndrome computation, error locator, error evaluator, magnitude correction." />
+                <file name="rs-interleaver.js" description="ECC profiles (Low through Extreme), block splitting, interleaving, protect/recover tuple API." />
+            </directory>
+            <directory name="secret-sharing">
+                <file name="cauchy-ec.js" description="Cauchy MDS erasure codec: encodeErasure/decodeErasure/planErasureAllocation over GF(256)." />
+                <file name="css-envelope.js" description="Computationally Secure Secret Sharing envelope: AES-GCM payload + Shamir-split DEK." />
+                <file name="gf-shamir.js" description="Shamir secret sharing over GF(256): splitSecret/combineShares with injectable RNG." />
+                <file name="gf256.js" description="Shared GF(2^8) field arithmetic: exp/log tables, multiplication, inversion." />
             </directory>
             <directory name="steganography">
-                <file name="batch-embedder.js" description="BatchEmbedder - Handles embedding data across multiple images" />
-                <file name="batch-extractor.js" description="BatchExtractor - Handles extracting and reassembling data from multiple images" />
-                <file name="chunk-manager.js" description="ChunkManager - Handles splitting large data into chunks and reassembling them" />
-                <file name="f5-syndrome.js" description="F5 Steganography Implementation Implements the F5 algorithm for hiding data in JPEG coefficients. F5 uses matrix encoding for improved embedding efficiency and correctly handles &quot;shrinkage&quot; when coefficients become 0. Key features: - Matrix encoding (k bits embedded changing at most 1 coefficient per n-group) - Permutation of coefficients for uniform change distribution - Shrinkage handling via re-embedding" />
-                <file name="index.js" description="Undocumented module" />
+                <file name="batch-embedder.js" description="BatchEmbedder: capacity-aware multi-carrier embedding with threshold mode and manifest stamping." />
+                <file name="batch-extractor.js" description="BatchExtractor: manifest verification, threshold reconstruction, chunk reassembly." />
+                <file name="carrier-manifest.js" description="HMAC-authenticated carrier manifests: create/verify/bind with canonical serialization." />
+                <file name="chunk-manager.js" description="ChunkManager: CRC32-checked data splitting and reassembly." />
+                <file name="coded-header.js" description="RS(255,191)-coded control header for container format v3." />
+                <file name="f5-syndrome.js" description="F5 steganography: matrix encoding, shrinkage handling, container v3 embed/extract." />
             </directory>
-        </directory>
-        <directory name="specs">
-            <file name="AAN-algo-spec.xml" description="Undocumented module" />
-            <file name="AAN-forward-algo-spec.xml" description="Undocumented module" />
-            <file name="bit-stuffing-edge-cases.md" description="Undocumented module" />
-            <file name="encoder-spec.xml" description="Undocumented module" />
-            <file name="f5-steganography.md" description="Undocumented module" />
-            <file name="fastIDCT-algo-spec.xml" description="Undocumented module" />
-            <file name="jpeg-spec.xml" description="Undocumented module" />
-            <file name="modern-jpeg-spec.xml" description="Undocumented module" />
-            <file name="outline.xml" description="Undocumented module" />
-            <file name="test-outline.xml" description="Undocumented module" />
-            <file name="testing-specs.xml" description="Undocumented module" />
         </directory>
         <directory name="structures">
             <directory name="vault">
-                <file name="immutable-vault.js" description="" />
-                <file name="secure-record.js" description="Use SecureEntry.create() instead." />
-            </directory>
-        </directory>
-        <directory name="ui">
-            <directory name="assets">
-            </directory>
-            <directory name="vault">
-                <directory name="components">
-                </directory>
+                <file name="immutable-vault.js" description="PasswordVault: frozen immutable vault with session-key wrapping, revision tracking, encrypted export/import, threshold save/load." />
+                <file name="secure-record.js" description="SecureEntry: per-entry AES-GCM encryption bound to entry id via AAD." />
             </directory>
         </directory>
         <directory name="utils">
-            <file name="crc32.js" description="CRC32 Checksum Utility Uses optimized lookup table implementation." />
+            <file name="atomic-writer.js" description="writeAllWithRollback: atomic multi-file writes with rollback on partial failure." />
+            <file name="crc32.js" description="CRC32 checksum utility (IEEE reflected, poly 0xEDB88320)." />
+            <file name="encoding.js" description="UTF-8 and base64 encoding helpers." />
+            <file name="escape-html.js" description="Canonical HTML escaping for safe interpolation." />
+            <file name="logger.js" description="Leveled logger (debug/info/warn/error) with env-var override." />
+            <file name="url-safety.js" description="URL scheme whitelist for safe link opening." />
         </directory>
-        <file name="main.js" description="Main entry point for the JPEG Encoder/Decoder application. Initializes UI modules." />
     </structure>
 </project>

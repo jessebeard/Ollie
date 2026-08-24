@@ -14,6 +14,14 @@ Implemented in Wave K: RS(255,191) coded control header carrying all
 self-describing fields + RS-coded body covering metadata + payload + CRC.
 v2 containers fail closed. See container-wire-format.md section 3.
 
+## REJECTED 2026-08-24 - Signed manifest verification layer (Ed25519)
+REJECTED on post-quantum grounds. Ed25519 relies on elliptic-curve discrete
+logarithm, which Shor's algorithm breaks completely. The existing HMAC-SHA256
+manifest authentication is already post-quantum resistant (symmetric primitive,
+Grover's algorithm provides only quadratic speedup). Adding Ed25519 would have
+introduced the sole quantum-vulnerable component into an otherwise PQ-safe
+system. The design goal is purely symmetric cryptography throughout.
+
 ## 2026-08-22 � Whole-container ECC framing (format v2.1 candidate)
 F5.extractContainer parses header/metadata BEFORE Reed-Solomon recovery;
 ErrorCorrection currently covers only the payload. Corrupted coefficients that

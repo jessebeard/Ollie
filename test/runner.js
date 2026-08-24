@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const htmlContent = fs.readFileSync(path.join(__dirname, '../app/index.html'), 'utf8');
+const htmlContent = fs.readFileSync(path.join(__dirname, '../app/vault.html'), 'utf8');
 
 global.document = {
     getElementById: (id) => {
@@ -17,6 +17,14 @@ global.document = {
             const element = {
                 tagName: match[1],
                 style: {},
+                addEventListener: () => { },
+                removeEventListener: () => { },
+                classList: {
+                    add: () => { },
+                    remove: () => { },
+                    contains: () => false,
+                    toggle: () => { }
+                },
 
                 get style() {
                     const styleMatch = tag.match(/style=["']([^"']*)["']/);
