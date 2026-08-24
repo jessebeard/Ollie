@@ -1,39 +1,14 @@
 /**
  * GF(256) Shamir secret sharing (Wave H2 Cycle 1 GREEN).
  *
- * Field arithmetic uses GF(2^8) with primitive polynomial 0x11D (the QR-code
- * field shared with error-correction), generator 2, exp/log lookup tables.
+ * Field arithmetic comes from gf256.js (GF(2^8), poly 0x11D, generator 2).
  * Splitting evaluates one random polynomial per secret byte; combination is
  * Lagrange interpolation at x = 0 restricted to the supplied shares.
  *
  * Both entry points report predictable failures as [value|null, Error|null]
  * tuples and never throw.
  */
-
-const EXP_TABLE = new Uint8Array(512);
-const LOG_TABLE = new Uint8Array(256);
-
-(function buildTables() {
-    let x = 1;
-    for (let i = 0; i < 255; i++) {
-        EXP_TABLE[i] = x;
-        LOG_TABLE[x] = i;
-        x <<= 1;
-        if (x & 0x100) x ^= 0x11D;
-    }
-    for (let i = 255; i < 512; i++) {
-        EXP_TABLE[i] = EXP_TABLE[i - 255];
-    }
-}());
-
-function gfMultiply(a, b) {
-    if (a === 0 || b === 0) return 0;
-    return EXP_TABLE[LOG_TABLE[a] + LOG_TABLE[b]];
-}
-
-function gfInverse(a) {
-    return EXP_TABLE[255 - LOG_TABLE[a]];
-}
+import { gfMultiply, gfInverse } from './gf256.js';
 
 function defaultRandom(n) {
     const out = new Uint8Array(n);

@@ -73,6 +73,14 @@ export function canonicalManifestBytes(manifest) {
         entries: (manifest.entries || []).map(e => ({ index: e.index, checksum: e.checksum }))
     };
 
+    if (manifest.ec !== undefined) {
+        core.ec = {
+            k: manifest.ec.k,
+            n: manifest.ec.n,
+            size: manifest.ec.size
+        };
+    }
+
     if (manifest.share !== undefined) {
         core.share = {
             index: manifest.share.index,
@@ -150,6 +158,7 @@ export function validateManifestStructure(m) {
  * @param {string} [spec.created] - ISO timestamp override (tests)
  * @param {{index: number, threshold: number, data: string}} [spec.share] - CSS envelope (H2)
  * @param {{algo: string, iterations: number, salt: string}} [spec.kdf] - Reuse one KDF block across a carrier set
+ * @param {{k: number, n: number, size: number}} [spec.ec] - Erasure-coding parameters for threshold sets
  * @returns {Promise<[Object|null, Error|null]>}
  */
 export async function createManifest(spec) {
@@ -203,6 +212,9 @@ export async function createManifest(spec) {
             created: spec.created !== undefined ? spec.created : new Date().toISOString(),
             entries: records.map(r => ({ index: r.index, checksum: r.checksum }))
         };
+        if (spec.ec !== undefined) {
+            unsigned.ec = { k: spec.ec.k, n: spec.ec.n, size: spec.ec.size };
+        }
         if (spec.share !== undefined) {
             unsigned.share = {
                 index: spec.share.index,
@@ -253,16 +265,30 @@ export async function verifyManifest(manifest, password) {
 }
 
 /**
- * Binds extracted chunk records to a verified manifest: every record must
- * match its manifest entry exactly (index present, checksum identical).
+ * Binds extracted chunk records to a verified manifest.
+ *
+ * Strict mode (default): records must cover every manifest entry exactly.
+ * Subset mode ({subset:true}): used by erasure-coded sets, where only some
+ * of the n coded stripes are present; every provided record must match its
+ * entry exactly and indices must be unique, but coverage is partial by
+ * design.
  *
  * @param {Array<{index: number, checksum: number}>} records
  * @param {Object} manifest
+ * @param {{subset?: boolean}} [options]
  * @returns {[null, Error|null]} Tuple of [null, bindError]
  */
-export function bindChunkRecords(records, manifest) {
-    if (!Array.isArray(records) || records.length !== manifest.total) {
-        return [null, new Error(`manifest: expected ${manifest.total} chunk records, got ${records ? records.length : 0}`)];
+export function bindChunkRecords(records, manifest, options = {}) {
+    const subset = !!(options && options.subset);
+
+    if (!Array.isArray(records)) {
+        return [null, new Error('manifest: expected an array of chunk records')];
+    }
+    if (!subset && records.length !== manifest.total) {
+        return [null, new Error(`manifest: expected ${manifest.total} chunk records, got ${records.length}`)];
+    }
+    if (records.length > manifest.total) {
+        return [null, new Error(`manifest: ${records.length} records exceed the ${manifest.total} coded chunks`)];
     }
 
     const byIndex = new Map();
@@ -270,10 +296,19 @@ export function bindChunkRecords(records, manifest) {
         if (!r || !Number.isInteger(r.index) || !isUint32(r.checksum)) {
             return [null, new Error('manifest: malformed chunk record')];
         }
+        if (byIndex.has(r.index)) {
+            return [null, new Error(`manifest: duplicate chunk record for index ${r.index}`)];
+        }
         byIndex.set(r.index, r.checksum);
     }
 
-    for (const entry of manifest.entries) {
+    // Strict mode demands full coverage; subset mode only requires that
+    // whatever IS present matches its manifest entry exactly.
+    const entriesToCheck = subset
+        ? manifest.entries.filter(e => byIndex.has(e.index))
+        : manifest.entries;
+
+    for (const entry of entriesToCheck) {
         const actual = byIndex.get(entry.index);
         if (actual === undefined) {
             return [null, new Error(`manifest: missing chunk record for index ${entry.index}`)];

@@ -268,25 +268,38 @@ embedded per carrier image.
     each chunk checksum; concatenate in index order. Any violation fails the
     whole load - there is no partial recovery across chunk sets.
 
-6.4 Threshold recovery mode (CSS, optional). When the manifest carries a
-    `share` envelope, the payload is sealed under a fresh random 256-bit DEK
-    (AES-256-GCM) and the DEK is Shamir-split over GF(256):
+6.4 Threshold recovery mode (CSS + erasure coding). When the manifest
+    carries a `share` envelope, the payload is sealed under a fresh random
+    256-bit DEK (AES-256-GCM) and recovery requires `threshold` carriers:
 
-        - Every carrier replicates the SAME sealed envelope as its single
-          chunk: payload = iv(12) || ciphertext(payload + 16-byte GCM tag),
-          manifest.total == 1, manifest.entries = [{index:0, checksum}]
+        - The sealed envelope bytes = iv(12) || ciphertext(payload+tag16)
+          are CAUCHY-ERASURE-CODED into n coded stripes of ceil(L/k) bytes,
+          where k = threshold and L = envelope length. Stripe i is row i of
+          M * S, with M the n x k Cauchy matrix M[i][j] =
+          inverse(x_i XOR y_j), y_j = j+1, x_i = k+1+i over GF(256)
+          (poly 0x11D). Any k distinct stripes invert the system.
+        - Carrier i holds stripes according to a capacity-proportional plan
+          (planErasureAllocation): stripe counts follow usable capacity;
+          carriers too small for one stripe contribute zero stripes but
+          still provide their key share.
+        - manifest.ec = {k, n, size} pins the code parameters and original
+          envelope length; manifest.entries cover ALL n coded stripes.
         - Each carrier's manifest.share holds its unique key share
-          {index in 1..n, threshold, data(base64)}; shares are MAC-covered
-          by their own carrier's manifest
-        - Load requires >= `threshold` carriers with DISTINCT share indices;
-          file copies of an already-present index count once
-        - Replicated envelopes MUST be byte-identical across provided
-          carriers (mixed or rolled-back sets fail closed)
-        - Reconstruction = combineShares(shares) -> DEK -> AES-GCM open;
-          authentication failure fails closed with no partial output
+          {index in 1..carriers, threshold, data(base64)}; shares are MAC-
+          covered by their own carrier's manifest.
 
-    Security note: below-threshold share sets reveal nothing beyond the
-    AES layer's computational bounds. The DEK is never stored in the clear.
+    Load contract:
+        - >= k DISTINCT stripe indices required (file copies count once);
+          conflicting data for the same index fails closed
+        - every provided stripe must subset-bind to its manifest entry
+          (full coverage NOT required)
+        - DEK reconstruction -> AES-GCM open; any authentication failure
+          fails closed with no partial output
+
+    Security note: below-threshold stripe/share sets reveal nothing beyond
+    the AES layer's computational bounds. The DEK is never stored clear.
+    Capacity note: maxPayload = k * stripeSize grows monotonically as
+    carriers are added - no single smallest-carrier ceiling.
 
 --------------------------------------------------------------------------------
 7. Layer 6 - Vault Document & Export Envelope

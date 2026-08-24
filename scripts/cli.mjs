@@ -41,7 +41,7 @@ function describeVault(vault) {
 /**
  * Embeds a vault from an encrypted export envelope into carrier images.
  */
-export async function cliSave({ fromExport, imagesDir, outDir, password }) {
+export async function cliSave({ fromExport, imagesDir, outDir, password, threshold }) {
     try {
         const envelope = fs.readFileSync(fromExport, 'utf8');
         const [vault, importErr] = await PasswordVault.importEncrypted(envelope, password);
@@ -50,7 +50,8 @@ export async function cliSave({ fromExport, imagesDir, outDir, password }) {
         const [files, filesErr] = await readCarrierFiles(imagesDir);
         if (filesErr) return { error: filesErr };
 
-        const [results, saveErr] = await vault.save(files, password);
+        const saveOptions = threshold !== undefined ? { threshold } : {};
+        const [results, saveErr] = await vault.save(files, password, null, saveOptions);
         if (saveErr) return { error: saveErr };
 
         fs.mkdirSync(outDir, { recursive: true });
@@ -140,7 +141,8 @@ if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
                 fromExport: args.fromExport,
                 imagesDir: args.imagesDir,
                 outDir: args.outDir,
-                password: args.password
+                password: args.password,
+                threshold: args.threshold !== undefined ? Number(args.threshold) : undefined
             });
             break;
         case 'load':

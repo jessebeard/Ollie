@@ -190,6 +190,8 @@ flowchart LR
     subgraph ss
         shamir["gf-shamir.js"]
         env["css-envelope.js"]
+        gf["gf256.js"]
+        cauchy["cauchy-ec.js"]
     end
 
     subgraph ecc
@@ -258,6 +260,8 @@ flowchart LR
     cman --> pbkdf
     env --> shamir
     env --> aes
+    shamir --> gf
+    cauchy --> gf
 
     enc --> alg["algebraic/*"]
     enc --> huffenc["huffman-encoder-fsm"]

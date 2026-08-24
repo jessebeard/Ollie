@@ -227,45 +227,59 @@ export class BatchEmbedder {
             )];
         }
 
-        // Threshold mode (CSS): seal the payload once under a random DEK and
-        // replicate the sealed envelope into EVERY carrier together with a
-        // distinct key share. Any `threshold` carriers recover the payload;
-        // the envelope alone reveals nothing.
+        // Threshold mode (CSS + erasure coding): seal the payload once under
+        // a random DEK, then Cauchy-erasure-code the sealed envelope into n
+        // coded stripes distributed across carriers by capacity. Any
+        // `threshold` distinct stripes (plus their key shares) recover the
+        // payload; the envelope alone reveals nothing.
         let chunks;
-        let shares = null;
+        let envelopeSize = 0;
 
         if (options.threshold) {
+            const k = options.threshold;
+            const n = imageCapacities.length;
+
             const { sealPayload } = await import('../secret-sharing/css-envelope.js');
-            const [sealed, sealErr] = await sealPayload(data, {
-                threshold: options.threshold,
-                total: imageCapacities.length
-            });
+            const [sealed, sealErr] = await sealPayload(data, { threshold: k, total: n });
             if (sealErr) return [null, new Error(`Threshold sealing failed: ${sealErr.message}`)];
 
             const envelopeBytes = new Uint8Array(sealed.envelope.iv.length + sealed.envelope.ciphertext.length);
             envelopeBytes.set(sealed.envelope.iv, 0);
             envelopeBytes.set(sealed.envelope.ciphertext, sealed.envelope.iv.length);
+            envelopeSize = envelopeBytes.length;
 
-            const shortfalls = [];
-            for (const cap of imageCapacities) {
-                if (cap.capacity < envelopeBytes.length) {
-                    shortfalls.push(`${cap.file.name} (${cap.capacity}/${envelopeBytes.length} bytes)`);
-                }
-            }
-            if (shortfalls.length > 0) {
+            const capacities = imageCapacities.map(c => c.capacity);
+            const { planErasureAllocation } = await import('../secret-sharing/cauchy-ec.js');
+            const [plan, planErr] = planErasureAllocation(capacities, { threshold: k });
+            if (planErr) {
                 return [null, new Error(
-                    `Threshold mode replicates the full payload into every carrier. Insufficient capacity: ${shortfalls.join(', ')}`
+                    `Carrier set cannot host a threshold-${k} vault (${data.length}-byte document). ` +
+                    `Planner said: ${planErr.message}`
                 )];
             }
 
+            const { encodeErasure } = await import('../secret-sharing/cauchy-ec.js');
+            const [codedChunks, codeErr] = encodeErasure(envelopeBytes, { k, n: plan.n });
+            if (codeErr) return [null, new Error(`Erasure coding failed: ${codeErr.message}`)];
+
             const chunkId = ChunkManager.generateId();
-            shares = sealed.shares;
-            chunks = imageCapacities.map((info, i) => ({
-                imageInfo: info,
-                chunkData: envelopeBytes,
-                chunkMeta: { id: chunkId, index: 0, total: 1 },
-                share: sealed.shares[i]
-            }));
+            chunks = [];
+            let idx = 0;
+            imageCapacities.forEach((info, i) => {
+                for (let c = 0; c < plan.counts[i]; c++) {
+                    chunks.push({
+                        imageInfo: info,
+                        chunkData: codedChunks[idx].data,
+                        chunkMeta: { id: chunkId, index: codedChunks[idx].index, total: plan.n },
+                        share: sealed.shares[i]
+                    });
+                    idx++;
+                }
+            });
+
+            logger.debug(
+                `Threshold plan: k=${k} n=${plan.n} stripeSize=${plan.stripeSize} maxPayload=${plan.maxPayload}`
+            );
         } else {
             const [allocated, allocErr] = this.allocateDataToImages(data, imageCapacities);
             if (allocErr) return [null, allocErr];
@@ -276,21 +290,19 @@ export class BatchEmbedder {
             return [null, new Error('Nothing to embed')];
         }
 
-        // Signed manifest: one block shared verbatim by every carrier so any
-        // surviving subset authenticates the whole chunk set on load. In
-        // threshold mode each carrier's manifest additionally carries its own
-        // MAC-covered key share, so manifests differ per carrier by design.
+        // Signed manifest: one block per carrier so any surviving subset
+        // authenticates the whole set on load. Threshold mode additionally
+        // carries the erasure parameters and each carrier's MAC-covered key
+        // share, so manifests differ per carrier by design.
         let manifestBlocks = null;
         if (options.manifest) {
             if (!options.password) {
                 return [null, new Error('Manifest signing requires a password')];
             }
-            const records = options.threshold
-                ? [{ index: 0, checksum: ChunkManager.calculateChecksum(chunks[0].chunkData) }]
-                : chunks.map(c => ({
-                    index: c.chunkMeta.index,
-                    checksum: ChunkManager.calculateChecksum(c.chunkData)
-                }));
+            const records = chunks.map(c => ({
+                index: c.chunkMeta.index,
+                checksum: ChunkManager.calculateChecksum(c.chunkData)
+            }));
 
             if (options.threshold) {
                 // One shared KDF block + timestamp across the carrier set so
@@ -313,6 +325,7 @@ export class BatchEmbedder {
                         password: options.password,
                         created,
                         kdf: sharedKdf,
+                        ec: { k: options.threshold, n: chunks[0].chunkMeta.total, size: envelopeSize },
                         share: {
                             index: /** @type {any} */ (chunks[i]).share.index,
                             threshold: options.threshold,

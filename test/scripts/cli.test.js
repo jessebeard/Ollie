@@ -105,6 +105,49 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
             fs.rmSync(workDir, { recursive: true, force: true });
         });
 
+        it('--threshold saves erasure-coded carriers and tolerates losing one', async () => {
+            const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ollie-cli-ec-'));
+            const carriersDir = path.join(workDir, 'carriers');
+            const outDir = path.join(workDir, 'out');
+            fs.mkdirSync(carriersDir);
+            fs.mkdirSync(outDir);
+
+            const envelopePath = path.join(workDir, 'seed-export.json');
+            await makeSeedEnvelope(envelopePath);
+            for (let i = 1; i <= 3; i++) {
+                await makeCarrierFile(carriersDir, `carrier-${i}.jpg`);
+            }
+
+            const saveReport = await cliSave({
+                fromExport: envelopePath,
+                imagesDir: carriersDir,
+                outDir,
+                password: PASSWORD,
+                threshold: 2
+            });
+            expect(saveReport.error).toEqual(null);
+
+            const written = fs.readdirSync(outDir);
+            if (written.length !== 3) throw new Error(`expected 3 coded carriers, got ${written.length}`);
+
+            // Loss tolerance: delete one carrier, the remaining two still load.
+            const keptDir = path.join(workDir, 'kept');
+            fs.mkdirSync(keptDir);
+            written.slice(1).forEach(f => fs.copyFileSync(path.join(outDir, f), path.join(keptDir, f)));
+
+            const reloadedPath = path.join(workDir, 'subset-export.json');
+            const loadReport = await cliLoad({
+                imagesDir: keptDir,
+                password: PASSWORD,
+                outExport: reloadedPath
+            });
+            expect(loadReport.error).toEqual(null);
+            if (!fs.existsSync(reloadedPath)) throw new Error('subset load produced no export');
+
+            const verifyReport = await cliVerify({ imagesDir: keptDir, password: PASSWORD });
+            expect(verifyReport.error).toEqual(null);
+        });
+
         it('verify reports a typed error instead of throwing on wrong password', async () => {
             const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ollie-cli-'));
             const outDir = path.join(workDir, 'out');

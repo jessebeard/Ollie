@@ -124,54 +124,80 @@ export class BatchExtractor {
             }
         }
 
-        // Threshold (CSS) mode: replicated envelope + distinct key shares.
-        // Replaces chunk reassembly with DEK reconstruction + GCM opening.
+        // Threshold (CSS + erasure) mode: distinct coded stripes + key shares.
+        // Replaces chunk reassembly with stripe reconstruction, DEK
+        // recombination, and GCM opening.
         if (verifiedManifest.share) {
             const threshold = verifiedManifest.share.threshold;
+            const ec = verifiedManifest.ec;
+            if (!ec || ec.k !== threshold) {
+                return [null, new Error('Manifest is missing consistent erasure parameters for share mode.')];
+            }
 
             if (shares.length !== chunks.length) {
                 return [null, new Error('Mixed carrier sets detected: some images lack a key share. Load refused.')];
             }
 
-            // Replicated envelopes must be byte-identical across carriers.
-            const reference = chunks[0].data;
-            for (const c of chunks) {
-                if (c.data.length !== reference.length) {
-                    return [null, new Error('Replicated envelopes differ in size across carriers.')];
-                }
-                for (let b = 0; b < c.data.length; b++) {
-                    if (c.data[b] !== reference[b]) {
-                        return [null, new Error('Replicated envelopes differ across carriers: mixed or tampered set.')];
-                    }
-                }
-            }
-
-            // Unique shares by index; same index must carry identical data.
-            const byIndex = new Map();
+            // Unique key shares by index; same index must carry identical data.
+            const sharesByIndex = new Map();
             for (const s of shares) {
                 if (!s || !Number.isInteger(s.index) || typeof s.data !== 'string') {
                     return [null, new Error('Malformed key share detected.')];
                 }
                 const [shareBytes] = base64ToBytes(s.data);
-                const existing = byIndex.get(s.index);
+                const existing = sharesByIndex.get(s.index);
                 if (!existing) {
-                    byIndex.set(s.index, { index: s.index, data: shareBytes });
+                    sharesByIndex.set(s.index, { index: s.index, data: shareBytes });
                 } else if (existing.data.length !== shareBytes.length ||
                            existing.data.join() !== shareBytes.join()) {
                     return [null, new Error(`Conflicting key shares detected for share index ${s.index}.`) ];
                 }
             }
-            if (byIndex.size < threshold) {
+            if (sharesByIndex.size < threshold) {
                 return [null, new Error(
-                    `Insufficient shares: ${byIndex.size} unique of ${chunks.length} carriers, threshold is ${threshold}. Provide more carriers.`
+                    `Insufficient shares: ${sharesByIndex.size} unique of ${chunks.length} carriers, threshold is ${threshold}. Provide more carriers.`
                 )];
             }
 
-            const iv = reference.slice(0, 12);
-            const ciphertext = reference.slice(12);
+            // Unique coded stripes by chunk index; conflicting data rejected.
+            const stripesByIndex = new Map();
+            for (const c of chunks) {
+                const existing = stripesByIndex.get(c.index);
+                if (!existing) {
+                    stripesByIndex.set(c.index, c);
+                } else if (existing.checksum !== c.checksum ||
+                           existing.data.join() !== c.data.join()) {
+                    return [null, new Error(`Conflicting coded stripes detected for chunk index ${c.index}.`) ];
+                }
+            }
+            if (stripesByIndex.size < ec.k) {
+                return [null, new Error(
+                    `Insufficient coded stripes: ${stripesByIndex.size} unique of ${chunks.length} carriers, need ${ec.k}. Provide more carriers.`
+                )];
+            }
+
+            // Subset binding: every provided stripe must match its manifest
+            // entry (full coverage is NOT required - that is the point).
+            const stripeRecords = Array.from(stripesByIndex.values())
+                .map(c => ({ index: c.index, checksum: c.checksum }));
+            const [, bindErr] = bindChunkRecords(stripeRecords, verifiedManifest, { subset: true });
+            if (bindErr) {
+                return [null, bindErr];
+            }
+
+            const selected = Array.from(stripesByIndex.values()).sort((a, b) => a.index - b.index).slice(0, ec.k);
+            const { decodeErasure } = await import('../secret-sharing/cauchy-ec.js');
+            const [envelopeBytes, decodeErr] = decodeErasure(
+                selected.map(c => ({ index: c.index, data: c.data })),
+                { k: ec.k, n: ec.n, size: ec.size }
+            );
+            if (decodeErr) return [null, new Error(`Erasure reconstruction failed: ${decodeErr.message}`)];
+
+            const iv = envelopeBytes.slice(0, 12);
+            const ciphertext = envelopeBytes.slice(12);
             const [plaintext, openErr] = await openEnvelope(
                 { iv, ciphertext },
-                Array.from(byIndex.values()),
+                Array.from(sharesByIndex.values()),
                 { threshold }
             );
             if (openErr) return [null, openErr];

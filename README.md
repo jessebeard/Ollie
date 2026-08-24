@@ -321,10 +321,15 @@ Every vault save now stamps an HMAC-authenticated manifest into each carrier,
 so swapped, rolled-back, or tampered photo sets **fail closed on load**.
 Carriers saved before this feature must be re-saved once.
 
-Passing `threshold` (e.g. `save(images, password, null, { threshold: 2 })`)
-switches to CSS recovery mode: the vault is sealed under a random key that is
-Shamir-split across carriers — any `threshold` of them reopen the vault, and
-fewer reveal nothing.
+Passing `threshold` (e.g. `save(images, password, null, { threshold: 2 })`,
+or `--threshold 2` on the CLI) switches to erasure-coded recovery mode: the
+vault is sealed under a random key, the sealed envelope is Cauchy-erasure-
+coded across all carriers, and the key is Shamir-split — any `threshold`
+photos reopen the vault, fewer reveal nothing.
+
+Because coded stripes are distributed by capacity (large photos carry more
+stripes), **vault capacity now grows as you add photos** instead of being
+capped by the smallest image.
 
 ---
 
