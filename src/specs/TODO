@@ -36,9 +36,9 @@ escapeHtml, vault structures, algebraic transforms, huffman encoder.
 - [ ] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
       generator (truncation, marker injection, lying length fields); MR -
       valid files unchanged, hostile input always fails closed
-- [ ] bit-streams: differential testing across BitReader variants on random
+- [x] bit-streams: differential testing across BitReader variants on random
       streams (all three must agree bit-for-bit)
-- [ ] error-correction core: GF(256) field axioms as properties; RS
+- [x] error-correction core: GF(256) field axioms as properties; RS
       roundtrip under random corruption distributions at tolerance edges;
       interleave permutation-invariance MRs
 - [x] cryptography: AES-GCM/PBKDF2/HMAC roundtrip + AAD-binding properties
