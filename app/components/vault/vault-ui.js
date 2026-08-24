@@ -76,8 +76,16 @@ export class VaultUI {
         this.updateState();
     }
 
-    async handleFilesDropped(items) {
-        if (items.length === 0) return;
+    async handleFilesDropped(items, errors) {
+        if (!items || items.length === 0) {
+            if (errors && errors.length > 0) {
+                const detail = errors.length === 1 ? errors[0].message : errors.length + ' read errors';
+                this.modals.showAlert('Drop Failed', 'Could not read the dropped items: ' + detail, 'error');
+            } else {
+                this.modals.showAlert('No Carriers Found', 'No JPEG (.jpg / .jpeg) carrier images were found in the dropped files or folders. Only JPEG images can be used.', 'error');
+            }
+            return;
+        }
 
         // Separate Handles and Files
         const filesToLoad = [];
@@ -105,7 +113,10 @@ export class VaultUI {
             }
         }
 
-        if (filesToLoad.length === 0) return;
+        if (filesToLoad.length === 0) {
+            this.modals.showAlert('No Carriers Found', 'No JPEG (.jpg / .jpeg) carrier images were found in the dropped files or folders. Only JPEG images can be used.', 'error');
+            return;
+        }
 
         try {
             const password = await this.modals.prompt('Unlock Vault', 'Enter Master Password:', 'password');

@@ -248,6 +248,7 @@ async function runTests() {
         await import('./conformance/wire-format.pbt.js');
         await import('./security/ui-legacy-xss.test.js');
         await import('./security/drop-zone-pagination.test.js');
+        await import('./security/drop-zone-folders.test.js');
         await import('./utils/atomic-writer.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/immutable-vault.test.js');

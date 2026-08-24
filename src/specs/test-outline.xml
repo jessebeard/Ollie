@@ -137,6 +137,7 @@
             <file name="css-envelope.test.js" description="CSS envelope sealing/opening, DEK zeroization, foreign-share rejection." />
             <file name="decoder-hardening.test.js" description="Decoder fail-loud hardening against malformed streams." />
             <file name="drop-zone-pagination.test.js" description="DropZone >100-entry directory pagination." />
+            <file name="drop-zone-folders.test.js" description="DropZone folder traversal: synchronous multi-item snapshot, deterministic ordering, zero-match feedback, unreadable-subtree resilience, depth cap." />
             <file name="ecc-edges.test.js" description="RS tolerance-edge corruption distribution properties." />
             <file name="forged-metadata.test.js" description="Forged metadata rejection at extraction boundaries." />
             <file name="gf-shamir.test.js" description="Shamir secret sharing over GF(256): splitting, combination, bijection." />
