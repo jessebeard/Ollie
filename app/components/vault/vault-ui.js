@@ -432,7 +432,7 @@ export class VaultUI {
 
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'application/json';
+        input.accept = '.csv,.json,text/csv,application/json';
 
         input.onchange = async (e) => {
             const file = e.target.files[0];
@@ -440,20 +440,35 @@ export class VaultUI {
 
             try {
                 const text = await file.text();
-                const data = JSON.parse(text);
+                let entries;
+                let skippedCount = 0;
 
-                if (!data.entries || !Array.isArray(data.entries)) {
-                    this.modals.showAlert('Error', 'Invalid import format. Expected an array of entries.', 'error');
-                    return;
+                if (text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {
+                    const data = JSON.parse(text);
+
+                    if (!data.entries || !Array.isArray(data.entries)) {
+                        this.modals.showAlert('Error', 'Invalid import format. Expected an array of entries.', 'error');
+                        return;
+                    }
+                    entries = data.entries;
+                } else {
+                    const { importFromCsv } = await import('../../../src/structures/vault/csv-import.js');
+                    const [result, csvErr] = await importFromCsv(text);
+                    if (csvErr) {
+                        this.modals.showAlert('Error', 'Failed to parse CSV import: ' + csvErr.message, 'error');
+                        return;
+                    }
+                    entries = result.entries;
+                    skippedCount = result.skipped.length;
                 }
 
-                this.showLoading(true, 'Importing ' + data.entries.length + ' entries...');
+                this.showLoading(true, 'Importing ' + entries.length + ' entries...');
 
                 let currentVault = this.vault;
                 let addedCount = 0;
                 let errorCount = 0;
 
-                for (const entry of data.entries) {
+                for (const entry of entries) {
                     const [newVault, err] = await currentVault.addEntry(entry, entry.id);
                     if (err) {
                         logger.warn(`Import rejected entry "${entry.title || entry.id}": ${err.message}`);
@@ -468,7 +483,12 @@ export class VaultUI {
                 this.updateUI();
                 this.showLoading(false);
 
-                this.modals.showAlert('Import Complete', `Successfully imported ${addedCount} entries. ${errorCount > 0 ? `Failed to import ${errorCount} entries.` : ''}`);
+                let summary = `Successfully imported ${addedCount} entries.` +
+                    (errorCount > 0 ? ` Failed to import ${errorCount} entries.` : '');
+                if (skippedCount > 0) {
+                    summary += ` Skipped ${skippedCount} rows (unsupported item types or malformed rows).`;
+                }
+                this.modals.showAlert('Import Complete', summary);
 
             } catch (err) {
                 this.showLoading(false);

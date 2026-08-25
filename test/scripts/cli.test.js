@@ -8,7 +8,7 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
-    const { cliSave, cliLoad, cliVerify } = await import('../../scripts/cli.mjs');
+    const { cliSave, cliLoad, cliVerify, cliImportCsv, parseArgs } = await import('../../scripts/cli.mjs');
     const { PasswordVault } = await import('../../src/structures/vault/immutable-vault.js');
     const { JpegEncoder } = await import('../../src/codec/encoder.js');
 
@@ -165,6 +165,65 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
             expect(report.error instanceof Error).toBe(true);
 
             fs.rmSync(workDir, { recursive: true, force: true });
+        });
+
+        it('import-csv converts vendor CSV into an encrypted envelope that save --fromExport accepts', async () => {
+            const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ollie-cli-import-'));
+            const csvPath = path.join(workDir, 'logins.csv');
+            const outEnvelope = path.join(workDir, 'imported.json');
+
+            const firefoxCsv = [
+                '"url","username","password","httpRealm","formActionOrigin","guid","timeCreated","timeLastUsed","timePasswordChanged"',
+                '"https://example.com/","u@x.com","pw1","realm","","g1","1700000000000","",""',
+                '"https://test.org/","u2","pw2","","","g2","","",""'
+            ].join('\r\n');
+            fs.writeFileSync(csvPath, firefoxCsv);
+
+            const report = await cliImportCsv({
+                csv: csvPath,
+                password: PASSWORD,
+                outExport: outEnvelope
+            });
+            expect(report.error).toEqual(null);
+            expect(report.entries).toBe(2);
+            if (!fs.existsSync(outEnvelope)) throw new Error('envelope not written');
+
+            // Composition contract: output must round-trip through importEncrypted.
+            const [restored, restoreErr] = await PasswordVault.importEncrypted(
+                fs.readFileSync(outEnvelope, 'utf8'), PASSWORD
+            );
+            expect(restoreErr).toEqual(null);
+            expect(restored.entries.length).toBe(2);
+
+            const [plaintext] = await restored.getPlaintextJSON();
+            const data = JSON.parse(plaintext);
+            expect(data.entries[0].title).toBe('example.com');
+            expect(data.entries[0].password).toBe('pw1');
+
+            fs.rmSync(workDir, { recursive: true, force: true });
+        });
+
+        it('import-csv reports unsupported headers as a typed error', async () => {
+            const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ollie-cli-import-bad-'));
+            const csvPath = path.join(workDir, 'weird.csv');
+            fs.writeFileSync(csvPath, 'foo,bar\n1,2\n');
+
+            const report = await cliImportCsv({
+                csv: csvPath,
+                password: PASSWORD,
+                outExport: path.join(workDir, 'out.json')
+            });
+            expect(report.error instanceof Error).toBe(true);
+            expect(report.error.message).toContain('unsupported header layout');
+
+            fs.rmSync(workDir, { recursive: true, force: true });
+        });
+
+        it('parseArgs maps the import-csv flag surface', () => {
+            const parsed = parseArgs(['--csv', 'a.csv', '--format', 'lastpass', '--outExport', 'o.json']);
+            expect(parsed.csv).toBe('a.csv');
+            expect(parsed.format).toBe('lastpass');
+            expect(parsed.outExport).toBe('o.json');
         });
     });
 }

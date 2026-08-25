@@ -250,7 +250,9 @@ async function runTests() {
         await import('./security/drop-zone-pagination.test.js');
         await import('./security/drop-zone-folders.test.js');
         await import('./utils/atomic-writer.test.js');
+        await import('./utils/csv.test.js');
         await import('./structures/vault/secure-record.test.js');
+        await import('./structures/vault/csv-import.test.js');
         await import('./structures/vault/immutable-vault.test.js');
         await import('./structures/vault/revision-tracking.test.js');
         await import('./structures/vault/encrypted-export.test.js');
@@ -264,6 +266,7 @@ async function runTests() {
         await import('./integration/vault/vault-e2e-multigen.test.js');
         await import('./integration/vault/vault-capacity-ui.test.js');
         await import('./integration/vault/vault-save-permission.test.js');
+        await import('./integration/vault/vault-csv-import-ui.test.js');
         await import('./integration/vault/vault-spread-save.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");

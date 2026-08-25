@@ -5,6 +5,7 @@
  *   node scripts/cli.mjs save   --fromExport seed.json --imagesDir dir --outDir dir --password pw
  *   node scripts/cli.mjs load   --imagesDir dir --password pw [--outExport out.json]
  *   node scripts/cli.mjs verify --imagesDir dir --password pw
+ *   node scripts/cli.mjs import-csv --csv passwords.csv --password pw [--format auto] [--outExport out.json]
  */
 import fs from 'fs';
 import path from 'path';
@@ -131,6 +132,51 @@ export async function cliTotp({ imagesDir, password }) {
 }
 
 /**
+ * Converts a password-manager CSV export into an encrypted export envelope
+ * compatible with `save --fromExport`. Vendor format auto-detected unless
+ * --format names a profile explicitly.
+ */
+export async function cliImportCsv({ csv, password, outExport, format }) {
+    try {
+        const { importFromCsv } = await import('../src/structures/vault/csv-import.js');
+        const text = fs.readFileSync(csv, 'utf8');
+        const [result, importErr] = await importFromCsv(text);
+        if (importErr) return { error: importErr };
+
+        if (format && format !== 'auto' && result.format !== format) {
+            return { error: new Error(`Detected format "${result.format}" does not match requested --format ${format}`) };
+        }
+
+        let vault = new PasswordVault([], null, true, password);
+        for (const entry of result.entries) {
+            const [next, addErr] = await vault.addEntry(entry);
+            if (addErr) return { error: addErr };
+            vault = next;
+        }
+        if (vault.entries.length === 0) {
+            return { error: new Error('No entries imported from CSV') };
+        }
+
+        const [json, exportErr] = await vault.exportEncrypted(password);
+        if (exportErr) return { error: exportErr };
+
+        let outputPath = outExport;
+        if (!outputPath) {
+            outputPath = path.join(process.cwd(), 'ollie-imported.json');
+        }
+        fs.writeFileSync(outputPath, json);
+
+        const summary =
+            `${vault.entries.length} entr${vault.entries.length === 1 ? 'y' : 'ies'} imported from ${path.basename(csv)} ` +
+            `(format: ${result.format}${result.skipped.length ? `, skipped ${result.skipped.length} row(s)` : ''}) — ` +
+            `envelope written to ${outputPath}`;
+        return { error: null, revision: vault.metadata.revision, entries: vault.entries.length, summary };
+    } catch (e) {
+        return { error: e instanceof Error ? e : new Error(String(e)) };
+    }
+}
+
+/**
  * Non-destructive integrity and identity check against carriers.
  */
 export async function cliVerify({ imagesDir, password }) {
@@ -223,8 +269,16 @@ if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
                 }
             }
             break;
+        case 'import-csv':
+            report = await cliImportCsv({
+                csv: args.csv,
+                password: args.password,
+                outExport: args.outExport,
+                format: args.format
+            });
+            break;
         default:
-            console.error('Usage: node scripts/cli.mjs <save|load|verify|totp> --help for flags');
+            console.error('Usage: node scripts/cli.mjs <save|load|verify|totp|import-csv> --help for flags');
             process.exit(1);
     }
 

@@ -85,6 +85,7 @@
             <directory name="vault">
                 <file name="immutable-vault.js" description="PasswordVault: frozen immutable vault with session-key wrapping, revision tracking, encrypted export/import, threshold save/load." />
                 <file name="secure-record.js" description="SecureEntry: per-entry AES-GCM encryption bound to entry id via AAD." />
+                <file name="csv-import.js" description="Vendor CSV import (Firefox, Chrome/GPM, Apple, KeePass, KeePassXC, Bitwarden, LastPass): header-sniffing detection plus row-to-entry mapping with timestamp normalization and provenance preservation." />
             </directory>
         </directory>
         <directory name="utils">
@@ -95,6 +96,7 @@
             <file name="logger.js" description="Leveled logger (debug/info/warn/error) with env-var override." />
             <file name="url-safety.js" description="URL scheme whitelist for safe link opening." />
             <file name="base32.js" description="RFC 4648 Base32 encoding/decoding." />
+            <file name="csv.js" description="RFC 4180 CSV parser with CRLF/BOM handling and a KeePass backslash-escape dialect mode." />
         </directory>
     </structure>
 </project>

@@ -55,3 +55,33 @@ escapeHtml, vault structures, algebraic transforms, huffman encoder.
 - [x] harness: npm run fuzz driver landed (CI smoke + scalable local runs); full corpus
 Related: RESOLVED whole-container ECC framing entry (see top of file).
 
+
+## 2026-08-24 - CSV import: Bitwarden card/identity item types
+Bitwarden CSV exports carry non-login item types in the `type` column
+(folder,favorite,type,...). Current importer scope:
+- type=login -> full import
+- type=note -> passwordless entry import
+- type=card / type=identity -> skipped with reason todo(card-identity-import)
+
+No meaningful field mapping exists yet (cardholder number, expiry, identity
+fields have no SecureEntry equivalents). Options when picked up: map to
+notes text dump, or extend customFields conventions. Track skipped counts
+in import summary either way.
+
+## 2026-08-24 - TOTP live codes never render in vault UI (broken)
+populateTotpCodes (app/components/vault/vault-ui.js) runs but produces no
+visible codes. Diagnosis:
+1. SECRET ENCODING BUG: line ~595 uses
+   `new TextEncoder().encode(params.secret)` on the Base32 secret STRING;
+   TOTP needs decodeBase32(params.secret) raw bytes (see scripts/cli.mjs
+   cliTotp for the correct pattern).
+2. Bare `catch {}` swallows every per-entry failure (suspect additional
+   algorithm-name mismatch between parseOtpauthUri output and totp()
+   options) -> slots stay blank forever with zero console signal.
+3. No lifecycle: no 30s refresh timer, no copy-code affordance, and
+   .totp-slot/.totp-code have no styling contract in vault.css.
+Fix = rewrite populateTotpCodes against src/utils/base32.js + totp.js,
+fail-loud logging, interval refresh aligned to period, CSS + hidden-until-
+present slot; pin with Node-runner DOM tests (revision-tracking pattern).
+NOTE: scripts/cli.mjs cliTotp has the SAME TextEncoder-as-base32 bug
+(line ~117) and must be fixed in the same pass.

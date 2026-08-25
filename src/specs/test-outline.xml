@@ -118,6 +118,9 @@
                 <file name="vault-e2e-ecc.test.js" description="Vault operations with ECC enabled." />
                 <file name="vault-e2e-empty.test.js" description="Empty vault edge cases." />
                 <file name="vault-e2e-multigen.test.js" description="Multi-generational vault updates (losslessness)." />
+                <file name="vault-save-permission.test.js" description="Save flow acquires FileSystemHandle write permission under fresh user activation, before encrypt/embed." />
+                <file name="vault-spread-save.test.js" description="Threshold save spreads one stripe per carrier on real photos; full-set, threshold-subset, and sub-threshold load behavior." />
+                <file name="vault-csv-import-ui.test.js" description="Import routing: CSV delegates to vendor importer, JSON envelope path unchanged." />
             </directory>
             <file name="roundtrip.test.js" description="Full JPEG encode-decode roundtrip." />
             <file name="steganography-roundtrip.test.js" description="End-to-end steganographic embed-extract roundtrip." />
@@ -125,7 +128,7 @@
         <directory name="scripts">
             <file name="auto_detection_roundtrip.test.js" description="Automatic format detection and roundtrip." />
             <file name="capacity_validation.test.js" description="Image capacity calculation validation." />
-            <file name="cli.test.js" description="CLI save/load/verify headless loop tests including --threshold." />
+            <file name="cli.test.js" description="CLI save/load/verify headless loop tests including --threshold; import-csv vendor-CSV-to-envelope conversion and flag surface." />
         </directory>
         <directory name="security">
             <file name="bitreader-differential.test.js" description="BitReader differential properties across read strategies." />
@@ -142,7 +145,6 @@
             <file name="forged-metadata.test.js" description="Forged metadata rejection at extraction boundaries." />
             <file name="gf-shamir.test.js" description="Shamir secret sharing over GF(256): splitting, combination, bijection." />
             <file name="manifest-enforcement.test.js" description="Manifest enforcement across batch pipeline: stamping, legacy rejection, swap detection." />
-            <file name="vault-save-permission.test.js" description="Save flow acquires FileSystemHandle write permission under fresh user activation, before encrypt/embed; declined permission aborts cleanly." />
             <file name="probe-regressions.test.js" description="Regressions promoted from root evidence scripts." />
             <file name="secure-id-generation.test.js" description="Secure UUID generation." />
             <file name="threshold-vault.test.js" description="Threshold vault recovery: distinct coded stripes, subset recovery, unique-share counting." />
@@ -158,10 +160,12 @@
                 <file name="revision-tracking.test.js" description="Revision counter strict monotonicity." />
                 <file name="encrypted-export.test.js" description="Encrypted export/import envelope format." />
                 <file name="secure-record.test.js" description="SecureEntry encryption and structural immutability." />
+                <file name="csv-import.test.js" description="Vendor CSV import: profile detection, title derivation chain, timestamp normalization, provenance customFields, TOTP wrapping, hostile-cell storage, ragged-row policy." />
             </directory>
         </directory>
         <directory name="utils">
             <file name="atomic-writer.test.js" description="Atomic multi-file write rollback on partial failure." />
+            <file name="csv.test.js" description="RFC 4180 CSV parser: quoting, embedded newlines, CRLF/BOM, ragged rows, KeePass escape dialect." />
             <file name="bit-reader.test.js" description="BitReader wrapper unit tests." />
             <file name="marker-parser.test.js" description="MarkerParser utility unit tests." />
             <file name="pbt.js" description="Property-based testing harness with seeded PRNG and shrinking." />

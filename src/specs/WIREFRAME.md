@@ -54,9 +54,9 @@ Ollie/
 â”‚   â”‚   â”œâ”€â”€ secret-sharing/       # gf-shamir (k-of-n), css-envelope
 â”‚   â”‚   â””â”€â”€ steganography/        # f5-syndrome, batch-embedder/-extractor,
 â”‚   â”‚                             # chunk-manager, carrier-manifest
-â”‚   â”œâ”€â”€ structures/vault/         # immutable-vault, secure-record
+â”‚   â”œâ”€â”€ structures/vault/         # immutable-vault, secure-record, csv-import
 â”‚   â”œâ”€â”€ utils/                    # crc32, encoding, logger, url-safety,
-â”‚   â”‚                             # escape-html, atomic-writer
+â”‚   â”‚                             # escape-html, atomic-writer, csv
 â”‚   â””â”€â”€ specs/                    # Normative specs and project rules
 â”œâ”€â”€ test/                         # Node runner + browser suite (see Â§7)
 â”œâ”€â”€ docs/audits/                  # Historical audit reports (archived)
@@ -86,6 +86,7 @@ flowchart TB
     subgraph STRUCT["structures/vault"]
         PV["PasswordVault<br/>immutable-vault.js"]
         SE["SecureEntry<br/>secure-record.js"]
+        CI["CSV import<br/>csv-import.js"]
     end
 
     subgraph IT["information-theory"]
@@ -129,7 +130,9 @@ flowchart TB
     VUI --> PV
     VUI --> CAP
     VUI --> FSC
+    VUI --> CI
     CLI --> PV
+    CLI --> CI
 
     PV --> SE
     PV --> STEGO
@@ -172,11 +175,13 @@ flowchart LR
     subgraph shared
         esc["utils/escape-html.js"]
         awriter["utils/atomic-writer.js"]
+        csvutil["utils/csv.js"]
     end
 
     subgraph structures
         pv["immutable-vault.js"]
         securerec["secure-record.js"]
+        csvimp["csv-import.js"]
     end
 
     subgraph stego
@@ -222,11 +227,14 @@ flowchart LR
     vview --> urlsafe["utils/url-safety.js"]
     vview --> esc
     vui --> awriter
+    vui --> csvimp
+    csvimp --> csvutil
 
     vaultpage --> bem
     vaultpage --> bex
     vaultpage --> fscan
     cli --> pv
+    cli --> csvimp
     vui --> pv
     vui --> cap
     vui --> fscan
