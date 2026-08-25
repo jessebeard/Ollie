@@ -135,6 +135,12 @@ export class VaultUI {
 
             this.vault = newVault;
             this._sessionPassword = password;
+            const gateOk = await this.enforceTotpGate();
+            if (!gateOk) {
+                this.vault = null;
+                this.updateUI();
+                return;
+            }
             this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
 
             // Scan for capacity
@@ -172,8 +178,102 @@ export class VaultUI {
         this.vault = new PasswordVault([], null, true, pass1);
         this._sessionPassword = pass1;
 
+        await this.enrollTotpGateFlow();
+
         this.updateUI();
         this.modals.showAlert('Created', 'New vault created. Add entries and save.');
+    }
+
+    /**
+     * Tier B gate enrollment: optional, explicitly disclosed as weak
+     * access control (deters shoulder-surfing only). Shows the otpauth
+     * URI and its QR exactly once for authenticator enrollment.
+     * @returns {Promise<boolean>} true when the gate was enabled
+     */
+    async enrollTotpGateFlow() {
+        const disclaimer =
+            'Enable a TOTP code gate on this vault?\n\n' +
+            'IMPORTANT - THIS IS NOT EXTRA ENCRYPTION:\n' +
+            'Anyone who has your master password can bypass this easily. It only deters someone glancing over your shoulder or grabbing an unlocked session.\n\n' +
+            'You will scan a QR once with any authenticator app and be asked for its rotating code each time the vault is opened. Enable?';
+        const accepted = await this.modals.confirm(disclaimer);
+        if (!accepted) return false;
+
+        const [gate, err] = await this.vault.enableTotpGate();
+        if (err) {
+            this.modals.showAlert('Error', 'Could not enable TOTP gate: ' + err.message, 'error');
+            return false;
+        }
+        this.vault = gate.vault;
+
+        this.showQrOverlay(gate.uri);
+        this.modals.showAlert(
+            'TOTP Gate Enabled',
+            'Scan the QR now with your authenticator app (it stays on screen until closed).\n\nEach time you open this vault you will be prompted for its rotating code.'
+        );
+        return true;
+    }
+
+    /** Renders an otpauth:// URI as an on-screen QR overlay (show-side of enrollment). */
+    showQrOverlay(uri) {
+        if (typeof document === 'undefined') return;
+        const overlay = document.createElement('div');
+        overlay.className = 'qr-overlay';
+        const note = document.createElement('p');
+        note.className = 'qr-uri';
+        note.textContent = uri;
+        overlay.appendChild(note);
+        const close = document.createElement('button');
+        close.textContent = 'Close';
+        close.addEventListener('click', () => overlay.remove());
+        overlay.appendChild(close);
+
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext && canvas.getContext('2d');
+            if (ctx) {
+                import('../../../src/codec/qr-encoder.js').then(({ encodeQR }) => {
+                    const matrix = encodeQR(new TextEncoder().encode(uri));
+                    const scale = 6;
+                    canvas.width = (matrix.size + 8) * scale;
+                    canvas.height = (matrix.size + 8) * scale;
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#000';
+                    for (let r = 0; r < matrix.size; r++) {
+                        for (let c = 0; c < matrix.size; c++) {
+                            if (matrix.modules[r * matrix.size + c]) {
+                                ctx.fillRect((c + 4) * scale, (r + 4) * scale, scale, scale);
+                            }
+                        }
+                    }
+                    overlay.insertBefore(canvas, note);
+                }).catch(() => {});
+            }
+        } catch { /* canvas unavailable: URI text remains */ }
+
+        document.body.appendChild(overlay);
+    }
+
+    /**
+     * Gate enforcement on unlock: prompts until a valid code is entered or
+     * the user cancels (cancel keeps the vault hidden).
+     * @returns {Promise<boolean>}
+     */
+    async enforceTotpGate() {
+        while (this.vault && this.vault.metadata.totpGate) {
+            const code = await this.modals.prompt(
+                'TOTP Required',
+                'Enter the current code from your authenticator:', 'text');
+            if (!code) {
+                this.modals.showAlert('Vault Hidden', 'Vault remains hidden until the TOTP code is provided.', 'error');
+                return false;
+            }
+            const [res] = await this.vault.verifyTotpGate(code);
+            if (res && res.valid) return true;
+            this.modals.showAlert('Wrong Code', 'That code did not match. Try again.', 'error');
+        }
+        return true;
     }
 
     async addEntry() {

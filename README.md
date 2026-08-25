@@ -43,6 +43,14 @@ and how to get oriented in the codebase.
 
 ## Security model
 
+### Optional TOTP gate (Tier B)
+
+Vault creation can enroll a TOTP code gate. **This is weak access control,
+not extra encryption**: the secret lives inside the encrypted vault document,
+so anyone who has your master password can bypass it trivially. It exists only
+to deter shoulder-surfing and opportunistic access to an unlocked session.
+The enrollment dialog states this disclaimer verbatim.
+
 | Property | Mechanism |
 |----------|-----------|
 | Confidentiality | AES-256-GCM per entry + AES-256-GCM container envelope |

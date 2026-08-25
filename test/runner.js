@@ -243,6 +243,7 @@ async function runTests() {
         await import('./security/decoder-hardening.test.js');
         await import('./security/capacity-consistency.test.js');
         await import('./security/vault-hardening.test.js');
+        await import('./security/totp-gate.test.js');
         await import('./security/url-safety.test.js');
         await import('./security/probe-regressions.test.js');
         await import('./conformance/wire-format-conformance.test.js');
@@ -271,6 +272,7 @@ async function runTests() {
         await import('./integration/vault/vault-totp-form.test.js');
         
         await import('./integration/vault/vault-qr-scan.test.js');
+        await import('./integration/vault/vault-tierb-flow.test.js');
         await import('./integration/vault/vault-spread-save.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");

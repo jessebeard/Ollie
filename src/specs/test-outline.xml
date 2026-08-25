@@ -93,6 +93,7 @@
                 <file name="aes-gcm.test.js" description="AES-GCM encryption/decryption tests." />
                 <file name="hmac.test.js" description="HMAC-SHA256 signing/verification tests." />
                 <file name="pbkdf2.test.js" description="PBKDF2 key derivation tests including deriveRawBits." />
+                <file name="totp-gate.test.js" description="PasswordVault Tier B TOTP gate: enable/verify/disable, drift window, export/import persistence, locked-vault refusal." />
                 <file name="totp.test.js" description="RFC 6238 TOTP: Annex B vectors, drift-window verification, otpauth URI roundtrip, codeFromOtpauthUri URI-routed exact vectors, normalizeTotpInput authoring helper." />
             </directory>
             <directory name="error-correction">
@@ -123,6 +124,7 @@
                 <file name="vault-spread-save.test.js" description="Threshold save spreads one stripe per carrier on real photos; full-set, threshold-subset, and sub-threshold load behavior." />
                 <file name="vault-csv-import-ui.test.js" description="Import routing: CSV delegates to vendor importer, JSON envelope path unchanged." />
                 <file name="vault-qr-scan.test.js" description="Scanned QR images populate entry TOTP via applyScannedImage; non-otpauth payloads rejected with alerts." />
+                <file name="vault-tierb-flow.test.js" description="Create-vault gate enrollment with explicit weak-access-control disclaimer, QR show-once overlay, unlock enforcement prompts." />
                 <file name="vault-totp-form.test.js" description="Add-entry form carries TOTP field; bare secrets stored normalized; garbage rejected before encryption." />
                 <file name="vault-totp-display.test.js" description="TOTP live display: Base32-correct codes in .totp-slot, countdown ticks with boundary recompute, warn-not-throw on malformed values, single-interval lifecycle." />
             </directory>

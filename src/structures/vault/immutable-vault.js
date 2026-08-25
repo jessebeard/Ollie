@@ -1,9 +1,10 @@
-﻿import { BatchEmbedder } from '../../information-theory/steganography/batch-embedder.js';
+import { BatchEmbedder } from '../../information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../../information-theory/steganography/batch-extractor.js';
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
 import { Encryption } from '../../information-theory/cryptography/aes-gcm.js';
-import { normalizeTotpInput } from '../../information-theory/cryptography/totp.js';
+import { normalizeTotpInput, buildOtpauthUri, codeFromOtpauthUri } from '../../information-theory/cryptography/totp.js';
+import { encodeBase32, decodeBase32 } from '../../utils/base32.js';
 import { randomUUID, getCrypto } from '../../information-theory/cryptography/crypto-provider.js';
 import { utf8ToBytes } from '../../utils/encoding.js';
 
@@ -477,6 +478,81 @@ export class PasswordVault {
      * @param {Object} entry
      * @returns {Error|null} Typed error, or null when valid
      */
+    /**
+     * Tier B access control: enables a TOTP code gate on this vault.
+     * WEAK ACCESS CONTROL ONLY - the secret lives inside the encrypted
+     * vault document, so anyone with the master password can defeat it.
+     * It deters shoulder-surfing and opportunistic access, nothing more.
+     *
+     * @returns {Promise<[Object|null, Error|null]>} Tuple of [{vault, uri}, error]
+     */
+    async enableTotpGate() {
+        if (!this.isUnlocked) return [null, new Error('Vault is locked')];
+        if (this.metadata.totpGate) return [null, new Error('TOTP gate already enabled')];
+
+        const [cryptoObj] = getCrypto();
+        const secretBytes = new Uint8Array(20);
+        cryptoObj.getRandomValues(secretBytes);
+        const secret = encodeBase32(secretBytes);
+
+        const [uri, uriErr] = buildOtpauthUri({ label: 'Ollie Vault', secret });
+        if (uriErr) return [null, uriErr];
+
+        const metadata = { ...this.metadata, totpGate: { secret, enrolled: new Date().toISOString() } };
+        const nv = new PasswordVault(this.entries, metadata, this.isUnlocked, this._password(), this._sessionKey());
+        return [{ vault: nv, uri }, null];
+    }
+
+    /**
+     * Verifies a candidate gate code against the enrolled secret with a
+     * single-step drift window by default.
+     *
+     * @param {string} code Candidate 6+ digit code
+     * @param {{now?: number, window?: number}} [options]
+     * @returns {Promise<[{valid: boolean}|null, Error|null]>}
+     */
+    async verifyTotpGate(code, options = {}) {
+        if (!this.isUnlocked) return [{ valid: false }, new Error('Vault is locked')];
+        const gate = this.metadata && this.metadata.totpGate;
+        if (!gate) return [{ valid: false }, null];
+        if (typeof code !== 'string' || !/^[0-9]{6,10}$/.test(code.trim())) {
+            return [{ valid: false }, null];
+        }
+         const [secretBytes, decErr] = decodeBase32(gate.secret);
+         if (decErr) return [{ valid: false }, new Error('Gate secret is corrupt: ' + decErr.message)];
+        
+         // Deterministic verification path: derive expected codes via
+         // codeFromOtpauthUri (same Base32/HOTP chain used everywhere else)
+         // across a +-window of 30s steps.
+         const period = 30;
+         const nowSec = options.now !== undefined ? options.now : Math.floor(Date.now() / 1000);
+         const window = options.window !== undefined ? options.window : 1;
+         const trimmed = typeof code === 'string' ? code.trim() : '';
+         let valid = false;
+         for (let off = -window; off <= window && !valid; off++) {
+             const at = nowSec + off * period;
+             const [candidate, candErr] = await codeFromOtpauthUri(
+                 'otpauth://totp/gate?secret=' + gate.secret, { now: at });
+             if (candErr || !candidate) continue;
+             if (candidate === trimmed) valid = true;
+         }
+         void secretBytes;
+         return [{ valid }, null];
+    }
+
+    /**
+     * Removes the TOTP gate.
+     * @returns {Promise<[PasswordVault|null, Error|null]>}
+     */
+    async disableTotpGate() {
+        if (!this.isUnlocked) return [null, new Error('Vault is locked')];
+        if (!this.metadata || !this.metadata.totpGate) return [this, null];
+        const metadata = { ...this.metadata };
+        delete metadata.totpGate;
+        const nv = new PasswordVault(this.entries, metadata, this.isUnlocked, this._password(), this._sessionKey());
+        return [nv, null];
+    }
+
     /**
      * Normalizes mutable user input before validation/storage: blank TOTP
      * values are dropped and bare Base32 secrets are wrapped into
