@@ -126,30 +126,57 @@ describe('cauchy-ec decoding (MDS guarantee)', () => {
     });
 });
 
-describe('planErasureAllocation (capacity-proportional)', () => {
+describe('planErasureAllocation (spread-first)', () => {
 
-    it('small carriers no longer cap large sets', () => {
+    it('spreads one stripe per carrier and includes small carriers when possible', () => {
         const [plan, err] = planErasureAllocation(
             [50_000, 5_000_000, 5_000_000],
             { threshold: 2, margin: 512 }
         );
         expect(err).toBe(null);
 
-        // The old replicate/uniform model capped at ~k*smallest. Max-S policy
-        // sets stripes by the large carriers; the small carrier contributes
-        // zero stripes instead of throttling everyone.
-        if (plan.maxPayload <= 2 * 50_000) {
-            throw new Error(`allocation still capped by smallest carrier (maxPayload=${plan.maxPayload})`);
-        }
-        if (plan.counts[0] !== 0) throw new Error('carrier below one stripe must carry zero stripes');
-        if (plan.counts[1] + plan.counts[2] !== plan.n) throw new Error('large carriers should absorb all stripes');
-        if (plan.n < 2) throw new Error('n must be at least threshold');
+        // One container per file: no carrier may ever hold two stripes.
+        plan.counts.forEach((c, i) => {
+            if (c > 1) throw new Error(`carrier ${i} assigned ${c} stripes; physical format allows at most 1`);
+        });
+        // Spread-first: the 50KB carrier can host one stripe, so all three
+        // participate (n=3 tolerates losing 1 file; concentration on the two
+        // large carriers would tolerate none).
+        if (plan.n !== 3) throw new Error(`expected n=3 (max participation), got ${plan.n}`);
         if (plan.counts.reduce((a, b) => a + b, 0) !== plan.n) throw new Error('counts must sum to n');
-        // Only k of n coded chunks carry unique information - the recoverable
-        // payload is threshold * stripeSize, never n * stripeSize.
         if (plan.maxPayload !== 2 * plan.stripeSize) {
             throw new Error(`maxPayload must be k*stripeSize (${plan.maxPayload} vs ${2 * plan.stripeSize})`);
         }
+    });
+
+    it('never concentrates stripes onto a single carrier (user-reported regression)', () => {
+        // One large photo + ten small ones, threshold 5: the old Max-S policy
+        // returned counts=[6,0,...,0], writing every stripe into ONE file.
+        const caps = [2_000_000, ...Array(10).fill(300_000)];
+        const [plan, err] = planErasureAllocation(caps, { threshold: 5, margin: 512 });
+        expect(err).toBe(null);
+        if (plan.n < 5) throw new Error(`n=${plan.n} below threshold`);
+        if (Math.max(...plan.counts) !== 1) throw new Error('a carrier received multiple stripes');
+        if (plan.counts.filter(c => c === 1).length !== plan.n) throw new Error('participants must each carry exactly one stripe');
+    });
+
+    it('honors payloadSize as a floor on stripe size', () => {
+        const caps = [600_000, 600_000, 600_000, 600_000, 600_000, 600_000, 100_000, 100_000];
+        const payload = 2_400_000;
+        const [plan, err] = planErasureAllocation(caps, { threshold: 6, margin: 512, payloadSize: payload });
+        expect(err).toBe(null);
+        if (plan.stripeSize < Math.ceil(payload / 6)) throw new Error('stripe smaller than required');
+        // Small carriers cannot host a full required stripe: excluded.
+        if (plan.n !== 6) throw new Error(`expected 6 participants, got ${plan.n}`);
+    });
+
+    it('rejects payloads that no threshold-subset of carriers can host', () => {
+        const [, err] = planErasureAllocation(
+            [600_000, 600_000, 600_000],
+            { threshold: 3, margin: 512, payloadSize: 5_000_000 }
+        );
+        if (!(err instanceof Error)) throw new Error('oversized payload accepted');
+        if (!err.message.includes('payload')) throw new Error('error should mention the payload');
     });
 
     it('is deterministic and consistent', () => {
@@ -158,13 +185,12 @@ describe('planErasureAllocation (capacity-proportional)', () => {
         const b = planErasureAllocation(caps, { threshold: 2, margin: 64 })[0];
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
 
-        // Every carrier must actually be able to hold its assigned stripes.
+        // Every carrier must actually be able to hold its assigned stripe.
         caps.forEach((cap, i) => {
-            if (cap - marginOf(64) < a.counts[i] * a.stripeSize && a.counts[i] > 0) {
+            if (cap - 64 < a.counts[i] * a.stripeSize && a.counts[i] > 0) {
                 throw new Error(`carrier ${i} overallocated`);
             }
         });
-        function marginOf(m) { return m; }
     });
 
     it('gives zero stripes to carriers too small for even one', () => {
@@ -174,6 +200,7 @@ describe('planErasureAllocation (capacity-proportional)', () => {
         );
         expect(err).toBe(null);
         if (plan.counts[0] !== 0) throw new Error('tiny carrier should carry zero stripes');
+        if (plan.n !== 3) throw new Error(`expected the three large carriers to participate, got n=${plan.n}`);
     });
 
     it('rejects infeasible sets via tuple', () => {

@@ -246,7 +246,10 @@ export class BatchEmbedder {
 
         const capacities = imageCapacities.map(c => c.capacity);
         const { planErasureAllocation } = await import('../secret-sharing/cauchy-ec.js');
-        const [plan, planErr] = planErasureAllocation(capacities, { threshold: k });
+        const [plan, planErr] = planErasureAllocation(capacities, {
+            threshold: k,
+            payloadSize: envelopeBytes.length
+        });
         if (planErr) {
             return [null, new Error(
                 `Carrier set cannot host a threshold-${k} vault (${data.length}-byte document). ` +
@@ -363,7 +366,8 @@ export class BatchEmbedder {
 
                 results.push({
                     name: `steg_${i}_${imageInfo.file.name}`,
-                    data: encodedBytes
+                    data: encodedBytes,
+                    sourceIndex: imageInfo.index
                 });
 
             } catch (error) {

@@ -320,14 +320,14 @@ export class VaultUI {
             // 4. Prepare Files (buffering originals so a failed write can be rolled back)
             this.showLoading(true, 'Reading images...');
             const fileObjs = [];
-            const handleMap = new Map(); // name -> handle
+            const handleList = [];   // parallel to fileObjs; results reference carriers by sourceIndex
             const originalBytes = new Map(); // name -> ArrayBuffer
 
             for (const h of handles) {
                 const file = await h.getFile();
                 originalBytes.set(file.name, await file.arrayBuffer());
                 fileObjs.push(file);
-                handleMap.set(file.name, h);
+                handleList.push(h);
             }
 
             // 4. Embed Data
@@ -347,16 +347,21 @@ export class VaultUI {
             const writeTargets = [];
 
             for (const result of results) {
-                let originalName = result.name;
-                const prefixMatch = result.name.match(/^steg_\d+_(.+)$/);
-                if (prefixMatch) {
-                    originalName = prefixMatch[1];
+                let handle = null;
+                if (Number.isInteger(result.sourceIndex) && handleList[result.sourceIndex]) {
+                    handle = handleList[result.sourceIndex];
+                } else {
+                    // Legacy result shape: fall back to filename matching.
+                    let originalName = result.name;
+                    const prefixMatch = result.name.match(/^steg_\d+_(.+)$/);
+                    if (prefixMatch) {
+                        originalName = prefixMatch[1];
+                    }
+                    handle = handles.find(h => h.name === originalName) ||
+                             handles.find(h => h.name === result.name);
                 }
-
-                let handle = handleMap.get(originalName);
-                if (!handle) handle = handleMap.get(result.name);
                 if (!handle) {
-                    logger.warn(`Could not find handle for ${result.name} (original: ${originalName})`);
+                    logger.warn(`Could not find handle for ${result.name}`);
                     continue;
                 }
 

@@ -202,15 +202,26 @@ export function decodeErasure(chunks, options) {
 }
 
 /**
- * Plans a capacity-proportional stripe allocation across carriers. Finds the
- * largest stripe size S whose summed per-carrier stripe counts
- * floor((capacity - margin)/S) reach `threshold`, then guarantees every
- * carrier with spare room carries the minimum of one full stripe, and trims
- * n below the Cauchy ceiling of 255 - threshold by shaving the smallest
- * counts first. maxPayload reports total storable bytes (n * S).
+ * Plans a spread-first stripe allocation across carriers.
+ *
+ * Physical constraint: each carrier file stores exactly ONE F5 container,
+ * so assigning more than one coded stripe to the same carrier is loss by
+ * construction (the second embedding would overwrite the first on
+ * write-back). This planner therefore hands out AT MOST one stripe per
+ * carrier and maximizes the number of participating carriers, which
+ * maximizes file-level loss tolerance (any n - threshold carriers may be
+ * lost).
+ *
+ * Selection: candidate stripe sizes are the distinct usable capacities
+ * (capacity minus margin). A carrier participates at candidate S iff its
+ * usable space holds one full stripe of S. Among feasible candidates
+ * (participants >= threshold, S >= ceil(payloadSize / threshold)) the
+ * planner picks the largest participant count, breaking ties toward the
+ * larger stripe size. n is capped by the Cauchy ceiling of 255 -
+ * threshold, keeping the highest-capacity carriers when trimming.
  *
  * @param {number[]} capacities
- * @param {{threshold: number, margin?: number}} options
+ * @param {{threshold: number, margin?: number, payloadSize?: number}} options
  * @returns {[{counts: number[], stripeSize: number, n: number, maxPayload: number}|null, Error|null]}
  */
 export function planErasureAllocation(capacities, options) {
@@ -224,6 +235,10 @@ export function planErasureAllocation(capacities, options) {
         if (!Number.isInteger(margin) || margin < 0) {
             return [null, new Error('cauchy-ec: margin must be an integer >= 0')];
         }
+    }
+    const payloadSize = options && options.payloadSize !== undefined ? options.payloadSize : undefined;
+    if (payloadSize !== undefined && (!Number.isInteger(payloadSize) || payloadSize < 1)) {
+        return [null, new Error('cauchy-ec: payloadSize must be an integer >= 1')];
     }
     if (!Array.isArray(capacities) || capacities.length < 1) {
         return [null, new Error('cauchy-ec: capacities must be a non-empty array')];
@@ -241,54 +256,47 @@ export function planErasureAllocation(capacities, options) {
     }
 
     const usable = capacities.map((cap) => Math.max(0, cap - margin));
-    let hi = Math.max(...usable);
-    if (hi < 1) {
-        return [null, new Error('cauchy-ec: no carrier has capacity beyond the margin')];
-    }
-    const stripeTotal = (s) => usable.reduce((acc, u) => acc + Math.floor(u / s), 0);
+    const requiredStripe = payloadSize !== undefined ? Math.ceil(payloadSize / threshold) : 0;
+    const cutoff = Math.max(margin, requiredStripe);
 
-    // Largest stripe size whose summed counts still reach the threshold.
-    let lo = 1;
-    let best = 0;
-    while (lo <= hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        if (stripeTotal(mid) >= threshold) {
-            best = mid;
-            lo = mid + 1;
-        } else {
-            hi = mid - 1;
+    const candidates = Array.from(new Set(usable.filter((u) => u > 0))).sort((a, b) => b - a);
+
+    let best = null;
+    for (const s of candidates) {
+        if (s < cutoff) break;
+
+        const eligible = [];
+        for (let i = 0; i < usable.length; i++) {
+            if (usable[i] >= s) eligible.push(i);
+        }
+        if (eligible.length > countCeiling) {
+            eligible.sort((a, b) => usable[b] - usable[a]);
+            eligible.length = countCeiling;
+        }
+        if (eligible.length < threshold) continue;
+
+        if (!best || eligible.length > best.n || (eligible.length === best.n && s > best.stripeSize)) {
+            best = {
+                eligible,
+                stripeSize: s,
+                n: eligible.length,
+                maxPayload: threshold * s
+            };
         }
     }
-    if (best < 1) {
-        return [null, new Error('cauchy-ec: capacity set cannot host the threshold')];
-    }
-    // Stripes smaller than the overhead margin are treated as infeasible:
-    // the set cannot usefully host the threshold at that fragmentation.
-    if (best < margin) {
-        return [null, new Error('cauchy-ec: capacity set too small for the margin')];
+
+    if (!best) {
+        return [null, new Error(
+            'cauchy-ec: capacity set cannot host a threshold-' + threshold +
+            (payloadSize !== undefined ? ' plan for a ' + payloadSize + '-byte payload' : '')
+        )];
     }
 
-    // Max-S policy: stripe size stays at the largest feasible value. Carriers
-    // too small for even one stripe at that size simply contribute zero
-    // stripes (and still provide their key share). Shrinking S to include
-    // them would REDUCE recoverable payload, since only k of n coded chunks
-    // carry unique information: maxPayload = threshold * S.
-    const counts = usable.map((u) => Math.floor(u / best));
-    let total = counts.reduce((a, b) => a + b, 0);
-    while (total > countCeiling) {
-        let victim = -1;
-        for (let i = 0; i < counts.length; i++) {
-            if (counts[i] > 0 && (victim === -1 || counts[i] < counts[victim])) victim = i;
-        }
-        if (victim === -1) break;
-        counts[victim] -= 1;
-        total -= 1;
-    }
-
+    const counts = capacities.map((_cap, i) => (best.eligible.includes(i) ? 1 : 0));
     return [{
         counts,
-        stripeSize: best,
-        n: total,
-        maxPayload: threshold * best
+        stripeSize: best.stripeSize,
+        n: best.n,
+        maxPayload: best.maxPayload
     }, null];
 }
