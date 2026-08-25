@@ -171,3 +171,54 @@ describe('AES-GCM binding hygiene', () => {
         expect(decErr instanceof Error).toBe(true);
     });
 });
+
+describe('TOTP entry validation', () => {
+    it('accepts valid otpauth URIs and bare Base32 secrets', async () => {
+        const okUri = PasswordVault.validateEntryInput({ title: 'T', totp: 'otpauth://totp/a?secret=JBSWY3DPEHPK3PXP' });
+        expect(okUri).toBe(null);
+        const okBare = PasswordVault.validateEntryInput({ title: 'T', totp: 'JBSWY3DPEHPK3PXP' });
+        expect(okBare).toBe(null);
+    });
+
+    it('rejects malformed totp values with a typed error', async () => {
+        for (const bad of ['otpauth://hotp/x?secret=AB', 'not a secret!!']) {
+            const err = PasswordVault.validateEntryInput({ title: 'T', totp: bad });
+            if (!(err instanceof Error)) throw new Error(`accepted '${bad}'`);
+            if (!err.message.toLowerCase().includes('totp')) throw new Error('error must mention totp');
+        }
+    });
+
+    it('normalizes bare secrets into otpauth URIs at the addEntry boundary', async () => {
+        const vault = new PasswordVault([], null, true, PASSWORD);
+        const [next, err] = await vault.addEntry({
+            title: 'GitHub',
+            password: 'pw',
+            totp: 'JBSWY3DPEHPK3PXP'
+        });
+        expect(err).toBe(null);
+
+        const [sessionKey] = await next._getSessionKey();
+        const [plain, decErr] = await next.entries[0].decrypt(sessionKey);
+        expect(decErr).toBe(null);
+        if (plain.totp !== 'otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP') {
+            throw new Error(`stored unnormalized: ${plain.totp}`);
+        }
+    });
+
+    it('drops empty-string totp instead of storing blanks', async () => {
+        const vault = new PasswordVault([], null, true, PASSWORD);
+        const [next, err] = await vault.addEntry({ title: 'Plain', password: 'pw', totp: '' });
+        expect(err).toBe(null);
+        const [sessionKey] = await next._getSessionKey();
+        const [plain] = await next.entries[0].decrypt(sessionKey);
+        // SecureEntry reconstructs string fields as '' when absent; the
+        // storage contract is "falsy means no TOTP configured".
+        if (plain.totp) throw new Error(`expected absent totp, got '${plain.totp}'`);
+    });
+
+    it('rejects garbage totp at the addEntry boundary', async () => {
+        const vault = new PasswordVault([], null, true, PASSWORD);
+        const [, err] = await vault.addEntry({ title: 'Bad', password: 'pw', totp: 'not a secret!!' });
+        if (!(err instanceof Error)) throw new Error('garbage totp accepted');
+    });
+});

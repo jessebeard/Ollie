@@ -97,7 +97,7 @@ export async function cliLoad({ imagesDir, password, outExport }) {
 /**
  * Generates current TOTP codes for all entries that have a totp field.
  */
-export async function cliTotp({ imagesDir, password }) {
+export async function cliTotp({ imagesDir, password, now = undefined }) {
     try {
         const [files, filesErr] = await readCarrierFiles(imagesDir);
         if (filesErr) return { error: filesErr };
@@ -108,19 +108,17 @@ export async function cliTotp({ imagesDir, password }) {
         const [sessionKey] = await vault._getSessionKey();
         if (!sessionKey) return { error: new Error('Cannot derive session key') };
 
+        const { codeFromOtpauthUri, parseOtpauthUri } = await import('../src/information-theory/cryptography/totp.js');
+
         const codes = [];
         for (const entry of vault.entries) {
             const [plain, decErr] = await entry.decrypt(sessionKey);
             if (decErr || !plain.totp) continue;
-            const { parseOtpauthUri } = await import('../src/information-theory/cryptography/totp.js');
+
+            const [code, genErr] = await codeFromOtpauthUri(plain.totp, { now });
+            if (genErr || !code) continue;
+
             const [params] = parseOtpauthUri(plain.totp);
-            if (!params) continue;
-            const secretBytes = new TextEncoder().encode(params.secret);
-            const { totp: genTotp } = await import('../src/information-theory/cryptography/totp.js');
-            const [code] = await genTotp(secretBytes, {
-                algorithm: params.algorithm, digits: params.digits, period: params.period
-            });
-            if (!code) continue;
             codes.push({ label: params.label || plain.title || entry.id, code });
         }
 

@@ -94,7 +94,7 @@ flowchart TB
         MANIFEST["carrier-manifest<br/>HMAC-authenticated set summaries"]
         CSS["secret-sharing<br/>gf-shamir Â· css-envelope"]
         ECC["error-correction<br/>rs-interleaver Â· reed-solomon-codec Â· galois-field"]
-        CRYPTO["cryptography<br/>pbkdf2 Â· aes-gcm Â· hmac Â· crypto-provider"]
+        CRYPTO["cryptography<br/>pbkdf2 Â· aes-gcm Â· hmac Â· crypto-provider Â· totp"]
     end
 
     subgraph CODEC["codec"]
@@ -228,6 +228,9 @@ flowchart LR
     vview --> esc
     vui --> awriter
     vui --> csvimp
+    vui --> totpmod
+    cli --> totpmod
+    totpmod --> b32["utils/base32.js"]
     csvimp --> csvutil
 
     vaultpage --> bem

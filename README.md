@@ -8,6 +8,17 @@ Everything is pure JavaScript: no dependencies, no WebAssembly, no build step.
 Every algorithm is hand-implemented in readable modules with exhaustive tests,
 so the entire security envelope can be audited end-to-end by one person in an afternoon.
 
+### Feature highlights
+
+- Steganographic multi-carrier storage with threshold (k-of-n) recovery: lose
+  carriers and the vault still loads
+- Live TOTP (RFC 6238) codes rendered on entry cards with countdown and
+  click-to-copy; secrets accepted as bare Base32 or full `otpauth://` URIs
+- CSV import from Firefox, Chrome/Google Password Manager, Apple Passwords,
+  KeePass, KeePassXC, Bitwarden, and LastPass exports
+- Tamper-evident carrier manifests, whole-container Reed-Solomon ECC, atomic
+  write-back with rollback
+
 Ollie implements the following published standards natively:
 
 | Standard | What we implement |

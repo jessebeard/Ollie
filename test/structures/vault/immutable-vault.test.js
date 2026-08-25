@@ -12,7 +12,7 @@ describe('PasswordVault (Property-Based Tests)', () => {
             password: Arbitrary.string(8, 64).generate(),
             notes: Arbitrary.string(0, 500).generate(),
             tags: Arbitrary.array(Arbitrary.string(1, 10), 0, 5).generate(),
-            totp: Arbitrary.string(16, 16).generate(),
+            totp: ['JBSWY3DPEHPK3PXP', 'otpauth://totp/PBT:u@x?secret=JBSWY3DPEHPK3PXP', undefined][Arbitrary.integer(0, 2).generate()],
             customFields: Arbitrary.array({
                 generate: () => ({
                     label: Arbitrary.string(1, 20).generate(),
@@ -138,3 +138,5 @@ describe('PasswordVault (Property-Based Tests)', () => {
         expect(vault.search('', ['personal', 'email']).length).toBe(1);
     });
 });
+
+

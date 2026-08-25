@@ -267,6 +267,8 @@ async function runTests() {
         await import('./integration/vault/vault-capacity-ui.test.js');
         await import('./integration/vault/vault-save-permission.test.js');
         await import('./integration/vault/vault-csv-import-ui.test.js');
+        await import('./integration/vault/vault-totp-form.test.js');
+        await import('./integration/vault/vault-totp-display.test.js');
         await import('./integration/vault/vault-spread-save.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");

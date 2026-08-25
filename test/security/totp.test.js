@@ -1,5 +1,6 @@
 import { describe, it, expect } from '../utils/test-runner.js';
-import { hotp, totp, verifyTotp, parseOtpauthUri, buildOtpauthUri } from '../../src/information-theory/cryptography/totp.js';
+import { hotp, totp, verifyTotp, parseOtpauthUri, buildOtpauthUri, codeFromOtpauthUri, normalizeTotpInput } from '../../src/information-theory/cryptography/totp.js';
+import { encodeBase32 } from '../../src/utils/base32.js';
 
 // RFC 4226 Appendix D test key (ASCII "12345678901234567890")
 const HOTP_KEY = new Uint8Array([0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30,
@@ -129,12 +130,76 @@ describe('otpauth:// URI handling', () => {
         }
     });
 
-    it('full roundtrip: URI → secret → generate code at known time', async () => {
-        const uri = 'otpauth://totp/Test:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Test';
-        const [params] = parseOtpauthUri(uri);
-        const secretBytes = new TextEncoder().encode(params.secret);
-        const [code, genErr] = await totp(secretBytes, { now: 59, digits: 8, algorithm: params.algorithm });
+    it('generates exact RFC vectors when routed through an otpauth URI', async () => {
+        // The secret must be DECODED from Base32, not UTF-8-encoded as text.
+        const [uri, buildErr] = buildOtpauthUri({
+            label: 'RFC:vector',
+            secret: encodeBase32(SEED_SHA1),
+            algorithm: 'SHA-1',
+            digits: 8
+        });
+        expect(buildErr).toBe(null);
+        const [code, err] = await codeFromOtpauthUri(uri, { now: 59 });
+        expect(err).toBe(null);
+        if (code !== '94287082') throw new Error(`got ${code}, expected 94287082`);
+    });
+
+    it('routes SHA-256 parameters through the URI to exact RFC vectors', async () => {
+        const [uri, buildErr] = buildOtpauthUri({
+            label: 'RFC:sha256',
+            secret: encodeBase32(SEED_SHA256),
+            algorithm: 'SHA-256',
+            digits: 8
+        });
+        expect(buildErr).toBe(null);
+        const [code, err] = await codeFromOtpauthUri(uri, { now: 1111111109 });
+        expect(err).toBe(null);
+        if (code !== '68084774') throw new Error(`got ${code}, expected 68084774`);
+    });
+
+    it('rejects non-Base32 secrets with a typed tuple error', async () => {
+        const [code, err] = await codeFromOtpauthUri('otpauth://totp/x?secret=AB!CDEF');
+        if (!(err instanceof Error)) throw new Error('invalid base32 secret accepted');
+        expect(code).toBe(null);
+    });
+
+    it('full roundtrip: URI → decoded secret → exact RFC code at known time', async () => {
+        const uri = 'otpauth://totp/Test:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Test&digits=8';
+        const [code, genErr] = await codeFromOtpauthUri(uri, { now: 59 });
         expect(genErr).toBe(null);
-        if (code.length !== 8) throw new Error('unexpected code length');
+        if (code !== '94287082') throw new Error(`got ${code}, expected 94287082 (RFC 6238 Annex B, SHA-1)`);
+    });
+});
+
+describe('normalizeTotpInput (entry authoring helper)', () => {
+    it('wraps bare Base32 secrets into an otpauth URI titled by the entry', () => {
+        const [uri, err] = normalizeTotpInput('JBSWY3DPEHPK3PXP', 'GitHub');
+        expect(err).toBe(null);
+        if (uri !== 'otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP') {
+            throw new Error(`unexpected wrap: ${uri}`);
+        }
+    });
+
+    it('passes otpauth URIs through verbatim', () => {
+        const uri = 'otpauth://totp/Example:alice?secret=JBSWY3DPEHPK3PXP&issuer=Example';
+        const [out, err] = normalizeTotpInput(uri, 'Ignored');
+        expect(err).toBe(null);
+        if (out !== uri) throw new Error('URI mutated');
+    });
+
+    it('maps empty input to undefined without error', () => {
+        for (const empty of ['', undefined, null]) {
+            const [out, err] = normalizeTotpInput(empty, 'X');
+            expect(err).toBe(null);
+            if (out !== undefined) throw new Error('empty should map to undefined');
+        }
+    });
+
+    it('rejects garbage and short strings via tuple error', () => {
+        for (const bad of ['not a secret!!', 'ABC', 'otpauth://hotp/x?secret=AB']) {
+            const [out, err] = normalizeTotpInput(bad, 'X');
+            if (!(err instanceof Error)) throw new Error(`accepted '${bad}'`);
+            if (out !== null) throw new Error('error path must return null value');
+        }
     });
 });

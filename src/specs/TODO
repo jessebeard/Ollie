@@ -68,7 +68,7 @@ fields have no SecureEntry equivalents). Options when picked up: map to
 notes text dump, or extend customFields conventions. Track skipped counts
 in import summary either way.
 
-## 2026-08-24 - TOTP live codes never render in vault UI (broken)
+## RESOLVED 2026-08-24 - TOTP live codes never render in vault UI (broken)
 populateTotpCodes (app/components/vault/vault-ui.js) runs but produces no
 visible codes. Diagnosis:
 1. SECRET ENCODING BUG: line ~595 uses
@@ -85,3 +85,14 @@ fail-loud logging, interval refresh aligned to period, CSS + hidden-until-
 present slot; pin with Node-runner DOM tests (revision-tracking pattern).
 NOTE: scripts/cli.mjs cliTotp has the SAME TextEncoder-as-base32 bug
 (line ~117) and must be fixed in the same pass.
+
+RESOLUTION: codeFromOtpauthUri() added to totp.js (single Base32-correct
+path; algorithm-name suspicion disproven - names already matched). UI and
+cliTotp both delegate to it now, with logger.warn on every failure path.
+Added TOTP field to Add/Edit forms with normalizeTotpInput() wrapping bare
+Base32 secrets at the PasswordVault.addEntry/updateEntry boundary
+(validateEntryInput rejects malformed values; lone-surrogate titles fall
+back to a safe label instead of throwing). Display renders click-to-copy
+code + countdown, single-interval refresh lifecycle stopped on re-render/
+lock. CSS contract added. Pinned by exact RFC 6238 vectors routed through
+URIs (UI + CLI), display/lifecycle DOM tests, and form-flow tests.

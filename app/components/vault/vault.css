@@ -350,3 +350,45 @@ body {
     white-space: nowrap;
     text-align: center;
 }
+
+/* TOTP live code display */
+.totp-slot:empty {
+    display: none;
+}
+
+.totp-slot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+}
+
+.totp-code {
+    font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 1.05rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.totp-code:hover {
+    background: var(--bg-secondary);
+    transform: translateY(-1px);
+}
+
+.totp-code.copied {
+    color: #30d158; /* Green */
+    border-color: #30d158;
+}
+
+.totp-countdown {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 2.2em;
+}

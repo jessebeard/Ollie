@@ -8,7 +8,7 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
-    const { cliSave, cliLoad, cliVerify, cliImportCsv, parseArgs } = await import('../../scripts/cli.mjs');
+    const { cliSave, cliLoad, cliVerify, cliImportCsv, cliTotp, parseArgs } = await import('../../scripts/cli.mjs');
     const { PasswordVault } = await import('../../src/structures/vault/immutable-vault.js');
     const { JpegEncoder } = await import('../../src/codec/encoder.js');
 
@@ -224,6 +224,41 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
             expect(parsed.csv).toBe('a.csv');
             expect(parsed.format).toBe('lastpass');
             expect(parsed.outExport).toBe('o.json');
+        });
+
+        it('totp generates live codes for carrier-backed entries with otpauth URIs', async () => {
+            const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ollie-cli-totp-'));
+            const carriersDir = path.join(workDir, 'carriers');
+            const outDir = path.join(workDir, 'out');
+            fs.mkdirSync(carriersDir);
+            fs.mkdirSync(outDir);
+
+            // Seed a vault whose entry carries an RFC-vector otpauth URI.
+            let vault = new PasswordVault([], null, true, PASSWORD);
+            [vault] = await vault.addEntry({
+                title: 'TOTP Site',
+                password: 'pw',
+                totp: 'otpauth://totp/RFC:vector?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8'
+            });
+            const [json, exportErr] = await vault.exportEncrypted(PASSWORD);
+            if (exportErr) throw exportErr;
+            const envelopePath = path.join(workDir, 'seed.json');
+            fs.writeFileSync(envelopePath, json);
+
+            await makeCarrierFile(carriersDir, 'c.jpg');
+            const saveReport = await cliSave({ fromExport: envelopePath, imagesDir: carriersDir, outDir, password: PASSWORD });
+            expect(saveReport.error).toEqual(null);
+
+            // Deterministic: RFC 6238 Annex B SHA-1 vector at T=59.
+            const report = await cliTotp({ imagesDir: outDir, password: PASSWORD, now: 59 });
+            expect(report.error).toEqual(null);
+            if (!report.codes || report.codes.length !== 1) throw new Error(`expected 1 code, got ${report.codes ? report.codes.length : 0}`);
+            if (report.codes[0].label !== 'RFC:vector') throw new Error(`label mismatch: ${report.codes[0].label}`);
+            if (report.codes[0].code !== '94287082') {
+                throw new Error(`got ${report.codes[0].code}, expected 94287082 (secret must be Base32-decoded, not UTF-8-encoded)`);
+            }
+
+            fs.rmSync(workDir, { recursive: true, force: true });
         });
     });
 }

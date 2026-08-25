@@ -4,6 +4,8 @@
  * otpauth:// URI parsing per Google Authenticator de facto standard.
  */
 
+import { decodeBase32 } from '../../utils/base32.js';
+
 /**
  * Generates an HMAC-based one-time password.
  *
@@ -224,4 +226,81 @@ export function buildOtpauthUri(p) {
     if (period !== 30) parts.push(`period=${period}`);
     const labelPart = encodeURIComponent(p.label);
     return [`otpauth://totp/${labelPart}?${parts.join('&')}`, null];
+}
+
+/**
+ * Generates a TOTP code directly from an otpauth:// URI.
+ *
+ * The URI secret is a Base32 STRING and must be decoded to raw bytes
+ * before HMAC; UTF-8-encoding the string instead produces silently wrong
+ * codes (the defect this wrapper exists to prevent). Callers only need
+ * the URI stored on an entry.
+ *
+ * @param {string} uri otpauth://totp/... URI
+ * @param {{now?: number}} [options] Unix seconds override for tests
+ * @returns {Promise<[string|null, Error|null]>} Tuple of [code, error]
+ */
+export async function codeFromOtpauthUri(uri, options = {}) {
+    const [params, parseErr] = parseOtpauthUri(uri);
+    if (parseErr) return [null, parseErr];
+
+    const [secretBytes, decodeErr] = decodeBase32(params.secret);
+    if (decodeErr) {
+        return [null, new Error(`otpauth: invalid Base32 secret: ${decodeErr.message}`)];
+    }
+
+    return totp(secretBytes, {
+        algorithm: params.algorithm,
+        digits: params.digits,
+        period: params.period,
+        now: options.now
+    });
+}
+
+/**
+ * Normalizes user-supplied TOTP input into a canonical otpauth:// URI.
+ *
+ * Accepts full otpauth URIs verbatim and bare RFC 4648 Base32 secrets
+ * (>= 16 significant chars), wrapping the latter with the entry title as
+ * label. Empty input maps to undefined so blank form fields never store
+ * placeholder values.
+ *
+ * @param {string|undefined|null} raw User input
+ * @param {string} title Entry title used as URI label for bare secrets
+ * @returns {[string|undefined|null, Error|null]} Tuple of [normalizedUri, error]
+ */
+export function normalizeTotpInput(raw, title) {
+    if (raw === undefined || raw === null || raw === '') {
+        return [undefined, null];
+    }
+    if (typeof raw !== 'string') {
+        return [null, new Error('otpauth: TOTP value must be a string')];
+    }
+
+    if (/^otpauth:\/\//i.test(raw)) {
+        try {
+            const [, parseErr] = parseOtpauthUri(raw);
+            if (parseErr) return [null, parseErr];
+        } catch (e) {
+            return [null, new Error(`otpauth: malformed URI: ${e.message}`)];
+        }
+        return [raw, null];
+    }
+
+    const trimmed = raw.trim();
+    if (/^[A-Z2-7]+=*$/i.test(trimmed) && trimmed.replace(/=+$/, '').length >= 16) {
+        const safeTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : 'Entry';
+        let labelPart;
+        try {
+            labelPart = encodeURIComponent(safeTitle);
+        } catch (e) {
+            // Lone surrogates and other unencodable titles fall back to a
+            // safe static label rather than throwing out of the tuple API.
+            labelPart = 'Entry';
+            void e;
+        }
+        return [`otpauth://totp/${labelPart}?secret=${trimmed}`, null];
+    }
+
+    return [null, new Error('otpauth: value is neither an otpauth:// URI nor a Base32 secret')];
 }

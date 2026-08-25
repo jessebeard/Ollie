@@ -3,6 +3,7 @@ import { BatchExtractor } from '../../information-theory/steganography/batch-ext
 import { SecureEntry } from './secure-record.js';
 import { KeyDerivation } from '../../information-theory/cryptography/pbkdf2.js';
 import { Encryption } from '../../information-theory/cryptography/aes-gcm.js';
+import { normalizeTotpInput } from '../../information-theory/cryptography/totp.js';
 import { randomUUID, getCrypto } from '../../information-theory/cryptography/crypto-provider.js';
 import { utf8ToBytes } from '../../utils/encoding.js';
 
@@ -174,7 +175,10 @@ export class PasswordVault {
         if (!entry || typeof entry !== 'object') return [this, new Error('Invalid entry data')];
         if (!this.isUnlocked) return [this, new Error('Vault is locked')];
 
-        const validationError = PasswordVault.validateEntryInput(entry);
+        const [prepared, prepErr] = PasswordVault.prepareEntryInput(entry);
+        if (prepErr) return [this, prepErr];
+
+        const validationError = PasswordVault.validateEntryInput(prepared);
         if (validationError) return [this, validationError];
 
         if (explicitId !== null && explicitId !== undefined) {
@@ -185,7 +189,7 @@ export class PasswordVault {
         const [sessionKey, kdfBlock, keyErr] = await this._resolveSessionKey();
         if (keyErr) return [this, keyErr];
 
-        const entryWithId = { ...entry, id: explicitId || PasswordVault.generateId() };
+        const entryWithId = { ...prepared, id: explicitId || PasswordVault.generateId() };
 
         const [secureEntry, secErr] = await SecureEntry.create(entryWithId, sessionKey);
         if (secErr) return [this, secErr];
@@ -230,7 +234,13 @@ export class PasswordVault {
             modified: new Date().toISOString()
         };
 
-        const [newSecureEntry, secErr] = await SecureEntry.create(mergedEntry, sessionKey);
+        const [preparedMerge, prepErr] = PasswordVault.prepareEntryInput(mergedEntry);
+        if (prepErr) return [this, prepErr];
+
+        const validationError = PasswordVault.validateEntryInput(preparedMerge);
+        if (validationError) return [this, validationError];
+
+        const [newSecureEntry, secErr] = await SecureEntry.create(preparedMerge, sessionKey);
         if (secErr) return [this, secErr];
 
         const newEntries = [...this.entries];
@@ -467,6 +477,28 @@ export class PasswordVault {
      * @param {Object} entry
      * @returns {Error|null} Typed error, or null when valid
      */
+    /**
+     * Normalizes mutable user input before validation/storage: blank TOTP
+     * values are dropped and bare Base32 secrets are wrapped into
+     * canonical otpauth:// URIs so stored entries are always uniform.
+     *
+     * @param {Object} entry Raw input object (copied, never mutated)
+     * @returns {[Object|null, Error|null]} Tuple of [preparedEntry, error]
+     */
+    static prepareEntryInput(entry) {
+        const prepared = { ...entry };
+        if (prepared.totp === '' || prepared.totp === null) {
+            delete prepared.totp;
+        } else if (prepared.totp !== undefined) {
+            const [normTotp, normErr] = normalizeTotpInput(prepared.totp, prepared.title);
+            if (normErr) {
+                return [null, new Error(`Entry "totp" is invalid: ${normErr.message}`)];
+            }
+            prepared.totp = normTotp;
+        }
+        return [prepared, null];
+    }
+
     static validateEntryInput(entry) {
         if (!entry || typeof entry !== 'object') {
             return new Error('Invalid entry data');
@@ -480,6 +512,13 @@ export class PasswordVault {
         for (const field of stringFields) {
             if (entry[field] !== undefined && typeof entry[field] !== 'string') {
                 return new Error(`Entry "${field}" must be a string`);
+            }
+        }
+
+        if (entry.totp !== undefined && entry.totp !== '') {
+            const [, totpErr] = normalizeTotpInput(entry.totp, entry.title);
+            if (totpErr) {
+                return new Error(`Entry "totp" is invalid: ${totpErr.message}`);
             }
         }
 

@@ -1,6 +1,7 @@
 "use strict";
 
 import { parseCsv } from '../../utils/csv.js';
+import { normalizeTotpInput } from '../../information-theory/cryptography/totp.js';
 
 /**
  * CSV import for password-manager exports.
@@ -93,6 +94,13 @@ function isoOrUndefined(value) {
 
 const cell = (row, idx) => (idx >= 0 && idx < row.length ? row[idx].trim() : '');
 
+// Shared normalizer returns null on garbage; entries store undefined so
+// baseEntry drops the field exactly as before.
+function normalizeTotp(rawSecret, title) {
+    const [normalized] = normalizeTotpInput(rawSecret, title);
+    return normalized || undefined;
+}
+
 function indexMap(headers) {
     const map = {};
     headers.forEach((h, i) => { map[norm(h)] = i; });
@@ -110,15 +118,6 @@ function pushFolderInfo(entry, fullPath) {
     if (lastSegment && !entry.tags.includes(lastSegment)) {
         entry.tags.push(lastSegment);
     }
-}
-
-function normalizeTotp(rawSecret, title) {
-    if (!rawSecret) return undefined;
-    if (/^otpauth:\/\//i.test(rawSecret)) return rawSecret;
-    if (/^[A-Z2-7]+=*$/i.test(rawSecret) && rawSecret.replace(/=+$/, '').length >= 16) {
-        return `otpauth://totp/${encodeURIComponent(title)}?secret=${rawSecret}`;
-    }
-    return undefined;
 }
 
 /**

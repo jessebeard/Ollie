@@ -7,7 +7,7 @@ import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 import { logger } from '../../../src/utils/logger.js';
 import { writeAllWithRollback } from '../../../src/utils/atomic-writer.js';
-import { totp, parseOtpauthUri } from '../../../src/information-theory/cryptography/totp.js';
+import { codeFromOtpauthUri } from '../../../src/information-theory/cryptography/totp.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -180,6 +180,7 @@ export class VaultUI {
             { name: 'username', label: 'Username' },
             { name: 'password', label: 'Password', type: 'password' },
             { name: 'url', label: 'URL', type: 'url' },
+            { name: 'totp', label: 'TOTP secret or otpauth:// URI' },
             { name: 'tags', label: 'Tags (comma separated)' },
             { name: 'notes', label: 'Notes', type: 'textarea' }
         ];
@@ -227,6 +228,7 @@ export class VaultUI {
             { name: 'username', label: 'Username' },
             { name: 'password', label: 'Password', type: 'password' },
             { name: 'url', label: 'URL', type: 'url' },
+            { name: 'totp', label: 'TOTP secret or otpauth:// URI' },
             { name: 'tags', label: 'Tags (comma separated)' },
             { name: 'notes', label: 'Notes', type: 'textarea' }
         ];
@@ -598,28 +600,94 @@ export class VaultUI {
             this.populateTotpCodes(filteredResults);
         } else {
             statusText.textContent = 'Locked';
+            this.stopTotpRefresh();
         }
     }
 
     async populateTotpCodes(entries) {
+        this.stopTotpRefresh();
         if (!this.vault || !this.vault.isUnlocked) return;
-        const [sessionKey] = await this.vault._getSessionKey();
+
+        const [sessionKey, , keyErr] = await this.vault._getSessionKey();
+        if (keyErr) {
+            logger.warn(`TOTP display skipped: session key unavailable (${keyErr.message})`);
+            return;
+        }
         if (!sessionKey) return;
+
+        this._totpEntries = [];
         for (const entry of entries) {
             if (!entry.decrypt) continue;
-            const [plain] = await entry.decrypt(sessionKey);
-            if (!plain || !plain.totp) continue;
-            try {
-                const [params] = parseOtpauthUri(plain.totp);
-                if (!params) continue;
-                const secretBytes = new TextEncoder().encode(params.secret);
-                const [code] = await totp(secretBytes, { algorithm: params.algorithm, digits: params.digits, period: params.period });
-                if (!code) continue;
-                const card = document.querySelector(`[data-entry-id="${entry.id}"] .totp-slot`);
-                if (card) {
-                    card.innerHTML = `<span class="totp-code">${code.slice(0, 3)} ${code.slice(3)}</span>`;
-                }
-            } catch { /* non-fatal */ }
+            const [plain, decErr] = await entry.decrypt(sessionKey);
+            if (decErr || !plain || !plain.totp) continue;
+
+            const [code, codeErr] = await codeFromOtpauthUri(plain.totp);
+            if (codeErr || !code) {
+                logger.warn(`TOTP for entry ${entry.id}: ${codeErr ? codeErr.message : 'no code generated'}`);
+                continue;
+            }
+
+            this._totpEntries.push({ id: entry.id, uri: plain.totp });
+
+            const slot = document.querySelector(`[data-entry-id="${entry.id}"] .totp-slot`);
+            if (!slot) continue;
+            const escapedCode = `${code.slice(0, 3)} ${code.slice(3)}`;
+            slot.innerHTML =
+                `<button class="totp-code" data-code="${escapedCode}" title="Copy one-time code">${escapedCode}</button>` +
+                `<span class="totp-countdown"></span>`;
+            const button = slot.querySelector('.totp-code');
+            if (button && navigator.clipboard && navigator.clipboard.writeText) {
+                button.addEventListener('click', () => {
+                    navigator.clipboard.writeText(button.dataset.code);
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 800);
+                });
+            }
+        }
+
+        if (this._totpEntries.length > 0) {
+            this.startTotpRefresh();
+        }
+    }
+
+    startTotpRefresh() {
+        if (this._totpTimer) return;
+        this._totpTimer = setInterval(() => this._totpTick(Date.now() / 1000), 1000);
+    }
+
+    stopTotpRefresh() {
+        if (this._totpTimer !== null && this._totpTimer !== undefined) {
+            clearInterval(this._totpTimer);
+            this._totpTimer = null;
+        }
+        this._totpEntries = [];
+    }
+
+    async _totpTick(nowSeconds) {
+        if (!this._totpEntries || this._totpEntries.length === 0) return;
+        for (const record of this._totpEntries) {
+            const slot = document.querySelector(`[data-entry-id="${record.id}"] .totp-slot`);
+            if (!slot || typeof slot.querySelector !== 'function') continue;
+
+            const [code, codeErr] = await codeFromOtpauthUri(record.uri, { now: nowSeconds });
+            if (codeErr || !code) {
+                logger.warn(`TOTP refresh failed for entry ${record.id}: ${codeErr ? codeErr.message : 'empty code'}`);
+                continue;
+            }
+
+            const label = `${code.slice(0, 3)} ${code.slice(3)}`;
+            const button = slot.querySelector('.totp-code');
+            if (button) {
+                button.textContent = label;
+                button.dataset.code = code;
+            }
+
+            const countdown = slot.querySelector('.totp-countdown');
+            if (countdown) {
+                const period = 30;
+                const remaining = period - (Math.floor(nowSeconds) % period);
+                countdown.textContent = `${remaining}s`;
+            }
         }
     }
 
