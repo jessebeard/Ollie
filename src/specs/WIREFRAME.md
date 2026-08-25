@@ -48,6 +48,7 @@ Ollie/
 â”‚   â”œâ”€â”€ codec/                    # High-level orchestrators
 â”‚   â”‚   â”œâ”€â”€ encoder.js  decoder.js  transcoder.js
 â”‚   â”‚   â”œâ”€â”€ capacity-scanner.js  file-scanner.js
+â”‚   â”‚   â”œâ”€â”€ qr-encoder.js     qr-decoder.js
 â”‚   â”œâ”€â”€ information-theory/
 â”‚   â”‚   â”œâ”€â”€ cryptography/         # pbkdf2, aes-gcm, hmac, totp, crypto-provider
 â”‚   â”‚   â”œâ”€â”€ error-correction/     # galois-field, reed-solomon-codec, rs-interleaver
@@ -103,6 +104,7 @@ flowchart TB
         JT["JpegTranscoder"]
         CAP["CapacityScanner"]
         FSC["FileScanner"]
+        QRD["QRDecoder"]
     end
 
     subgraph MATH["algebraic â€” pure transforms"]
@@ -220,6 +222,7 @@ flowchart LR
         trans["transcoder.js"]
         cap["capacity-scanner.js"]
         fscan["file-scanner.js"]
+        qrdec["qr-decoder.js"]
     end
 
     encui --> enc
@@ -229,6 +232,8 @@ flowchart LR
     vui --> awriter
     vui --> csvimp
     vui --> totpmod
+    vui --> qrdec
+    cli --> qrdec
     cli --> totpmod
     totpmod --> b32["utils/base32.js"]
     csvimp --> csvutil
@@ -278,6 +283,9 @@ flowchart LR
     env --> aes
     shamir --> gf
     cauchy --> gf
+    qrdec --> rsc2["reed-solomon-codec.js"]
+    qrdec --> gfs["galois-field.js"]
+    rsc2 --> gfs
 
     enc --> alg["algebraic/*"]
     enc --> huffenc["huffman-encoder-fsm"]

@@ -217,6 +217,7 @@ async function runTests() {
         await import('./security/extreme-universal.test.js');
         await import('./security/encrypted-container.test.js');
         await import('./security/qr-encoder.test.js');
+        await import('./security/qr-decoder.test.js');
         await import('./security/format-v3.test.js');
         await import('./security/cauchy-ec.test.js');
 
@@ -268,7 +269,8 @@ async function runTests() {
         await import('./integration/vault/vault-save-permission.test.js');
         await import('./integration/vault/vault-csv-import-ui.test.js');
         await import('./integration/vault/vault-totp-form.test.js');
-        await import('./integration/vault/vault-totp-display.test.js');
+        
+        await import('./integration/vault/vault-qr-scan.test.js');
         await import('./integration/vault/vault-spread-save.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");

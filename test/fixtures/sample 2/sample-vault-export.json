@@ -1,0 +1,1670 @@
+{
+  "version": "3.0",
+  "metadata": {
+    "version": "3.0",
+    "revision": 100,
+    "created": "2026-10-16T21:42:43.021Z",
+    "modified": "2026-10-16T21:42:43.093Z",
+    "kdf": {
+      "algo": "PBKDF2-SHA256",
+      "iterations": 600000,
+      "salt": "Eb5LMl5hNE9i5ehXC7s1Xg==",
+      "wrapIV": "Asr5RyhVFhb+6Du7",
+      "wrappedSessionKey": "0uN6dDEGmBKrTMel1F3iypKXK8IecMk8GEPtGIPQedQl7pb1+IP1q96ytTwsRJoy",
+      "lastRotated": "2026-10-16T21:42:43.086Z"
+    }
+  },
+  "entries": [
+    {
+      "id": "02d7e8c7-5e60-4d9e-8116-fb8205ad3873",
+      "title": "AWS Root Production",
+      "url": "https://console.aws.amazon.com",
+      "username": "admin-awsrootproduction@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "infra",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.086Z",
+      "modified": "2026-10-16T21:42:43.086Z",
+      "password": "hM*w1gL&v0fK^uZeJ%tY",
+      "notes": "### Security & Operational Policy — AWS Root Production\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-1.\n- **Recovery Token:** `RECOVERY-TOKEN-1-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/AWS%20Root%20Production?secret=3PRF2ZZXC2OG5663DSPUCYXRBXSXRS74&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "7796e5b0-b4da-4269-b64a-149e78aa885d",
+      "title": "Google Cloud Platform",
+      "url": "https://console.cloud.google.com",
+      "username": "admin-googlecloudplatform@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "prod",
+        "infra"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "y3iN(x2hM*w1gL&v0fK^",
+      "notes": "Managed service login for Google Cloud Platform.",
+      "totp": "otpauth://totp/Google%20Cloud%20Platform?secret=O3PNEKFAPJFRVJEJCWWMDNIWU2VS4CCL&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "f872a90a-fdd2-4bf6-a3dc-91f9cd556ef7",
+      "title": "Azure Enterprise Portal",
+      "url": "https://portal.azure.com",
+      "username": "admin-azureenterpriseportal@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "infra",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "P_z4jO)y3iN(x2hM*w1g",
+      "notes": "Standard corporate credentials for Azure Enterprise Portal. Rotated quarterly.",
+      "totp": "otpauth://totp/Azure%20Enterprise%20Portal?secret=DN46T5YQ2WLFQBKZ5XQV6ONDHJDZDZFN&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "5b02b4a0-0e0a-4346-af33-aba2e94fc681",
+      "title": "Cloudflare Edge Admin",
+      "url": "https://dash.cloudflare.com",
+      "username": "admin-cloudflareedgeadmin@ollie-vault.io",
+      "tags": [
+        "infra",
+        "dns",
+        "security",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "6lQ+A5kP_z4jO)y3iN(x",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Cloudflare%20Edge%20Admin?secret=FG3F343FUPNBOAICDHOPAB7CLIU2LLRO&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "977f418d-4a4e-4692-baaf-c733e4f62a6e",
+      "title": "Fastly CDN Delivery",
+      "url": "https://manage.fastly.com",
+      "username": "admin-fastlycdndelivery@ollie-vault.io",
+      "tags": [
+        "infra",
+        "cdn",
+        "networking"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "}C7mR{B6lQ+A5kP_z4jO",
+      "notes": "Standard corporate credentials for Fastly CDN Delivery. Rotated quarterly.",
+      "totp": "otpauth://totp/Fastly%20CDN%20Delivery?secret=424ZIJFTV3WHUP4LMTSJ27GYU7MHCL6V&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "1a838319-bc2b-4609-9c81-9b557cdcb6a7",
+      "title": "Hetzner Cloud Console",
+      "url": "https://console.hetzner.cloud",
+      "username": "admin-hetznercloudconsole@ollie-vault.io",
+      "tags": [
+        "infra",
+        "hosting",
+        "servers"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "oT[D8nS}C7mR{B6lQ+A5",
+      "notes": "**Production Credentials Policy — Hetzner Cloud Console**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-7685-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Hetzner%20Cloud%20Console?secret=FDO6D7VRBNC3MOPPCJCLCAXS7R24ZABE&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "3c29c155-3ff2-4d2d-abfb-5a08a6ab09ca",
+      "title": "DigitalOcean Team",
+      "url": "https://cloud.digitalocean.com",
+      "username": "admin-digitaloceanteam@ollie-vault.io",
+      "tags": [
+        "infra",
+        "vps"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "F!pU]E9oT[D8nS}C7mR{",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/DigitalOcean%20Team?secret=VQ6XJAF52ATJ67KHMHSIT72B7PXXPLIM&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "e2a736cb-d559-49dc-b213-0bffb6e6cfa6",
+      "title": "Linode Cloud Manager",
+      "url": "https://cloud.linode.com",
+      "username": "admin-linodecloudmanager@ollie-vault.io",
+      "tags": [
+        "infra",
+        "vps"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "WbG@qVaF!pU]E9oT[D8n",
+      "notes": "Managed service login for Linode Cloud Manager.",
+      "totp": "otpauth://totp/Linode%20Cloud%20Manager?secret=SPTV5IUDT6ZHFR3UECJZDYIXB5TULCW2&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "474dac32-80bf-443f-b8ce-ba96737b8940",
+      "title": "Vercel Enterprise",
+      "url": "https://vercel.com",
+      "username": "admin-vercelenterprise@ollie-vault.io",
+      "tags": [
+        "dev",
+        "frontend",
+        "prod"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "$sXcH#rWbG@qVaF!pU]E",
+      "notes": "Standard corporate credentials for Vercel Enterprise. Rotated quarterly.",
+      "totp": "otpauth://totp/Vercel%20Enterprise?secret=LUTBPONFARCJA6KBX6EUXINB5GKO4VQ4&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "9e723ab5-e757-4041-b317-8cc572c1847f",
+      "title": "Supabase DB Cluster",
+      "url": "https://supabase.com",
+      "username": "admin-supabasedbcluster@ollie-vault.io",
+      "tags": [
+        "dev",
+        "database",
+        "postgres",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.087Z",
+      "modified": "2026-10-16T21:42:43.087Z",
+      "password": "eJ%tYdI$sXcH#rWbG@qV",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Supabase%20DB%20Cluster?secret=6KXPUCN6ABTAZDU3RAK75A57IED3QU3G&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "737f8332-4768-40ec-bbc0-001bbb5628ae",
+      "title": "Render Production Services",
+      "url": "https://dashboard.render.com",
+      "username": "admin-renderproductionservices@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "hosting"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "v0fK^uZeJ%tYdI$sXcH#",
+      "notes": "### Security & Operational Policy — Render Production Services\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-11.\n- **Recovery Token:** `RECOVERY-TOKEN-11-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Render%20Production%20Services?secret=V5QVSNMORAZ4IZHRVHATZOQOULXU6MJU&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "cdbb274d-8cfe-411c-96e2-8bee9781ad51",
+      "title": "Fly.io Application Edge",
+      "url": "https://fly.io/dashboard",
+      "username": "admin-flyioapplicationedge@ollie-vault.io",
+      "tags": [
+        "infra",
+        "edge",
+        "containers"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "M*w1gL&v0fK^uZeJ%tYd",
+      "notes": "Managed service login for Fly.io Application Edge.",
+      "totp": "otpauth://totp/Fly.io%20Application%20Edge?secret=DBTRKQEYQJAPUER2RFNIIFFSIHWTGHLD&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "1b200f89-52fd-435d-a3bb-18f3de5b9c0a",
+      "title": "Railway Cloud Deploy",
+      "url": "https://railway.app",
+      "username": "admin-railwayclouddeploy@ollie-vault.io",
+      "tags": [
+        "dev",
+        "paas"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "3iN(x2hM*w1gL&v0fK^u",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Railway%20Cloud%20Deploy?secret=35DJ7KWRX2PJ6ZQNEY7BPPOZWGUD27EO&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "d58937b3-a402-4668-95a1-241264fa000f",
+      "title": "Neon Serverless Postgres",
+      "url": "https://console.neon.tech",
+      "username": "admin-neonserverlesspostgres@ollie-vault.io",
+      "tags": [
+        "database",
+        "postgres"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "_z4jO)y3iN(x2hM*w1gL",
+      "notes": "Managed service login for Neon Serverless Postgres.",
+      "totp": "otpauth://totp/Neon%20Serverless%20Postgres?secret=KX7UOUMBDF7XJAFBEC5FE3KZHS2JVIAH&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "fd9947d5-d9e8-4bd6-b8c6-e44903ab6328",
+      "title": "PlanetScale MySQL Cluster",
+      "url": "https://app.planetscale.com",
+      "username": "admin-planetscalemysqlcluster@ollie-vault.io",
+      "tags": [
+        "database",
+        "mysql"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "lQ+A5kP_z4jO)y3iN(x2",
+      "notes": "Standard corporate credentials for PlanetScale MySQL Cluster. Rotated quarterly.",
+      "totp": "otpauth://totp/PlanetScale%20MySQL%20Cluster?secret=TGFWIXPY43SQQ2HSSR66IL5ONHNBKKPI&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "1ad4e5b8-19b5-4ea2-bb6f-086ba09e3f16",
+      "title": "GitHub Enterprise",
+      "url": "https://github.com",
+      "username": "admin-githubenterprise@ollie-vault.io",
+      "tags": [
+        "dev",
+        "vcs",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "C7mR{B6lQ+A5kP_z4jO)",
+      "notes": "**Production Credentials Policy — GitHub Enterprise**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-21055-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/GitHub%20Enterprise?secret=WW2RWFZ4M4N4XPLC47NU2M62PBVBWXWM&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "03886682-3bd5-4ebe-9670-7644c5b44a09",
+      "title": "GitLab Self-Hosted",
+      "url": "https://gitlab.internal.net",
+      "username": "admin-gitlabselfhosted@ollie-vault.io",
+      "tags": [
+        "dev",
+        "vcs",
+        "ci"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "T[D8nS}C7mR{B6lQ+A5k",
+      "notes": "Standard corporate credentials for GitLab Self-Hosted. Rotated quarterly.",
+      "totp": "otpauth://totp/GitLab%20Self-Hosted?secret=SQJX6EPARPUROZDJ2YUVWZU2IQ65LJB2&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "cfa5fd1d-9b58-4d28-9b0f-cbe95e5561b0",
+      "title": "Bitbucket Cloud Operations",
+      "url": "https://bitbucket.org",
+      "username": "admin-bitbucketcloudoperations@ollie-vault.io",
+      "tags": [
+        "dev",
+        "vcs"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "!pU]E9oT[D8nS}C7mR{B",
+      "notes": "Managed service login for Bitbucket Cloud Operations.",
+      "totp": "otpauth://totp/Bitbucket%20Cloud%20Operations?secret=6O4D6IUZMHH35BHQM2JNLRW5DZGBWYLZ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "14c48ab1-71a1-4626-9257-0a2686d0a14f",
+      "title": "HashiCorp Cloud HCP",
+      "url": "https://portal.cloud.hashicorp.com",
+      "username": "admin-hashicorpcloudhcp@ollie-vault.io",
+      "tags": [
+        "infra",
+        "vault",
+        "terraform",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "bG@qVaF!pU]E9oT[D8nS",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/HashiCorp%20Cloud%20HCP?secret=JTEXGWE4HGBE4GKFFCL5QRZAWOPG5HG6&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4827e693-e68a-4efb-9177-75681ba74a31",
+      "title": "Docker Hub Registry",
+      "url": "https://hub.docker.com",
+      "username": "admin-dockerhubregistry@ollie-vault.io",
+      "tags": [
+        "dev",
+        "containers"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "sXcH#rWbG@qVaF!pU]E9",
+      "notes": "Managed service login for Docker Hub Registry.",
+      "totp": "otpauth://totp/Docker%20Hub%20Registry?secret=ABNTRPIJWDDSVK5A23IYQH72WGZRT4DZ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "72d210e1-5acd-4fa6-a08e-0b0f85f0bb3a",
+      "title": "Quay.io Container Registry",
+      "url": "https://quay.io",
+      "username": "admin-quayiocontainerregistry@ollie-vault.io",
+      "tags": [
+        "dev",
+        "containers",
+        "security"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "J%tYdI$sXcH#rWbG@qVa",
+      "notes": "### Security & Operational Policy — Quay.io Container Registry\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-9.\n- **Recovery Token:** `RECOVERY-TOKEN-21-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Quay.io%20Container%20Registry?secret=6YI27WZHTIQLRQIXOQWTYFBU6X3Y6C5O&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "e5331d05-bd6b-4d4d-90a9-e481fb5e262e",
+      "title": "OpenAI Platform API",
+      "url": "https://platform.openai.com",
+      "username": "admin-openaiplatformapi@ollie-vault.io",
+      "tags": [
+        "ai",
+        "dev",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "0fK^uZeJ%tYdI$sXcH#r",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/OpenAI%20Platform%20API?secret=QXXI3PCCZDJUSQV5BRSPG44YHJTJPRHE&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "7ec34e28-52ff-412f-87d1-aeda2859efe2",
+      "title": "Anthropic Claude Console",
+      "url": "https://console.anthropic.com",
+      "username": "admin-anthropicclaudeconsole@ollie-vault.io",
+      "tags": [
+        "ai",
+        "dev",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "*w1gL&v0fK^uZeJ%tYdI",
+      "notes": "Standard corporate credentials for Anthropic Claude Console. Rotated quarterly.",
+      "totp": "otpauth://totp/Anthropic%20Claude%20Console?secret=HBS73HFLB2II2RLQ5XYXZGTJA7Q4OOHG&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "2892baf4-f6c6-4f77-8293-acec0c74188b",
+      "title": "Midjourney Studio",
+      "url": "https://midjourney.com",
+      "username": "admin-midjourneystudio@ollie-vault.io",
+      "tags": [
+        "ai",
+        "graphics"
+      ],
+      "created": "2026-10-16T21:42:43.088Z",
+      "modified": "2026-10-16T21:42:43.088Z",
+      "password": "iN(x2hM*w1gL&v0fK^uZ",
+      "notes": "Managed service login for Midjourney Studio.",
+      "totp": "otpauth://totp/Midjourney%20Studio?secret=XP4MFLGNTWIENETUNZSJLHQYXWT42PBC&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "7b7e6978-b4a6-406f-822b-1992f1b996f5",
+      "title": "Hugging Face Enterprise Hub",
+      "url": "https://huggingface.co",
+      "username": "admin-huggingfaceenterprisehub@ollie-vault.io",
+      "tags": [
+        "ai",
+        "ml",
+        "models"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "z4jO)y3iN(x2hM*w1gL&",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Hugging%20Face%20Enterprise%20Hub?secret=DAWRHGENDPTCOVZL7QTSVMIX5LUCMGYQ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "aa7b8321-3a08-4c88-a04e-3ba256385dc3",
+      "title": "Weights & Biases ML Ops",
+      "url": "https://wandb.ai",
+      "username": "admin-weightsbiasesmlops@ollie-vault.io",
+      "tags": [
+        "ai",
+        "mlops"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "Q+A5kP_z4jO)y3iN(x2h",
+      "notes": "**Production Credentials Policy — Weights & Biases ML Ops**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-34425-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Weights%20%26%20Biases%20ML%20Ops?secret=6U2LJRT6XWOEGXESL43L4ABIEVKPOHU4&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4857658c-040a-4c5f-b18f-726bb31d6b05",
+      "title": "Replicate Inference Engine",
+      "url": "https://replicate.com",
+      "username": "admin-replicateinferenceengine@ollie-vault.io",
+      "tags": [
+        "ai",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "7mR{B6lQ+A5kP_z4jO)y",
+      "notes": "Standard corporate credentials for Replicate Inference Engine. Rotated quarterly.",
+      "totp": "otpauth://totp/Replicate%20Inference%20Engine?secret=36IR7DJQHC4AT6IWSTBT7QEQGLNFBQMJ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "6bbeb07f-ae19-41a3-9e76-2b741ac70df5",
+      "title": "Pinecone Vector DB",
+      "url": "https://app.pinecone.io",
+      "username": "admin-pineconevectordb@ollie-vault.io",
+      "tags": [
+        "ai",
+        "vector",
+        "database"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "[D8nS}C7mR{B6lQ+A5kP",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Pinecone%20Vector%20DB?secret=A27BAHQWTKWIKHYEXS3F4FPOAQZ5FVOT&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "8014f843-64c5-468a-8e48-c3647f4c61fd",
+      "title": "Linear Issue Tracker",
+      "url": "https://linear.app",
+      "username": "admin-linearissuetracker@ollie-vault.io",
+      "tags": [
+        "pm",
+        "dev"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "pU]E9oT[D8nS}C7mR{B6",
+      "notes": "Standard corporate credentials for Linear Issue Tracker. Rotated quarterly.",
+      "totp": "otpauth://totp/Linear%20Issue%20Tracker?secret=QSC7EGKVER4DKINA7J2JEJZRDXHOJYYK&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "5ff6e778-06ba-4e57-8058-59551af37b88",
+      "title": "Atlassian Jira & Confluence",
+      "url": "https://id.atlassian.com",
+      "username": "admin-atlassianjiraconfluence@ollie-vault.io",
+      "tags": [
+        "corp",
+        "pm"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "G@qVaF!pU]E9oT[D8nS}",
+      "notes": "Managed service login for Atlassian Jira & Confluence.",
+      "totp": "otpauth://totp/Atlassian%20Jira%20%26%20Confluence?secret=62CTLIBJRLCFKBWWXC6SRX5NP3VS6GW2&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "383574a1-c07c-4850-b4f3-3ecf9c89608a",
+      "title": "Datadog Observability",
+      "url": "https://app.datadoghq.com",
+      "username": "admin-datadogobservability@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "infra",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "XcH#rWbG@qVaF!pU]E9o",
+      "notes": "### Security & Operational Policy — Datadog Observability\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-7.\n- **Recovery Token:** `RECOVERY-TOKEN-31-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Datadog%20Observability?secret=S7SRTKHDZQGOW5HQGKXU2VXQKWJMZ7TJ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "c291e110-37ba-4897-a145-91975d960946",
+      "title": "Sentry Error Tracking",
+      "url": "https://sentry.io",
+      "username": "admin-sentryerrortracking@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "dev"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "%tYdI$sXcH#rWbG@qVaF",
+      "notes": "Managed service login for Sentry Error Tracking.",
+      "totp": "otpauth://totp/Sentry%20Error%20Tracking?secret=45WNBDRF2D4KE4YZY32I47SUE6GZI3SV&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "8004c20e-4f46-47be-b325-6e37db3495d4",
+      "title": "New Relic APM Suite",
+      "url": "https://one.newrelic.com",
+      "username": "admin-newrelicapmsuite@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "apm"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "fK^uZeJ%tYdI$sXcH#rW",
+      "notes": "Standard corporate credentials for New Relic APM Suite. Rotated quarterly.",
+      "totp": "otpauth://totp/New%20Relic%20APM%20Suite?secret=TUX6TP7GRCVPA56MSJUGSLBDWRKMKOOR&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "a8852bff-6c01-4adb-b681-7ffcc073e8b8",
+      "title": "Grafana Cloud Admin",
+      "url": "https://grafana.net",
+      "username": "admin-grafanacloudadmin@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "metrics"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "w1gL&v0fK^uZeJ%tYdI$",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Grafana%20Cloud%20Admin?secret=QROR3PQO4OVEWVZGNAGMG3VDQSDZVHSA&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "96a6f9f1-2cbf-4235-a040-8d52b383eded",
+      "title": "Better Uptime Status & Alerting",
+      "url": "https://betteruptime.com",
+      "username": "admin-betteruptimestatusalerting@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "status"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "N(x2hM*w1gL&v0fK^uZe",
+      "notes": "Standard corporate credentials for Better Uptime Status & Alerting. Rotated quarterly.",
+      "totp": "otpauth://totp/Better%20Uptime%20Status%20%26%20Alerting?secret=PO6R4P2JCKC7D3HZF4LRVLLTOA74NH6S&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "ef88f195-0600-4912-be64-b5480b0cbd2f",
+      "title": "PagerDuty Incident On-Call",
+      "url": "https://pagerduty.com",
+      "username": "admin-pagerdutyincidentoncall@ollie-vault.io",
+      "tags": [
+        "operations",
+        "oncall",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "4jO)y3iN(x2hM*w1gL&v",
+      "notes": "**Production Credentials Policy — PagerDuty Incident On-Call**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-47795-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/PagerDuty%20Incident%20On-Call?secret=FSPCSLAQS4RSZ6LSL32UNKCPGBALXYOR&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4024a574-900d-4e38-9f2b-32e3c81945e2",
+      "title": "Opsgenie Incident Command",
+      "url": "https://app.opsgenie.com",
+      "username": "admin-opsgenieincidentcommand@ollie-vault.io",
+      "tags": [
+        "operations",
+        "oncall"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "+A5kP_z4jO)y3iN(x2hM",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Opsgenie%20Incident%20Command?secret=NTPHHZBJXAWQE5POTFQTQVXBAQY5X6K5&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4b2ad3af-02d4-4ccb-8f3d-745c940bbd52",
+      "title": "Splunk Enterprise Cloud",
+      "url": "https://splunkcloud.com",
+      "username": "admin-splunkenterprisecloud@ollie-vault.io",
+      "tags": [
+        "security",
+        "siem",
+        "logs"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "mR{B6lQ+A5kP_z4jO)y3",
+      "notes": "Managed service login for Splunk Enterprise Cloud.",
+      "totp": "otpauth://totp/Splunk%20Enterprise%20Cloud?secret=QNV67USYUUY4NZLV2V7LMB2IAXCYUYMX&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "42823ef2-2dc9-4992-94b0-0c74c03946e2",
+      "title": "Honeycomb Distributed Tracing",
+      "url": "https://ui.honeycomb.io",
+      "username": "admin-honeycombdistributedtracing@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "tracing"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "D8nS}C7mR{B6lQ+A5kP_",
+      "notes": "Standard corporate credentials for Honeycomb Distributed Tracing. Rotated quarterly.",
+      "totp": "otpauth://totp/Honeycomb%20Distributed%20Tracing?secret=X5EGEQSOICMBRM7ZS6VEEOSS2FOGNL5W&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "98b4f402-412f-4d9c-a4df-c9a01db05b9d",
+      "title": "Dynatrace Full-Stack Monitoring",
+      "url": "https://dynatrace.com",
+      "username": "admin-dynatracefullstackmonitoring@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "enterprise"
+      ],
+      "created": "2026-10-16T21:42:43.089Z",
+      "modified": "2026-10-16T21:42:43.089Z",
+      "password": "U]E9oT[D8nS}C7mR{B6l",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Dynatrace%20Full-Stack%20Monitoring?secret=IWAOD5LW6Q5ZEZP5QZCGIFZ7GQENR7YY&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "5cab0a8a-d127-4086-bd4f-2be2be9acf39",
+      "title": "1Password Master Team",
+      "url": "https://my.1password.com",
+      "username": "admin-1passwordmasterteam@ollie-vault.io",
+      "tags": [
+        "security",
+        "vault",
+        "corp",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "@qVaF!pU]E9oT[D8nS}C",
+      "notes": "### Security & Operational Policy — 1Password Master Team\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-5.\n- **Recovery Token:** `RECOVERY-TOKEN-41-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/1Password%20Master%20Team?secret=VRJNYIHSRNIHSRXTUI4SR7AWHOZDYBQK&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "27173ad1-a12a-4a76-ad67-6749398e39ae",
+      "title": "Bitwarden Enterprise Vault",
+      "url": "https://vault.bitwarden.com",
+      "username": "admin-bitwardenenterprisevault@ollie-vault.io",
+      "tags": [
+        "security",
+        "vault"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "cH#rWbG@qVaF!pU]E9oT",
+      "notes": "Managed service login for Bitwarden Enterprise Vault.",
+      "totp": "otpauth://totp/Bitwarden%20Enterprise%20Vault?secret=LQIXI2EENFA7VWTTPSCKDBKY4QDHMH2D&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "6181a835-33ac-4a92-9960-ae68833886ab",
+      "title": "Okta Workforce Identity",
+      "url": "https://matrix-ops.okta.com",
+      "username": "admin-oktaworkforceidentity@ollie-vault.io",
+      "tags": [
+        "identity",
+        "sso",
+        "security",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "tYdI$sXcH#rWbG@qVaF!",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Okta%20Workforce%20Identity?secret=OVJUYFXZ7MX6GXDLEK342MHDHC2OP2EV&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "1474a375-f7df-4fe9-aa11-65566759de4f",
+      "title": "Auth0 Production Tenant",
+      "url": "https://manage.auth0.com",
+      "username": "admin-auth0productiontenant@ollie-vault.io",
+      "tags": [
+        "identity",
+        "auth",
+        "dev"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "K^uZeJ%tYdI$sXcH#rWb",
+      "notes": "Managed service login for Auth0 Production Tenant.",
+      "totp": "otpauth://totp/Auth0%20Production%20Tenant?secret=J6R6HJDBFGNQPK4P5AXCW2D3K3SGGNIB&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "fa0f08eb-dcbc-438b-97e9-1cf282ff09c1",
+      "title": "Tailscale Zero-Trust Mesh",
+      "url": "https://login.tailscale.com",
+      "username": "admin-tailscalezerotrustmesh@ollie-vault.io",
+      "tags": [
+        "network",
+        "vpn",
+        "security",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "1gL&v0fK^uZeJ%tYdI$s",
+      "notes": "Standard corporate credentials for Tailscale Zero-Trust Mesh. Rotated quarterly.",
+      "totp": "otpauth://totp/Tailscale%20Zero-Trust%20Mesh?secret=J5VVZGQSY6KOKCEBZUQ36RCHW7GTKNNI&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "0982b585-46de-4617-922c-1f2a1b91f758",
+      "title": "Slack Enterprise Grid",
+      "url": "https://slack.com",
+      "username": "admin-slackenterprisegrid@ollie-vault.io",
+      "tags": [
+        "comms",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "(x2hM*w1gL&v0fK^uZeJ",
+      "notes": "**Production Credentials Policy — Slack Enterprise Grid**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-61165-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Slack%20Enterprise%20Grid?secret=NJ3FUWQMGMANTWYTCY3WD3AA2GKBBM4A&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "9de13bba-93df-4dc7-9f3f-6db1d4fce490",
+      "title": "Discord Developer Portal",
+      "url": "https://discord.com/developers",
+      "username": "admin-discorddeveloperportal@ollie-vault.io",
+      "tags": [
+        "dev",
+        "bots",
+        "community"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "jO)y3iN(x2hM*w1gL&v0",
+      "notes": "Standard corporate credentials for Discord Developer Portal. Rotated quarterly.",
+      "totp": "otpauth://totp/Discord%20Developer%20Portal?secret=OD4E3MC3WQ532QVUP7IQ26GMBNYFGRDK&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "abfd142d-facb-43d8-a25e-4fc7f001e01b",
+      "title": "Zoom Enterprise Video",
+      "url": "https://zoom.us",
+      "username": "admin-zoomenterprisevideo@ollie-vault.io",
+      "tags": [
+        "comms",
+        "meetings"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "A5kP_z4jO)y3iN(x2hM*",
+      "notes": "Managed service login for Zoom Enterprise Video.",
+      "totp": "otpauth://totp/Zoom%20Enterprise%20Video?secret=PNVBIVAAQIB4DZJO5L2RE4RVPVE7NC5S&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "ebf99543-4502-4f46-81fb-115f77e621d7",
+      "title": "Google Workspace Admin",
+      "url": "https://admin.google.com",
+      "username": "admin-googleworkspaceadmin@ollie-vault.io",
+      "tags": [
+        "corp",
+        "email",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "R{B6lQ+A5kP_z4jO)y3i",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Google%20Workspace%20Admin?secret=WUVV3UZJG5II6YT3RPEF44FYCOL2PAFA&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "b96f4b91-5e80-449d-b3da-7ef2fea46d79",
+      "title": "Microsoft 365 Admin Center",
+      "url": "https://admin.microsoft.com",
+      "username": "admin-microsoft365admincenter@ollie-vault.io",
+      "tags": [
+        "corp",
+        "email",
+        "infra"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "8nS}C7mR{B6lQ+A5kP_z",
+      "notes": "Managed service login for Microsoft 365 Admin Center.",
+      "totp": "otpauth://totp/Microsoft%20365%20Admin%20Center?secret=H3PZOXDJL2CFJDH6LRUWGFS44RNC3AYZ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "200b43f2-5169-489b-9e07-eb042458b467",
+      "title": "Loom Video Sharing",
+      "url": "https://loom.com",
+      "username": "admin-loomvideosharing@ollie-vault.io",
+      "tags": [
+        "comms",
+        "video"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "]E9oT[D8nS}C7mR{B6lQ",
+      "notes": "### Security & Operational Policy — Loom Video Sharing\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-3.\n- **Recovery Token:** `RECOVERY-TOKEN-51-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Loom%20Video%20Sharing?secret=FU67BGERNY4UC34D2SSHIUMMJJ3ZVHLF&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "7b0cdf8b-7b92-4335-a3f6-ed44094eecdc",
+      "title": "Miro Team Collaboration",
+      "url": "https://miro.com",
+      "username": "admin-miroteamcollaboration@ollie-vault.io",
+      "tags": [
+        "design",
+        "whiteboard"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "qVaF!pU]E9oT[D8nS}C7",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Miro%20Team%20Collaboration?secret=2I5N2XKK7WQZIPD62VCYUVG3URGACPRJ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "c7b91279-51c3-4ba0-a90f-198b595e2817",
+      "title": "Basecamp Project HQ",
+      "url": "https://basecamp.com",
+      "username": "admin-basecampprojecthq@ollie-vault.io",
+      "tags": [
+        "pm",
+        "operations"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "H#rWbG@qVaF!pU]E9oT[",
+      "notes": "Standard corporate credentials for Basecamp Project HQ. Rotated quarterly.",
+      "totp": "otpauth://totp/Basecamp%20Project%20HQ?secret=LARYHHO7RZWQTYPFUO2QOGKML5O25UAJ&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "929be670-59d2-46e4-bca8-94224d60a26a",
+      "title": "Asana Portfolio Management",
+      "url": "https://app.asana.com",
+      "username": "admin-asanaportfoliomanagement@ollie-vault.io",
+      "tags": [
+        "pm",
+        "operations"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "YdI$sXcH#rWbG@qVaF!p",
+      "notes": "Managed service login for Asana Portfolio Management.",
+      "totp": "otpauth://totp/Asana%20Portfolio%20Management?secret=CZRYPXFZCGYIVDGOKRES4BSXWKBSHJIF&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "3b300bdc-81db-4297-bf94-4afc4909726b",
+      "title": "Notion Workspace Admin",
+      "url": "https://notion.so",
+      "username": "admin-notionworkspaceadmin@ollie-vault.io",
+      "tags": [
+        "wiki",
+        "knowledge"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "^uZeJ%tYdI$sXcH#rWbG",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Notion%20Workspace%20Admin?secret=C25MKRWDZ3CT3UTSMSZP2TL3MEQHYHUC&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4fcdcbc1-3af7-47bb-9694-5a793623fcd9",
+      "title": "Figma Organization Hub",
+      "url": "https://figma.com",
+      "username": "admin-figmaorganizationhub@ollie-vault.io",
+      "tags": [
+        "design",
+        "product"
+      ],
+      "created": "2026-10-16T21:42:43.090Z",
+      "modified": "2026-10-16T21:42:43.090Z",
+      "password": "gL&v0fK^uZeJ%tYdI$sX",
+      "notes": "**Production Credentials Policy — Figma Organization Hub**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-74535-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Figma%20Organization%20Hub?secret=JIQ4ZYEOUDXLVUC3YIDIF66F5AA33SJW&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "19dcba1b-b5a1-49af-aa7b-6b2a01f8497d",
+      "title": "Postman API Hub",
+      "url": "https://go.postman.co",
+      "username": "admin-postmanapihub@ollie-vault.io",
+      "tags": [
+        "dev",
+        "api",
+        "testing"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "x2hM*w1gL&v0fK^uZeJ%",
+      "notes": "Standard corporate credentials for Postman API Hub. Rotated quarterly.",
+      "totp": "otpauth://totp/Postman%20API%20Hub?secret=IPTHFZHGFXSMUTSX2HKQZI5QOPNFKQOB&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "223c6aeb-d8ca-4a21-bbea-d270d7a9ac3f",
+      "title": "Insomnia Cloud Workspaces",
+      "url": "https://insomnia.rest",
+      "username": "admin-insomniacloudworkspaces@ollie-vault.io",
+      "tags": [
+        "dev",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "O)y3iN(x2hM*w1gL&v0f",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Insomnia%20Cloud%20Workspaces?secret=HGMM3MKEV2OVX67YNARBP4ITNPIVD2HE&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "64dcf5f4-337e-41ac-833d-f767477cea50",
+      "title": "Sourcegraph Code Intelligence",
+      "url": "https://sourcegraph.com",
+      "username": "admin-sourcegraphcodeintelligence@ollie-vault.io",
+      "tags": [
+        "dev",
+        "code-search"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "5kP_z4jO)y3iN(x2hM*w",
+      "notes": "Standard corporate credentials for Sourcegraph Code Intelligence. Rotated quarterly.",
+      "totp": "otpauth://totp/Sourcegraph%20Code%20Intelligence?secret=PATRSKCIQ7BBBMEC5H7Y5I4ORXORDIJK&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4eaaa375-bf44-483d-befa-5f435a00661e",
+      "title": "Zendesk Support Enterprise",
+      "url": "https://zendesk.com",
+      "username": "admin-zendesksupportenterprise@ollie-vault.io",
+      "tags": [
+        "support",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "{B6lQ+A5kP_z4jO)y3iN",
+      "notes": "Managed service login for Zendesk Support Enterprise.",
+      "totp": "otpauth://totp/Zendesk%20Support%20Enterprise?secret=FJVDRZRMNHHABY5D6ABCP6UUACPCBXJ5&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "dfb4182d-3e77-4513-8716-82353e0e0bdc",
+      "title": "Stripe Production Dashboard",
+      "url": "https://dashboard.stripe.com",
+      "username": "admin-stripeproductiondashboard@ollie-vault.io",
+      "tags": [
+        "finance",
+        "billing",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "nS}C7mR{B6lQ+A5kP_z4",
+      "notes": "### Security & Operational Policy — Stripe Production Dashboard\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-1.\n- **Recovery Token:** `RECOVERY-TOKEN-61-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Stripe%20Production%20Dashboard?secret=WOBLNMNEH5CXITNJVPRWXNFC5BJGUNKF&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "a3aaa108-2cd0-40d2-b304-157d2266cd2e",
+      "title": "PayPal Merchant Gateway",
+      "url": "https://paypal.com",
+      "username": "admin-paypalmerchantgateway@ollie-vault.io",
+      "tags": [
+        "finance",
+        "payments"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "E9oT[D8nS}C7mR{B6lQ+",
+      "notes": "Managed service login for PayPal Merchant Gateway.",
+      "totp": "otpauth://totp/PayPal%20Merchant%20Gateway?secret=JOIJIU6K4OMV4UITL3DI4WORVDOCUGJE&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "5f8b3cbb-2a6b-409f-88ce-33f16dc7a542",
+      "title": "Square Developer Portal",
+      "url": "https://developer.squareup.com",
+      "username": "admin-squaredeveloperportal@ollie-vault.io",
+      "tags": [
+        "finance",
+        "pos",
+        "payments"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "VaF!pU]E9oT[D8nS}C7m",
+      "notes": "Standard corporate credentials for Square Developer Portal. Rotated quarterly.",
+      "totp": "otpauth://totp/Square%20Developer%20Portal?secret=3XQ2Q6PYIKXUSEPXJRYNVACB46SY6BWM&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "ce242adc-2efc-42c5-a736-4379a8af87a1",
+      "title": "Wise Business Multi-Currency",
+      "url": "https://wise.com",
+      "username": "admin-wisebusinessmulticurrency@ollie-vault.io",
+      "tags": [
+        "finance",
+        "banking",
+        "fx"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "#rWbG@qVaF!pU]E9oT[D",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Wise%20Business%20Multi-Currency?secret=GZO5MCI3YXGCYO7JQUEL34PE5QWPP3GH&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "59a2b882-5988-4ded-b8a2-0b4d03636ca9",
+      "title": "Mercury Corporate Banking",
+      "url": "https://mercury.com",
+      "username": "admin-mercurycorporatebanking@ollie-vault.io",
+      "tags": [
+        "finance",
+        "banking",
+        "critical"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "dI$sXcH#rWbG@qVaF!pU",
+      "notes": "Standard corporate credentials for Mercury Corporate Banking. Rotated quarterly.",
+      "totp": "otpauth://totp/Mercury%20Corporate%20Banking?secret=CTTQVTNWHR5DFB36K4INU7WBJCTJ3K7P&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "59a0a046-f641-41f7-8e14-fcf6eadd8f6f",
+      "title": "Brex Financial Operations",
+      "url": "https://brex.com",
+      "username": "admin-brexfinancialoperations@ollie-vault.io",
+      "tags": [
+        "finance",
+        "cards"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "uZeJ%tYdI$sXcH#rWbG@",
+      "notes": "**Production Credentials Policy — Brex Financial Operations**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-87905-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Brex%20Financial%20Operations?secret=Z2PUUJJR27CMADXK7WDGZOTKUJEUMHXC&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "0c5eff8c-17c3-427a-b5f6-d663bbe3c363",
+      "title": "Ramp Spend Management",
+      "url": "https://ramp.com",
+      "username": "admin-rampspendmanagement@ollie-vault.io",
+      "tags": [
+        "finance",
+        "corporate"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "L&v0fK^uZeJ%tYdI$sXc",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Ramp%20Spend%20Management?secret=NFRQPM6XYMH4QUKE2YWEVFOWOBTDAOTI&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "ebb65dca-e215-43e7-b93b-ada4ee3b76fe",
+      "title": "Plaid Developer Console",
+      "url": "https://dashboard.plaid.com",
+      "username": "admin-plaiddeveloperconsole@ollie-vault.io",
+      "tags": [
+        "finance",
+        "banking",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "2hM*w1gL&v0fK^uZeJ%t",
+      "notes": "Managed service login for Plaid Developer Console.",
+      "totp": "otpauth://totp/Plaid%20Developer%20Console?secret=UQFJVZHLCRSSGICBR7FRW5VRQC6TDMLG&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "0dc333b9-42fd-483c-8c1b-b948cd461709",
+      "title": "QuickBooks Online Finance",
+      "url": "https://qbo.intuit.com",
+      "username": "admin-quickbooksonlinefinance@ollie-vault.io",
+      "tags": [
+        "finance",
+        "accounting"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": ")y3iN(x2hM*w1gL&v0fK",
+      "notes": "Standard corporate credentials for QuickBooks Online Finance. Rotated quarterly.",
+      "totp": "otpauth://totp/QuickBooks%20Online%20Finance?secret=57KWM4LN6KHKYQBNNV3RPRNLHMQ3VVUN&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "5b45156f-46a0-48b0-a844-b395961bf56d",
+      "title": "Xero Accounting Hub",
+      "url": "https://login.xero.com",
+      "username": "admin-xeroaccountinghub@ollie-vault.io",
+      "tags": [
+        "finance",
+        "accounting"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "kP_z4jO)y3iN(x2hM*w1",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Xero%20Accounting%20Hub?secret=JG5PAUESB4TDNREVVUIMVGWPGHIJOYJB&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "e529ade7-a7f0-49aa-aa0a-5508a993b0cc",
+      "title": "Carta Cap Table Management",
+      "url": "https://carta.com",
+      "username": "admin-cartacaptablemanagement@ollie-vault.io",
+      "tags": [
+        "finance",
+        "equity",
+        "legal"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "B6lQ+A5kP_z4jO)y3iN(",
+      "notes": "### Security & Operational Policy — Carta Cap Table Management\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-11.\n- **Recovery Token:** `RECOVERY-TOKEN-71-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Carta%20Cap%20Table%20Management?secret=R3WUZESE7EAMM6XMWICAWP2UFTAMPDJ7&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "144c124d-9211-4232-923d-fb97916edc27",
+      "title": "Bill.com Payment Operations",
+      "url": "https://app.bill.com",
+      "username": "admin-billcompaymentoperations@ollie-vault.io",
+      "tags": [
+        "finance",
+        "ap",
+        "ar"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "S}C7mR{B6lQ+A5kP_z4j",
+      "notes": "Managed service login for Bill.com Payment Operations.",
+      "totp": "otpauth://totp/Bill.com%20Payment%20Operations?secret=PUF3QKL3EKXRQCBHGXWTDVH42NRGBLUV&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "544b4b86-2efe-4a94-b2b1-7805839b013e",
+      "title": "Chargebee Subscription Billing",
+      "url": "https://app.chargebee.com",
+      "username": "admin-chargebeesubscriptionbilling@ollie-vault.io",
+      "tags": [
+        "finance",
+        "billing"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "9oT[D8nS}C7mR{B6lQ+A",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Chargebee%20Subscription%20Billing?secret=MNFRW475KP3G3LZ63EWCTEHRXR257LAW&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "a1a28ae9-d9ef-400e-bc31-8907b4d9b9dd",
+      "title": "Adyen Global Payments",
+      "url": "https://ca-live.adyen.com",
+      "username": "admin-adyenglobalpayments@ollie-vault.io",
+      "tags": [
+        "finance",
+        "gateway"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "aF!pU]E9oT[D8nS}C7mR",
+      "notes": "Managed service login for Adyen Global Payments.",
+      "totp": "otpauth://totp/Adyen%20Global%20Payments?secret=ZU622PBIQ5MLW54WZSYJVZT5HOQ6EJ37&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "bd60e93e-4b6c-48bb-a125-096eaa127bab",
+      "title": "Gusto Payroll Administration",
+      "url": "https://app.gusto.com",
+      "username": "admin-gustopayrolladministration@ollie-vault.io",
+      "tags": [
+        "hr",
+        "payroll",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "rWbG@qVaF!pU]E9oT[D8",
+      "notes": "Standard corporate credentials for Gusto Payroll Administration. Rotated quarterly.",
+      "totp": "otpauth://totp/Gusto%20Payroll%20Administration?secret=SUQWL5JB7K7AACQXY5BI57AHPIUMWHYH&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4b14c168-ab1c-4a33-98ca-ee48405a17f7",
+      "title": "ProtonMail Secure Mailbox",
+      "url": "https://mail.proton.me",
+      "username": "admin-protonmailsecuremailbox@ollie-vault.io",
+      "tags": [
+        "email",
+        "security",
+        "privacy"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "I$sXcH#rWbG@qVaF!pU]",
+      "notes": "**Production Credentials Policy — ProtonMail Secure Mailbox**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-101275-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/ProtonMail%20Secure%20Mailbox?secret=WHVSU6ZA3ALZ5NMMQ24E2NS55RTFYQMF&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "27694b47-bc32-460c-8d75-67b3323cb760",
+      "title": "Fastmail Team Email",
+      "url": "https://app.fastmail.com",
+      "username": "admin-fastmailteamemail@ollie-vault.io",
+      "tags": [
+        "email",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.091Z",
+      "modified": "2026-10-16T21:42:43.091Z",
+      "password": "ZeJ%tYdI$sXcH#rWbG@q",
+      "notes": "Standard corporate credentials for Fastmail Team Email. Rotated quarterly.",
+      "totp": "otpauth://totp/Fastmail%20Team%20Email?secret=S2E5DH2E2DALIPO5ZY7O6KIG4ZRJZSDP&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "6913167e-52b8-46fd-92e6-504ec788f616",
+      "title": "Twilio Communications API",
+      "url": "https://console.twilio.com",
+      "username": "admin-twiliocommunicationsapi@ollie-vault.io",
+      "tags": [
+        "api",
+        "sms",
+        "voice"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "&v0fK^uZeJ%tYdI$sXcH",
+      "notes": "Managed service login for Twilio Communications API.",
+      "totp": "otpauth://totp/Twilio%20Communications%20API?secret=S6YMDI5S74RXBMXYLLHBBNAZG55YV7O3&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "ba169779-b6ab-44a5-84c9-addb32354cc4",
+      "title": "SendGrid Production Delivery",
+      "url": "https://app.sendgrid.com",
+      "username": "admin-sendgridproductiondelivery@ollie-vault.io",
+      "tags": [
+        "email",
+        "api",
+        "prod"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "hM*w1gL&v0fK^uZeJ%tY",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/SendGrid%20Production%20Delivery?secret=7P3LPJRDOZT6QWWEEOA7SCFIFBOXQG2I&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "9ea2ccf6-e35e-4a05-95ff-1016eb279f6a",
+      "title": "Postmark Transactional Mail",
+      "url": "https://account.postmarkapp.com",
+      "username": "admin-postmarktransactionalmail@ollie-vault.io",
+      "tags": [
+        "email",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "y3iN(x2hM*w1gL&v0fK^",
+      "notes": "Managed service login for Postmark Transactional Mail.",
+      "totp": "otpauth://totp/Postmark%20Transactional%20Mail?secret=VBSQ247L6FNCZEN5VBVHDN67E7TES757&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "c54673c7-617b-4675-90c8-1a4848915233",
+      "title": "Mailchimp Campaigns Hub",
+      "url": "https://mailchimp.com",
+      "username": "admin-mailchimpcampaignshub@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "newsletters"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "P_z4jO)y3iN(x2hM*w1g",
+      "notes": "### Security & Operational Policy — Mailchimp Campaigns Hub\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-9.\n- **Recovery Token:** `RECOVERY-TOKEN-81-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Mailchimp%20Campaigns%20Hub?secret=VPGG5HPZCFZQS7OPMIV6N4ZJGEHWSUJU&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "0b9c486e-89c6-44ac-81bd-f8ddacbcf241",
+      "title": "HubSpot CRM & Marketing Suite",
+      "url": "https://app.hubspot.com",
+      "username": "admin-hubspotcrmmarketingsuite@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "sales",
+        "crm"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "6lQ+A5kP_z4jO)y3iN(x",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/HubSpot%20CRM%20%26%20Marketing%20Suite?secret=E2QK6Y2M7Y4PMQGUKYMIXRFOLFGC3H2L&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "f98a6fa8-266f-4e8b-b88e-710e10edcf40",
+      "title": "Customer.io Messaging Platform",
+      "url": "https://fly.customer.io",
+      "username": "admin-customeriomessagingplatform@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "automation"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "}C7mR{B6lQ+A5kP_z4jO",
+      "notes": "Standard corporate credentials for Customer.io Messaging Platform. Rotated quarterly.",
+      "totp": "otpauth://totp/Customer.io%20Messaging%20Platform?secret=NDVGI2SHYZTE4H33GKT5MKDENUAM7AAU&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "78d32824-0223-491a-bccb-c3aecc904ec7",
+      "title": "Braze Customer Engagement",
+      "url": "https://dashboard.braze.com",
+      "username": "admin-brazecustomerengagement@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "push"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "oT[D8nS}C7mR{B6lQ+A5",
+      "notes": "Managed service login for Braze Customer Engagement.",
+      "totp": "otpauth://totp/Braze%20Customer%20Engagement?secret=IUGR5QGHWBYS2JD3ZYPEDO664547GT2K&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "d1fb9176-28c1-4008-b12e-56e34f41a37b",
+      "title": "Klaviyo Ecommerce Marketing",
+      "url": "https://www.klaviyo.com",
+      "username": "admin-klaviyoecommercemarketing@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "ecommerce"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "F!pU]E9oT[D8nS}C7mR{",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Klaviyo%20Ecommerce%20Marketing?secret=2WZEYO436MBYAFPDEPZJGPV2ZV4NV2NO&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "96e94ab9-8e75-4c84-9cee-92169cc18208",
+      "title": "Dropbox Business Storage",
+      "url": "https://dropbox.com",
+      "username": "admin-dropboxbusinessstorage@ollie-vault.io",
+      "tags": [
+        "storage",
+        "backup",
+        "corp"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "WbG@qVaF!pU]E9oT[D8n",
+      "notes": "**Production Credentials Policy — Dropbox Business Storage**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-114645-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Dropbox%20Business%20Storage?secret=MV4PIBGVQR3RC5RO2UMR3J62DCWY5NUX&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "3c4a8660-4667-440e-a0d8-4bde4efc6b07",
+      "title": "Box Enterprise Content",
+      "url": "https://account.box.com",
+      "username": "admin-boxenterprisecontent@ollie-vault.io",
+      "tags": [
+        "storage",
+        "compliance"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "$sXcH#rWbG@qVaF!pU]E",
+      "notes": "Standard corporate credentials for Box Enterprise Content. Rotated quarterly.",
+      "totp": "otpauth://totp/Box%20Enterprise%20Content?secret=BVVQC3P4CPH4XK36WLIXDORJ7F4RUL6Y&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "c67d2489-d99b-4515-8d9b-c925379edcca",
+      "title": "Backblaze B2 Object Storage",
+      "url": "https://secure.backblaze.com",
+      "username": "admin-backblazeb2objectstorage@ollie-vault.io",
+      "tags": [
+        "storage",
+        "s3",
+        "backup"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "eJ%tYdI$sXcH#rWbG@qV",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Backblaze%20B2%20Object%20Storage?secret=QZZBT5MRY4HV5GBS5LHK4EQ7T7LRSDM7&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "6124f1e5-ce43-4e0b-b417-1549ab730289",
+      "title": "Wasabi Hot Cloud Storage",
+      "url": "https://console.wasabisys.com",
+      "username": "admin-wasabihotcloudstorage@ollie-vault.io",
+      "tags": [
+        "storage",
+        "s3"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "v0fK^uZeJ%tYdI$sXcH#",
+      "notes": "Standard corporate credentials for Wasabi Hot Cloud Storage. Rotated quarterly.",
+      "totp": "otpauth://totp/Wasabi%20Hot%20Cloud%20Storage?secret=MRXU5BWLKQZVGZASVWHFRKN3SBYSSMSG&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "a3552920-7ad9-4582-9563-c683b61e1bbb",
+      "title": "Namecheap Domain Registrar",
+      "url": "https://namecheap.com",
+      "username": "admin-namecheapdomainregistrar@ollie-vault.io",
+      "tags": [
+        "domains",
+        "infra"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "M*w1gL&v0fK^uZeJ%tYd",
+      "notes": "Managed service login for Namecheap Domain Registrar.",
+      "totp": "otpauth://totp/Namecheap%20Domain%20Registrar?secret=VFW4IZMRBK4SZKYGNXUX3ALDHJLW7RNI&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "27dc1081-3558-432f-849a-b6c687e59f9b",
+      "title": "Porkbun DNS Management",
+      "url": "https://porkbun.com",
+      "username": "admin-porkbundnsmanagement@ollie-vault.io",
+      "tags": [
+        "domains",
+        "dns"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "3iN(x2hM*w1gL&v0fK^u",
+      "notes": "### Security & Operational Policy — Porkbun DNS Management\n- **Account Classification:** Tier-1 Critical Production Infrastructure.\n- **Rotation Schedule:** Semi-annually rotated under PBKDF2-HMAC-SHA256 standards.\n- **MFA Enforcement:** Strict Hardware FIDO2 + TOTP fallback.\n- **Emergency Break-Glass:** Retrieve hardware token from Safe #3, Slot B-7.\n- **Recovery Token:** `RECOVERY-TOKEN-91-9941-F8B2`\n- **Access Constraints:** CIDR whitelists `192.168.100.0/24` and `10.240.0.0/16`.\n- **On-Call:** `security-oncall@matrix-ops.internal` / Signal `#infra-emergencies`.",
+      "totp": "otpauth://totp/Porkbun%20DNS%20Management?secret=BB2A5C7UZKBEZALM3FHEN6MEKGEK53PX&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "693c12e8-477b-4bd4-aeb6-80e31f7f3985",
+      "title": "Hover Domain Services",
+      "url": "https://hover.com",
+      "username": "admin-hoverdomainservices@ollie-vault.io",
+      "tags": [
+        "domains",
+        "dns"
+      ],
+      "created": "2026-10-16T21:42:43.092Z",
+      "modified": "2026-10-16T21:42:43.092Z",
+      "password": "_z4jO)y3iN(x2hM*w1gL",
+      "notes": "Managed service login for Hover Domain Services.",
+      "totp": "otpauth://totp/Hover%20Domain%20Services?secret=27UFGPCKVFUPVR3SWWTOHKT66DVGDKGH&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "6a15800b-9877-4471-b9e1-1fca2a19826d",
+      "title": "Ubiquiti UniFi Site Manager",
+      "url": "https://unifi.ui.com",
+      "username": "admin-ubiquitiunifisitemanager@ollie-vault.io",
+      "tags": [
+        "hardware",
+        "network",
+        "iot"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "lQ+A5kP_z4jO)y3iN(x2",
+      "notes": "Standard corporate credentials for Ubiquiti UniFi Site Manager. Rotated quarterly.",
+      "totp": "otpauth://totp/Ubiquiti%20UniFi%20Site%20Manager?secret=ZIRDXTOQVDU6DKO7HDJJBLJ6VXQ63FJ7&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "61728fa3-840a-4681-bf26-4e9003936fb1",
+      "title": "Apple Developer Program",
+      "url": "https://developer.apple.com",
+      "username": "admin-appledeveloperprogram@ollie-vault.io",
+      "tags": [
+        "dev",
+        "mobile",
+        "apple"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "C7mR{B6lQ+A5kP_z4jO)",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Apple%20Developer%20Program?secret=UHTIMO367AMZBBJGUL2VE7TKYCGD4PDC&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "efb61e8c-4c29-4f1e-87e0-44a5e5aa4753",
+      "title": "Google Play Console",
+      "url": "https://play.google.com/console",
+      "username": "admin-googleplayconsole@ollie-vault.io",
+      "tags": [
+        "dev",
+        "mobile",
+        "android"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "T[D8nS}C7mR{B6lQ+A5k",
+      "notes": "Standard corporate credentials for Google Play Console. Rotated quarterly.",
+      "totp": "otpauth://totp/Google%20Play%20Console?secret=B46X7R7ZJIF4JFRKHDKDUVFYLDGQF635&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "659d451a-a1a2-450d-8ad9-ec6055acc78d",
+      "title": "Reddit Corporate Admin",
+      "url": "https://reddit.com",
+      "username": "admin-redditcorporateadmin@ollie-vault.io",
+      "tags": [
+        "social",
+        "community"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "!pU]E9oT[D8nS}C7mR{B",
+      "notes": "**Production Credentials Policy — Reddit Corporate Admin**\n- Primary account for production environment deployment pipelines.\n- Multi-factor authentication enforced for all web dashboard sessions.\n- Recovery code stored in encrypted cold backup: `REC-128015-SEC`.\n- Scheduled rotation: 90 days.",
+      "totp": "otpauth://totp/Reddit%20Corporate%20Admin?secret=VG4S7TO2Y47LZ7CZWH5PSDEK5DLXFVLP&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "4adf153f-902f-4da5-9708-7a2b544c094d",
+      "title": "X / Twitter Developer Portal",
+      "url": "https://developer.x.com",
+      "username": "admin-xtwitterdeveloperportal@ollie-vault.io",
+      "tags": [
+        "social",
+        "api"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "bG@qVaF!pU]E9oT[D8nS",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/X%20%2F%20Twitter%20Developer%20Portal?secret=WNQNORG4MMB3Z7Y4NKKJHH2T3Q66D5AW&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "be888977-e25e-401a-bf42-2dbe0ba62e83",
+      "title": "LinkedIn Corporate Talent",
+      "url": "https://linkedin.com",
+      "username": "admin-linkedincorporatetalent@ollie-vault.io",
+      "tags": [
+        "social",
+        "recruiting"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "sXcH#rWbG@qVaF!pU]E9",
+      "notes": "Managed service login for LinkedIn Corporate Talent.",
+      "totp": "otpauth://totp/LinkedIn%20Corporate%20Talent?secret=BTFR7R6ZLOLG4ROZ4P7APYIZVNZ2LJZ5&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "2cce2051-eb0e-46e3-a434-fb14bdeb1f36",
+      "title": "Spotify Studio Audio Network",
+      "url": "https://spotify.com",
+      "username": "admin-spotifystudioaudionetwork@ollie-vault.io",
+      "tags": [
+        "media",
+        "audio"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "J%tYdI$sXcH#rWbG@qVa",
+      "notes": "Standard corporate credentials for Spotify Studio Audio Network. Rotated quarterly.",
+      "totp": "otpauth://totp/Spotify%20Studio%20Audio%20Network?secret=KBEL2SMRRSNQSWNUOE3FNQMXP3CW2RQO&issuer=Ollie",
+      "customFields": []
+    },
+    {
+      "id": "54fc2d1b-12dd-4bab-8999-f205b66db4db",
+      "title": "Netflix Studio Production Hub",
+      "url": "https://netflix.com",
+      "username": "admin-netflixstudioproductionhub@ollie-vault.io",
+      "tags": [
+        "media",
+        "streaming"
+      ],
+      "created": "2026-10-16T21:42:43.093Z",
+      "modified": "2026-10-16T21:42:43.093Z",
+      "password": "0fK^uZeJ%tYdI$sXcH#r",
+      "notes": "Developer service account for CI/CD and automated toolchain integration. Single-sign-on enabled with TOTP backup.",
+      "totp": "otpauth://totp/Netflix%20Studio%20Production%20Hub?secret=OJKNHNRCSARNCLZWMZ4HQOFCB5PKCA3E&issuer=Ollie",
+      "customFields": []
+    }
+  ]
+}

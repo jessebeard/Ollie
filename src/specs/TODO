@@ -96,3 +96,30 @@ back to a safe label instead of throwing). Display renders click-to-copy
 code + countdown, single-interval refresh lifecycle stopped on re-render/
 lock. CSS contract added. Pinned by exact RFC 6238 vectors routed through
 URIs (UI + CLI), display/lifecycle DOM tests, and form-flow tests.
+
+## 2026-08-24 - Camera capture (getUserMedia) + perspective-corrected QR decode
+Current qr-decoder assumes axis-aligned, cleanly captured symbols
+(screenshots). For phone-camera photos: (a) add getUserMedia-based live
+capture into the card dropzone flow, (b) implement perspective correction -
+locate the three finder centers, estimate the homography, warp to a flat
+module grid before sampling. Both belong together; ship behind the same
+feature. PWA target (Android + iOS).
+
+## 2026-08-24 - iOS / PWA track: directory import fallback + app shell
+iOS Safari lacks showDirectoryPicker and full File System Access. Needed:
+1. <input type=file webkitdirectory multiple> fallback in the carrier
+   import path (also benefits desktop Firefox), feeding the existing
+   DropZone pipeline.
+2. PWA app shell: manifest.json (icons, standalone display) + service
+   worker for offline vault use on phones.
+
+## 2026-08-24 - Master-password second factor roadmap
+Tier B shipped this wave: optional TOTP gate enrolled during vault creation;
+explicitly weak access control vs shoulder-surfing only (anyone with the
+master password defeats it - disclaimer shown in UI).
+NEXT (high security option, discouraged-by-default): WebAuthn PRF wrap
+layer - session key additionally wrapped under a platform-authenticator
+PRF-derived symmetric key. Real 2FA offline (secret never leaves enclave),
+PQ-safe, ideal for the PWA target. UX MUST warn loudly: losing the
+authenticator = permanent vault lockout. Requires metadata.kdf2 wire-doc
+addition + golden vector regeneration.

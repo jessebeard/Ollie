@@ -1,4 +1,4 @@
-﻿
+
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { DropZone } from './components/drop-zone.js';
 import { ModalManager } from './components/modal-manager.js';
@@ -7,7 +7,8 @@ import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 import { logger } from '../../../src/utils/logger.js';
 import { writeAllWithRollback } from '../../../src/utils/atomic-writer.js';
-import { codeFromOtpauthUri } from '../../../src/information-theory/cryptography/totp.js';
+import { codeFromOtpauthUri, normalizeTotpInput } from '../../../src/information-theory/cryptography/totp.js';
+import { decodeQR } from '../../../src/codec/qr-decoder.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -42,6 +43,7 @@ export class VaultUI {
 
         // Bind Events
         this.events.on('edit-entry', (e) => this.editEntry(e));
+        this.events.on('scan-qr-file', (e) => this.handleScanQrFile(e));
         this.events.on('copy-password', (p) => this.copyPassword(p));
         this.events.on('unsafe-url-blocked', () => {
             this.modals.showAlert('Blocked', 'That entry URL uses an unsupported scheme. Only http(s) links can be opened.', 'error');
@@ -54,7 +56,7 @@ export class VaultUI {
         document.getElementById('importBtn').addEventListener('click', () => this.importData());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
 
-        // Î“ÃœÃ­ Bolt Optimization: Debounce search input to prevent main thread blocking
+        // ÃƒÅ½Ã¢â‚¬Å“ÃƒÆ’Ã…â€œÃƒÆ’Ã‚Â­ Bolt Optimization: Debounce search input to prevent main thread blocking
         // This limits full DOM re-renders and expensive capacity calculations while the user types
         const searchInput = document.getElementById('searchInput');
         let searchTimeout;
@@ -413,6 +415,66 @@ export class VaultUI {
         }
     }
 
+    /**
+     * Rasterizes a dropped/selected image file into canvas ImageData.
+     * Browser path uses createImageBitmap + 2D canvas; the Node/test seam
+     * accepts files that already expose an `imageData` property.
+     */
+    async rasterizeToImageData(file) {
+        if (file && file.imageData) return file.imageData;
+        if (typeof createImageBitmap !== 'function') {
+            throw new Error('QR image capture requires a browser canvas');
+        }
+        const bmp = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bmp.width;
+        canvas.height = bmp.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bmp, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        bmp.close && bmp.close();
+        return imageData;
+    }
+
+    async handleScanQrFile({ id, file }) {
+        if (!id || !file) return;
+        try {
+            const imageData = await this.rasterizeToImageData(file);
+            await this.applyScannedImage(id, imageData);
+        } catch (err) {
+            this.modals.showAlert('QR Scan Failed', err.message, 'error');
+        }
+    }
+
+    async applyScannedImage(entryId, imageData) {
+        if (!this.vault || !this.vault.isUnlocked) return;
+
+        const [decoded, decodeErr] = decodeQR(imageData);
+        if (decodeErr) {
+            this.modals.showAlert('QR Scan Failed', 'Could not read a QR code from that image: ' + decodeErr.message, 'error');
+            return;
+        }
+
+        const text = new TextDecoder().decode(decoded.bytes).trim();
+        if (!/^otpauth:\/\//i.test(text)) {
+            this.modals.showAlert('Not a TOTP Code', 'The scanned QR does not contain an otpauth:// login secret.', 'error');
+            return;
+        }
+
+        const entry = this.vault.entries.find(e => e.id === entryId);
+        const [normalized] = normalizeTotpInput(text, entry ? entry.title : '');
+
+        const [newVault, updateErr] = await this.vault.updateEntry(entryId, { totp: normalized });
+        if (updateErr) {
+            this.modals.showAlert('Error', 'Failed to store scanned TOTP: ' + updateErr.message, 'error');
+            return;
+        }
+
+        this.vault = newVault;
+        this.updateUI();
+        this.modals.showAlert('TOTP Added', 'One-time password secret imported from QR.');
+    }
+
     async copyPassword(id) {
         if (!this.vault.isUnlocked) return;
 
@@ -504,7 +566,7 @@ export class VaultUI {
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
-        const warningMsg = 'â‰¡Æ’Ã¶â”¤ SECURITY WARNING: Red Flag Operation\n\n' +
+        const warningMsg = 'ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â¡Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¶ÃƒÂ¢Ã¢â‚¬ÂÃ‚Â¤ SECURITY WARNING: Red Flag Operation\n\n' +
             'You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.\n\n' +
             'Anyone who gains access to this file will have immediate access to all your passwords.\n\n' +
             'Are you absolutely sure you want to proceed?';
@@ -595,7 +657,7 @@ export class VaultUI {
             const savedDate = this.vault.metadata.modified
                 ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
                 : 'unknown';
-            statusText.textContent = `Unlocked Â· Rev ${this.vault.metadata.revision} Â· ${savedDate} UTC`;
+            statusText.textContent = `Unlocked Ãƒâ€šÃ‚Â· Rev ${this.vault.metadata.revision} Ãƒâ€šÃ‚Â· ${savedDate} UTC`;
 
             this.populateTotpCodes(filteredResults);
         } else {

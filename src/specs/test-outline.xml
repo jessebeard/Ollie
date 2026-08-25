@@ -66,6 +66,7 @@
             <file name="encoder.test.js" description="JpegEncoder integration tests." />
             <file name="transcoder.test.js" description="Lossless coefficient roundtrip validation." />
             <file name="qr-encoder.test.js" description="QR encoder structural tests: dimensions, finder patterns, timing patterns, determinism." />
+            <file name="qr-decoder.test.js" description="QR decoder: byte-exact encode/render/decode roundtrips across versions and scales, seeded PBT, luminance jitter tolerance, scattered-damage EC-M correction, format destruction fail-closed, hostile-input tuple safety." />
         </directory>
         <directory name="conformance">
             <file name="golden-vectors.json" description="Bit-exact golden vectors for wire format layers 0-3." />
@@ -121,6 +122,7 @@
                 <file name="vault-save-permission.test.js" description="Save flow acquires FileSystemHandle write permission under fresh user activation, before encrypt/embed." />
                 <file name="vault-spread-save.test.js" description="Threshold save spreads one stripe per carrier on real photos; full-set, threshold-subset, and sub-threshold load behavior." />
                 <file name="vault-csv-import-ui.test.js" description="Import routing: CSV delegates to vendor importer, JSON envelope path unchanged." />
+                <file name="vault-qr-scan.test.js" description="Scanned QR images populate entry TOTP via applyScannedImage; non-otpauth payloads rejected with alerts." />
                 <file name="vault-totp-form.test.js" description="Add-entry form carries TOTP field; bare secrets stored normalized; garbage rejected before encryption." />
                 <file name="vault-totp-display.test.js" description="TOTP live display: Base32-correct codes in .totp-slot, countdown ticks with boundary recompute, warn-not-throw on malformed values, single-interval lifecycle." />
             </directory>

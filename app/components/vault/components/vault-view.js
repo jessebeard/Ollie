@@ -87,6 +87,62 @@ export class VaultView {
             window.open(entry.url, '_blank', 'noopener,noreferrer');
         });
 
+        // QR scan toggle: checking it reveals an inline dropzone that
+        // accepts a TOTP enrollment QR (drop, click-to-browse, or paste).
+        const qrToggle = document.createElement('label');
+        qrToggle.className = 'qr-scan-toggle';
+        const qrCheck = document.createElement('input');
+        qrCheck.type = 'checkbox';
+        qrCheck.addEventListener('change', () => {
+            const existing = div.querySelector('.qr-dropzone');
+            if (qrCheck.checked && !existing) {
+                const dz = document.createElement('div');
+                dz.className = 'qr-dropzone';
+                dz.setAttribute('role', 'button');
+                dz.textContent = 'Drop QR image, click to browse, or paste';
+                const picker = document.createElement('input');
+                picker.type = 'file';
+                picker.accept = 'image/*';
+                picker.style.display = 'none';
+                dz.addEventListener('click', () => picker.click());
+                picker.addEventListener('change', () => {
+                    if (picker.files[0]) this.events.emit('scan-qr-file', { id: entry.id, file: picker.files[0] });
+                    qrCheck.checked = false;
+                    dz.remove();
+                });
+                dz.addEventListener('dragover', (e) => e.preventDefault());
+                dz.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer && e.dataTransfer.files[0]) {
+                        this.events.emit('scan-qr-file', { id: entry.id, file: e.dataTransfer.files[0] });
+                    }
+                    qrCheck.checked = false;
+                    dz.remove();
+                });
+                this._pasteTarget = (e) => {
+                    if (e.clipboardData && e.clipboardData.files[0]) {
+                        this.events.emit('scan-qr-file', { id: entry.id, file: e.clipboardData.files[0] });
+                        qrCheck.checked = false;
+                        dz.remove();
+                        document.removeEventListener('paste', this._pasteTarget);
+                    }
+                };
+                document.addEventListener('paste', this._pasteTarget);
+                div.appendChild(dz);
+            } else if (!qrCheck.checked && existing) {
+                existing.remove();
+                if (this._pasteTarget) {
+                    document.removeEventListener('paste', this._pasteTarget);
+                    this._pasteTarget = null;
+                }
+            }
+        });
+        qrToggle.appendChild(qrCheck);
+        const toggleText = document.createElement('span');
+        toggleText.textContent = ' Scan QR';
+        qrToggle.appendChild(toggleText);
+        div.appendChild(qrToggle);
+
         return div;
     }
 

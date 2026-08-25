@@ -51,6 +51,7 @@
             <file name="file-scanner.js" description="FileScanner: directory scanning via File System Access API." />
                 <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
                 <file name="qr-encoder.js" description="ISO/IEC 18004 QR encoder: byte-mode data encoding, RS error correction via GF(256), matrix construction with masking." />
+                <file name="qr-decoder.js" description="ISO/IEC 18004 QR decoder: binarization, finder-pattern detection with merge-tolerant run ratios, BCH format validation, zigzag extraction and shared Reed-Solomon correction." />
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">
