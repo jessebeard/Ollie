@@ -217,7 +217,11 @@ async function runTests() {
         await import('./security/extreme-universal.test.js');
         await import('./security/encrypted-container.test.js');
         await import('./security/qr-encoder.test.js');
+        await import('./security/qr-capacity.test.js');
+        await import('./security/qr-format-tolerance.test.js');
+        await import('./security/qr-binarizer.test.js');
         await import('./security/qr-decoder.test.js');
+        await import('./security/qr-fixtures.test.js');
         await import('./security/format-v3.test.js');
         await import('./security/cauchy-ec.test.js');
 

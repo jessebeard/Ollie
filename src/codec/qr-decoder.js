@@ -3,302 +3,321 @@
  *
  * Accepts canvas-shaped RGBA input ({data,width,height}) - the product of
  * createImageBitmap() + canvas rasterization - and returns the decoded
- * payload bytes. Mirrors qr-encoder.js exactly: byte mode, EC level M,
- * versions 1-6, single RS block per version, BCH format info XOR 0x5412,
- * zigzag placement, penalty-selected masks.
+ * payload bytes. Consumes the shared spec tables in qr-capacity.js:
+ * byte mode, EC level M, versions 1-15, interleaved multi-block RS,
+ * BCH format info XOR 0x5412, zigzag placement, penalty-selected masks.
  *
- * RS error correction uses syndromes + Berlekamp-Massey + Chien search +
- * Forney over GF(256) with polynomial 0x11D (same field parameters as the
- * encoder's local arithmetic; kept local for codec isolation).
+ * RS error correction delegates to the audited Euclidean
+ * decoder in information-theory/error-correction (GF(256), poly 0x11D).
  *
  * V1 scope: axis-aligned, cleanly captured codes (screenshots). Skewed or
- * perspective-distorted photographs are out of scope (see specs/TODO).
+ * perspective-distorted photographs are out of scope until C5 (see TODO).
  */
 
-const VERSION_DATA = [
-    null,
-    { total: 14, ec: 10 },
-    { total: 26, ec: 16 },
-    { total: 42, ec: 26 },
-    { total: 62, ec: 18 },
-    { total: 84, ec: 24 },
-    { total: 106, ec: 16 }
-];
-
-const ALIGNMENT_CENTERS = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34]];
-
-const FMT_MASK = 0x5412;
-const FMT_GEN = 0x537;
-
-/* ------------------------------------------- RS correction (shared codec) */
-/*
- * Delegates to the audited Euclidean-algorithm decoder in
- * information-theory/error-correction - the same field parameters as the
- * encoder's local arithmetic (poly 0x11D, generator base 0), but battle-
- * tested across the ECC framing waves. Convention-robust by construction,
- * unlike hand-rolled Berlekamp-Massey/Forney variants.
- */
-
+import {
+    MAX_VERSION,
+    blocksFor,
+    parityFor,
+    totalCodewords,
+    alignmentCenters,
+    formatInfoBits,
+    EC_LEVEL_BITS
+} from './qr-capacity.js';
 import { GenericGF } from '../information-theory/error-correction/galois-field.js';
 import { ReedSolomonDecoder } from '../information-theory/error-correction/reed-solomon-codec.js';
 
 const QR_FIELD = new GenericGF(0x11D, 256, 0);
 const QR_RS_DECODER = new ReedSolomonDecoder(QR_FIELD);
 
-/**
- * Corrects a single-block RS codeword (data || parity).
- * Returns [correctedDataBytes|null, Error|null].
- */
-/**
- * @param {Uint8Array} codeword
- * @param {number} ecLen
- * @returns {[Int32Array|null, Error|null]} corrected data bytes or error
- */
-function rsCorrectBlock(codeword, ecLen) {
-    const received = Int32Array.from(codeword);
-    try {
-        QR_RS_DECODER.decode(received, ecLen);
-        const corrected = Int32Array.from(received.subarray(0, codeword.length - ecLen));
-        return [corrected, null];
-    } catch (e) {
-        const detail = String(e.message || e)
-            .replace(/ReedSolomonException\("/, '')
-            .replace(/"\)$/, '')
-            .replace(/^qr-rs:\s*/, '');
-        return [null, new Error('qr-rs: uncorrectable block (' + detail + ')')];
-    }
-}
-
 /* ------------------------------------------------------------- binarize */
 
+const BLOCK = 8;          // block-stat window side
+const LOW_CONTRAST = 24;  // value range below which a block is "flat"
+
 /**
+ * Converts RGBA pixel data to a binary bitmap via LOCAL ADAPTIVE
+ * thresholding (block-stat and neighborhood-mean approach).
+ *
+ * 1. luma per pixel
+ * 2. BLOCK x BLOCK block statistics {mean, min, max}
+ * 3. causal black points (raster order): high-range blocks use their mean;
+ *    low-range blocks take min/2 unless they can INHERIT a black point from
+ *    already-computed above/left/diagonal neighbors (min*4 < sum form).
+ *    This carries real edge contrast from boundaries into flat interiors.
+ * 4. per-block threshold = mean of the 5x5 black-point neighborhood;
+ *    EVERY pixel is individually thresholded: lum <= threshold -> dark.
+ *
  * @param {{data: Uint8ClampedArray|Uint8Array, width: number, height: number}} imageData
  * @returns {[{bw: Uint8Array, width: number, height: number}|null, Error|null]}
  */
-function binarize(imageData) {
+export function binarize(imageData) {
     const { data, width, height } = imageData;
     if (!data || !width || !height) {
         return [null, new Error('qr: imageData must contain data, width and height')];
     }
-    const bw = new Uint8Array(width * height);
-    let sum = 0;
-    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-        const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
-        bw[p] = lum;
-        sum += lum;
+    const nPix = width * height;
+    const lum = new Uint8Array(nPix);
+    for (let i = 0, p2 = 0; p2 < nPix; i += 4, p2++) {
+        lum[p2] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
     }
-    const threshold = sum / (width * height);
-    for (let p = 0; p < bw.length; p++) bw[p] = bw[p] >= threshold ? 0 : 1;
+
+    const bw_ = Math.ceil(width / BLOCK);
+    const bh = Math.ceil(height / BLOCK);
+    const bMean = new Uint16Array(bw_ * bh);
+    const bMin = new Uint8Array(bw_ * bh);
+    const bMax = new Uint8Array(bw_ * bh);
+    for (let by = 0; by < bh; by++) {
+        for (let bx = 0; bx < bw_; bx++) {
+            let sum = 0, mn = 255, mx = 0, cnt = 0;
+            const y0 = by * BLOCK, x0 = bx * BLOCK;
+            const y1 = Math.min(y0 + BLOCK, height), x1 = Math.min(x0 + BLOCK, width);
+            for (let y = y0; y < y1; y++) {
+                for (let x = x0; x < x1; x++) {
+                    const v = lum[y * width + x];
+                    sum += v;
+                    if (v < mn) mn = v;
+                    if (v > mx) mx = v;
+                    cnt++;
+                }
+            }
+            const idx = by * bw_ + bx;
+            bMean[idx] = cnt ? sum / cnt : 0;
+            bMin[idx] = mn;
+            bMax[idx] = mx;
+        }
+    }
+
+    // PASS 1 - causal black points (raster order; above/left/diag already final):
+    //   high range  : bp = block mean
+    //   low  range  : bp = min/2, inherited from neighbors' black points
+    //                 when min < (bp_above + 2*bp_left + bp_diag)/4
+    // The inheritance carries real edge contrast from boundary regions into
+    // flat interiors - structural correctness, not a tuned heuristic.
+    const bp = new Float32Array(bw_ * bh);
+    for (let by = 0; by < bh; by++) {
+        for (let bx = 0; bx < bw_; bx++) {
+            const idx = by * bw_ + bx;
+            const bmin = bMin[idx];
+            let point = bMean[idx];
+            if (bMax[idx] - bmin <= LOW_CONTRAST) {
+                point = bmin / 2;
+                if (by > 0 && bx > 0) {
+                    const num = bp[idx - bw_] + 2 * bp[idx - 1] + bp[idx - bw_ - 1];
+                    if (bmin * 4 < num) point = num / 4;
+                }
+            }
+            bp[idx] = point;
+        }
+    }
+
+    // PASS 2 - threshold = mean of the 5x5 black-point neighborhood
+    // (indices clamped at borders), applied PER PIXEL: lum <= threshold.
+    const NB = 2;
+    const area = (NB * 2 + 1) * (NB * 2 + 1);
+    const bw = new Uint8Array(nPix);
+    for (let by = 0; by < bh; by++) {
+        const cy = Math.min(Math.max(by, NB), bh - NB - 1);
+        const y0 = cy - NB, y1 = cy + NB;
+        for (let bx = 0; bx < bw_; bx++) {
+            const cx = Math.min(Math.max(bx, NB), bw_ - NB - 1);
+            const x0 = cx - NB, x1 = cx + NB;
+            let nSum = 0;
+            for (let yy = y0; yy <= y1; yy++) {
+                for (let xx = x0; xx <= x1; xx++) nSum += bp[yy * bw_ + xx];
+            }
+            const cut = nSum / area;
+
+            const py0 = by * BLOCK, px0 = bx * BLOCK;
+            const py1 = Math.min(py0 + BLOCK, height), px1 = Math.min(px0 + BLOCK, width);
+            for (let y = py0; y < py1; y++) {
+                for (let x = px0; x < px1; x++) {
+                    bw[y * width + x] = lum[y * width + x] <= cut ? 1 : 0;
+                }
+            }
+        }
+    }
     return [{ bw, width, height }, null];
 }
 
 /* ------------------------------------------------------- finder location */
 
-const RUN_TOL = 0.5;
+/* Row scanLine via the shared pattern machinery, per-candidate cross-checks
+ * (vertical -> horizontal -> diagonal) with coarse totals-consistency, weighted
+ * cluster merging, then generic best-right-triangle selection over confirmed
+ * candidates. No domain constraints - rotation/skew safe by construction. */
+const RUN_VARIANCE = 2;              // straight-line tolerance divisor
+const RUN_VARIANCE_DIAGONAL = 1.333; // diagonal scans tolerance
+const PATTERN_MIN_CONFIRMATIONS = 2; // cluster quorum
 
-/**
- * Validates a 5-run window against ratios 1:1:3:1:1. The encoder emits no
- * separator ring, so data modules frequently merge into an OUTER arm,
- * lengthening it; inner light runs and the 3-wide center must still hold.
- * Outer dark runs are therefore LOWER-BOUNDED only, and the unit is
- * anchored on an inner light run or the center run.
- */
-function matchRunWindow(runs, i) {
-    const r = [runs[i], runs[i + 1], runs[i + 2], runs[i + 3], runs[i + 4]];
-    if (r[0].val !== 1 || r[1].val !== 0 || r[2].val !== 1 || r[3].val !== 0 || r[4].val !== 1) return null;
-    const len = r.map(x => x.len);
-    const units = [len[1], len[3], len[2] / 3];
-    for (const u of units) {
-        if (u < 1.2) continue;
-        const tol = Math.max(1.5, u * RUN_TOL);
-        const innerOk =
-            Math.abs(len[1] - u) <= tol &&
-            Math.abs(len[3] - u) <= tol &&
-            Math.abs(len[2] - u * 3) <= tol;
-        const outerOk = len[0] >= u - tol && len[4] >= u - tol;
-        if (innerOk && outerOk) {
-            // Best unit estimate: center run dominates
-            return { unit: len[2] / 3 };
-        }
+const FINDER = makePattern([true, false, true, false, true], [1, 1, 3, 1, 1]);
+const DETECT_MIN_ROW_SKIP = 3;
+
+function patternEquals(p, p2) {
+    if (Math.abs(p2.y - p.y) <= p2.module && Math.abs(p2.x - p.x) <= p2.module) {
+        const diff = Math.abs(p2.module - p.module);
+        return diff <= 1.0 || diff <= p.module;
     }
-    return null;
+    return false;
 }
 
-/** Checks a full 7x7 finder template centered at (cx,cy) with module size m. */
-function templateConfirm(bw, width, height, cx, cy, m) {
-    const PATTERN = [
-        [1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,0,0,0,0,1],
-        [1,1,1,1,1,1,1]
-    ];
-    let hit = 0, total = 0;
-    for (let dr = -3; dr <= 3; dr++) {
-        for (let dc = -3; dc <= 3; dc++) {
-            const sx = Math.round(cx + dc * m);
-            const sy = Math.round(cy + dr * m);
-            if (sx < 0 || sy < 0 || sx >= width || sy >= height) return false;
-            const v = bw[sy * width + sx] >= 0.5 ? 1 : 0;
-            if (v === PATTERN[dr + 3][dc + 3]) hit++;
-            total++;
-        }
-    }
-    return hit / total >= 0.9;
-}
-
-function verticalConfirm(bw, width, height, cx, cy, module) {
-    const halfSpan = module * 4.5;
-    const startRow = Math.round(cy - halfSpan);
-    const col = Math.round(cx);
-    if (startRow < 0 || col < 0 || col >= width || startRow + Math.ceil(halfSpan * 2) >= height) return false;
-
-    // Skip any leading light (quiet-zone) pixels so run slot 0 is the
-    // finder's own top dark arm.
-    let r = startRow;
-    const endRow = startRow + Math.ceil(halfSpan * 2);
-    while (r < endRow && bw[r * width + col] === 0) r++;
-    if (r >= endRow) return false;
-
-    let idx = 0;
-    const lens = [0, 0, 0, 0, 0];
-    let lastVal = bw[r * width + col];
-    for (; r < endRow; r++) {
-        const v = bw[r * width + col];
-        if (v === lastVal) {
-            lens[idx]++;
-            continue;
-        }
-        idx++;
-        if (idx > 4) break;
-        lens[idx] = 1;
-        lastVal = v;
-    }
-    if (idx < 4) return false;
-
-    // Inner runs must be symmetric; outer arms lower-bounded only (the
-    // window or merged neighbors may truncate/extend them).
-    const tol = Math.max(1.5, module * RUN_TOL);
-    const innerOk =
-        Math.abs(lens[1] - module) <= tol &&
-        Math.abs(lens[3] - module) <= tol &&
-        Math.abs(lens[2] - module * 3) <= tol;
-    const outerOk = lens[0] >= module - tol && lens[4] >= module - tol;
-    return innerOk && outerOk;
-}
-
-/**
- * Finds the three finder-pattern centers by scanning BOTH orientations.
- * The encoder emits no separator ring around finders, so data modules can
- * merge into an arm along one axis; the orthogonal axis stays clean for
- * any mask, so unioning candidates from horizontal + vertical run scans
- * guarantees each finder yields at least one valid hit. Candidates are
- * verified by full 7x7 template match before clustering.
- */
-function findFinderCenters(img) {
-    const { bw, width, height } = img;
-    const candidates = [];
-
-    const lineRuns = (get, lineLen) => {
-        const runs = [];
-        let curVal = get(0), curLen = 0;
-        for (let i = 0; i < lineLen; i++) {
-            const v = get(i);
-            if (v === curVal) { curLen++; continue; }
-            runs.push({ val: curVal, len: curLen });
-            curVal = v; curLen = 1;
-        }
-        runs.push({ val: curVal, len: curLen });
-        return { runs, starts: (() => { const s = []; let a = 0; for (const r of runs) { s.push(a); a += r.len; } return s; })() };
+function patternMerge(a, b) {
+    const count = a.count + b.count;
+    return {
+        x: (a.count * a.x + b.count * b.x) / count,
+        y: (a.count * a.y + b.count * b.y) / count,
+        module: (a.count * a.module + b.count * b.module) / count,
+        count
     };
+}
 
-    const scanOrientation = (isHorizontal) => {
-        const lineCount = isHorizontal ? height : width;
-        const lineLen = isHorizontal ? width : height;
-        for (let li = 0; li < lineCount; li++) {
-            const { runs, starts } = lineRuns(
-                (i) => isHorizontal ? bw[li * width + i] : bw[i * width + li],
-                lineLen
-            );
-            for (let i = 0; i + 4 < runs.length; i++) {
-                const u = matchRunWindow(runs, i);
-                if (!u) continue;
-                const unit = u.unit;
-                const centerX = isHorizontal
-                    ? starts[i] + runs[i].len + runs[i + 1].len + runs[i + 2].len / 2
-                    : li + 0.5;
-                const centerY = isHorizontal
-                    ? li + 0.5
-                    : starts[i] + runs[i].len + runs[i + 1].len + runs[i + 2].len / 2;
+function patternsConfirmed(lst) {
+    return lst.filter((i) => i.count >= PATTERN_MIN_CONFIRMATIONS);
+}
 
-                if (!verticalConfirm(bw, width, height, centerX, centerY, unit)) continue;
-                if (!templateConfirm(bw, width, height, centerX, centerY, unit)) continue;
-                candidates.push({ x: centerX, y: centerY, module: unit });
+/**
+ * Reference findFinder(): returns the three finder corners or null.
+ * @param {{bw: Uint8Array, width: number, height: number}} img
+ * @returns {{tl: {x:number,y:number,module:number}, tr: {x:number,y:number,module:number}, bl: {x:number,y:number,module:number}}|null}
+ */
+function findFindersRef(img) {
+    const found = [];
+    const sumR = (runs) => runs.reduce((a, b) => a + b, 0);
+
+    function checkRuns(runs, v = RUN_VARIANCE) {
+        const total = sumR(runs);
+        if (total < FINDER.totalSize) return false;
+        const moduleSize = total / FINDER.totalSize;
+        return FINDER.checkSize(runs, moduleSize, v);
+    }
+
+    // Non-diagonal cross line: walk from candidate center along incr,
+    // bounded arms (maxCount), totals-consistency, ratio re-validation.
+    // Returns sub-pixel center offset from start point (reference trick:
+    // check()'s step count doubles as toCenter's end coordinate).
+    function checkLine(cx, cy, maxCount, total, incrX, incrY) {
+        const runs = FINDER.runs();
+        const i = FINDER.check(img, runs, cx, cy, incrX, incrY, maxCount);
+        if (i === false) return false;
+        const runsTotal = sumR(runs);
+        if (5 * Math.abs(runsTotal - total) >= 2 * total) return false;
+        if (checkRuns(runs)) return FINDER.toCenter(runs, i);
+        return false;
+    }
+
+    function checkCandidate(runs, i, j) {
+        if (!checkRuns(runs)) return false;
+        const total = sumR(runs);
+        let x = FINDER.toCenter(runs, j);
+        // Vertical
+        let y = checkLine(Math.trunc(x), i, runs[2], total, 0, 1);
+        if (y === false) return false;
+        y += i;
+        // Horizontal recheck
+        const xx = checkLine(Math.trunc(x), Math.trunc(y), runs[2], total, 1, 0);
+        if (xx === false) return false;
+        x = xx + Math.trunc(x);
+        // Diagonal (looser tolerance)
+        const dRuns = FINDER.runs();
+        if (!FINDER.check(img, dRuns, Math.trunc(x), Math.trunc(y), 1, 1)) return false;
+        if (!checkRuns(dRuns, RUN_VARIANCE_DIAGONAL)) return false;
+        // Merge-or-add against existing clusters
+        const cur = { x, y, module: total / FINDER.totalSize, count: 1 };
+        for (let idx = 0; idx < found.length; idx++) {
+            if (!patternEquals(found[idx], cur)) continue;
+            found[idx] = patternMerge(found[idx], cur);
+            return true;
+        }
+        found.push(cur);
+        return true;
+    }
+
+    let skipped = false;
+    let ySkip = Math.max(Math.trunc((3 * img.height) / (4 * 97)), DETECT_MIN_ROW_SKIP);
+    let done = false;
+    for (let y = ySkip - 1; y < img.height && !done; y += ySkip) {
+        FINDER.scanLine(img, y, 0, img.width, (runs, x) => {
+            if (!checkCandidate(runs, y, x)) return;
+            // Found a pattern: densify rows, then early-exit heuristics
+            ySkip = 2;
+            if (skipped) {
+                // Third-pattern consistency check over confirmed clusters
+                let count = 0;
+                let mtotal = 0;
+                for (const pc of found) {
+                    if (pc.count < PATTERN_MIN_CONFIRMATIONS) continue;
+                    count++;
+                    mtotal += pc.module;
+                }
+                if (count < 3) return;
+                const average = mtotal / found.length;
+                let deviation = 0.0;
+                for (const pc of found) deviation += Math.abs(pc.module - average);
+                if (deviation <= 0.05 * mtotal) {
+                    done = true;
+                    return false; // stop scan
+                }
+            } else if (found.length > 1) {
+                // Two top patterns: jump toward the third's expected row band
+                const q = patternsConfirmed(found);
+                if (q.length < 2) return false; // stop
+                skipped = true;
+                const d = Math.trunc((Math.abs(q[0].x - q[1].x) - Math.abs(q[0].y - q[1].y)) / 2);
+                if (d <= runs[2] + ySkip) return false; // stop
+                y += d - runs[2] - ySkip;
+                return false; // restart scan from jumped position
+            }
+            return; // slide window
+        });
+        if (done) break;
+    }
+    const flen = found.length;
+    if (flen < 3) return null;
+
+    found.sort((a, b) => a.module - b.module);
+    const dist2 = (p, q) => (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
+    let bestScore = Infinity;
+    let best = null;
+    for (let i = 0; i < flen - 2; i++) {
+        const fi = found[i];
+        for (let j = i + 1; j < flen - 1; j++) {
+            const fj = found[j];
+            const square0 = dist2(fi, fj);
+            for (let k = j + 1; k < flen; k++) {
+                const fk = found[k];
+                if (fk.module > fi.module * 1.4) continue;
+                const arr = [square0, dist2(fj, fk), dist2(fi, fk)].sort((a, b) => a - b);
+                const score = Math.abs(arr[2] - 2 * arr[1]) + Math.abs(arr[2] - 2 * arr[0]);
+                if (score >= bestScore) continue; // ties keep first (reference)
+                bestScore = score;
+                best = [fi, fj, fk];
             }
         }
-    };
-
-    scanOrientation(true);
-    scanOrientation(false);
-
-    // Cluster nearby candidates, averaging hits for a precise anchor
-    const clusters = [];
-    for (const c of candidates) {
-        let target = null;
-        for (const k of clusters) {
-            const mx = k.sumX / k.n, my = k.sumY / k.n, mm = k.sumM / k.n;
-            if (Math.abs(mx - c.x) < mm * 2.5 && Math.abs(my - c.y) < mm * 2.5) { target = k; break; }
-        }
-        if (!target) { clusters.push({ sumX: c.x, sumY: c.y, sumM: c.module, n: 1 }); continue; }
-        target.sumX += c.x; target.sumY += c.y; target.sumM += c.module; target.n++;
     }
-    return clusters.map(k => ({
-        x: k.sumX / k.n,
-        y: k.sumY / k.n,
-        module: k.sumM / k.n
-    }));
+    if (!best) return null;
+
+    // Orientation: longest side is the hypotenuse; right-angle vertex is TL.
+    const [p0, p1, p2] = best;
+    const d01 = Math.hypot(p0.x - p1.x, p0.y - p1.y);
+    const d12 = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    const d02 = Math.hypot(p0.x - p2.x, p0.y - p2.y);
+    let tl = p2, bl = p0, tr = p1;
+    if (d12 >= d01 && d12 >= d02) { tl = p0; bl = p1; tr = p2; }
+    else if (d02 >= d12 && d02 >= d01) { tl = p1; bl = p0; tr = p2; }
+    // Cross-product handedness fix (image coords are y-down)
+    if ((tr.x - tl.x) * (bl.y - tl.y) - (tr.y - tl.y) * (bl.x - tl.x) < 0.0) {
+        const t = bl; bl = tr; tr = t;
+    }
+    return { tl, tr, bl };
 }
 
-/**
- * Snaps a cluster anchor to the offset with the best 7x7 template match,
- * sweeping +-2px in half-pixel steps. Decouples final precision from
- * which scan lines happened to produce candidates.
- */
-function refineCenter(img, cx, cy, m) {
-    const PATTERN = [
-        [1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,1,1,1,0,1],
-        [1,0,0,0,0,0,1],
-        [1,1,1,1,1,1,1]
-    ];
-    let bestX = cx, bestY = cy;
-    const scoreAt = (ox, oy) => {
-        let hit = 0;
-        for (let dr = -3; dr <= 3; dr++) {
-            for (let dc = -3; dc <= 3; dc++) {
-                const sx = Math.round(ox + dc * m);
-                const sy = Math.round(oy + dr * m);
-                if (sx < 0 || sy < 0 || sx >= img.width || sy >= img.height) continue;
-                if ((bwAt(img, sx, sy)) === PATTERN[dr + 3][dc + 3]) hit++;
-            }
-        }
-        return hit;
-    };
-    let bestScore = scoreAt(cx, cy); // center wins ties
-    for (let dx = -2; dx <= 2; dx += 0.5) {
-        for (let dy = -2; dy <= 2; dy += 0.5) {
-            if (dx === 0 && dy === 0) continue;
-            const hit = scoreAt(cx + dx, cy + dy);
-            if (hit > bestScore) { bestScore = hit; bestX = cx + dx; bestY = cy + dy; }
-        }
-    }
-    return { x: bestX, y: bestY, module: m };
-}
+
+
+
+
+
+
+
+
 
 function bwAt(img, x, y) {
     return img.bw[y * img.width + x] >= 0.5 ? 1 : 0;
@@ -316,69 +335,320 @@ export function decodeQR(imageData) {
     if (!imageData || typeof imageData !== 'object') {
         return [null, new Error('qr: imageData must be an object with data, width, height')];
     }
-    const [img, binErr] = binarize(imageData);
+    const [img0, binErr] = binarize(imageData);
     if (binErr) return [null, binErr];
 
-    const centers = findFinderCenters(img);
-    if (centers.length < 3) {
-        return [null, new Error(`qr: expected 3 finder patterns, found ${centers.length}`)];
+    // Finder detection across BOTH polarities with ranked hypotheses.
+    // Every finder triangle is a HYPOTHESIS verified by fully decoding:
+    // false positives lose to real finders on RS evidence, not heuristics.
+    // Inverted captures are handled by flipping the bitmap ONCE so all
+    // downstream stages (template refine, extent re-center, sampling) see
+    // standard dark-on-light geometry.
+    let lastErr = null;
+    const pushErr = (e) => { if (e && !lastErr) lastErr = e instanceof Error ? e : new Error(String(e)); };
+    for (const bitmap of [img0, negateBitmap(img0)]) {
+        {
+            const corners = findFindersRef(bitmap);
+            if (!corners) continue;
+            const tl = corners.tl;
+            const tr = corners.tr;
+            const bl = corners.bl;
+            const res = decodeGeometry(bitmap, { tl, tr, bl }, pushErr);
+            if (res) return [res, null];
+        }
     }
+    return [null, lastErr || new Error('qr: no decodable finder configuration found')];
+}
 
-    // Identify corners: TL minimizes x+y; of the rest, TR is the one
-    // further right, BL the one further down (no bottom-right finder).
-    const refined = centers.map(c => refineCenter(img, c.x, c.y, c.module));
-    const sorted = [...refined].sort((a, b) => a.x + a.y - (b.x + b.y));
-    const tl = sorted[0];
-    const rest = sorted.slice(1);
-    let tr = rest[0], bl = rest[1];
-    if (!tr || !bl) return [null, new Error('qr: degenerate finder geometry')];
-    if (bl.x > tr.x) { tr = rest[1]; bl = rest[0]; }
+/**
+ * DEV HOOK (differential harness only): run the full geometry+decode
+ * pipeline with externally supplied finder corners.
+ */
+export function decodeWithCorners(imageData, corners) {
+    const errs = [];
+    const pushErr = (e) => { if (e && errs.length === 0) errs.push(e instanceof Error ? e : new Error(String(e))); };
+    const [img0, binErr] = binarize(imageData);
+    if (binErr) return [null, binErr];
+    for (const bitmap of [img0, negateBitmap(img0)]) {
+        const out = decodeGeometry(bitmap, corners, pushErr);
+        if (out) return [out, null];
+    }
+    return [null, errs[0] || new Error('qr: geometry failed')];
+}
 
-    const mEst = (
-        (tl.module * 3 + tr.module + bl.module) /
-        (tl.module * 3 / tl.module + 1 + 1)
-    ); // weighted mean; tl counted thrice implicitly via formula below
-    const moduleSize = ((tl.module + tr.module + bl.module) / 3 + mEst) / 2;
+    
+
+/**
+ * Pattern machinery - verbatim translation of decode.ts pattern():
+ * run-window matching with per-ratio variance checks, cross-axis walks
+ * (check), sliding scanLine with shift-by-two continuity, and toCenter
+ * end-coordinate arithmetic. Shared by finder and alignment detection.
+ * @param {boolean[]} p dark/light pattern (odd length, center = middle)
+ * @param {number[]} size expected run widths in modules
+ */
+function makePattern(p, size) {
+    const center = Math.ceil(p.length / 2) - 1;
+    const totalSize = size.reduce((a, b) => a + b, 0);
+    const newRuns = () => new Array(p.length).fill(0);
+    const shift = (runs, n) => {
+        for (let i = 0; i < runs.length - n; i++) runs[i] = runs[i + 2];
+        for (let i = runs.length - n; i < runs.length; i++) runs[i] = 0;
+    };
+    return {
+        center,
+        length: p.length,
+        runs: newRuns,
+        totalSize,
+        checkSize(runs, moduleSize, v = RUN_VARIANCE) {
+            const variance = moduleSize / v;
+            for (let i = 0; i < runs.length; i++) {
+                if (Math.abs(size[i] * moduleSize - runs[i]) >= size[i] * variance) return false;
+            }
+            return true;
+        },
+        /**
+         * Walks negative then positive from center, filling runs.
+         * @returns {number} step count usable as toCenter's end coordinate
+         */
+        /** @returns {number|false} step count for toCenter, or false on failure */
+        check(img, runs, cx, cy, incrX, incrY, maxCount) {
+            let j = 0;
+            let x = cx, y = cy;
+            const inB = () => x >= 0 && y >= 0 && x < img.width && y < img.height;
+            const walk = (pi, stepX, stepY) => {
+                for (; inB() && (bwAt(img, x, y) ? 1 : 0) === (p[pi] ? 1 : 0); x += stepX, y += stepY) {
+                    runs[pi]++;
+                    j++;
+                }
+                if (runs[pi] === 0) return true;
+                if (maxCount && pi !== center && runs[pi] > size[pi] * maxCount) return true;
+                return false;
+            };
+            for (let pi = center; pi >= 0; pi--) if (walk(pi, -incrX, -incrY)) return false;
+            x = cx; y = cy; j = 1;
+            for (let pi = center; pi < p.length; pi++) if (walk(pi, incrX, incrY)) return false;
+            return j;
+        },
+        toCenter(runs, end) {
+            for (let i = p.length - 1; i > center; i--) end -= runs[i];
+            end -= runs[center] / 2;
+            return end;
+        },
+        scanLine(img, y, xStart, xEnd, fn) {
+            const runs = newRuns();
+            const patternBit = (x) => (img.bw[y * img.width + x] ? 1 : 0);
+            let pos = 0;
+            let x = xStart;
+            // Skip the first partial run when starting mid-image: its full
+            // width is unknowable from the left edge of the window.
+            if (xStart > 0 && xStart < xEnd) {
+                const want = p[0] ? 1 : 0;
+                while (x < xEnd && patternBit(x) === want) x++;
+            }
+            for (; x < xEnd; x++) {
+                const cur = patternBit(x);
+                if (cur === (p[pos] ? 1 : 0)) {
+                    // Consume the whole run; loop ++ lands on next color
+                    const start = x;
+                    while (x < xEnd && patternBit(x) === cur) x++;
+                    runs[pos] += x - start;
+                    x--;
+                }
+                if (pos !== p.length - 1) {
+                    pos++;
+                    runs[pos]++;
+                    continue;
+                }
+                // Window complete: fn decides match(true)/stop(false)/slide
+                const found = fn(runs, x);
+                if (found === false) break;
+                if (found === true) {
+                    pos = 0;
+                    for (let k = 0; k < runs.length; k++) runs[k] = 0;
+                    continue;
+                }
+                // No match: slide window by two runs so the tail becomes
+                // the new leading context (reference shift semantics).
+                shift(runs, 2);
+                pos = p.length - 2;
+                runs[pos]++;
+            }
+        }
+    };
+}
+
+const ALIGNMENT = makePattern([false, true, false], [1, 1, 1]);
+
+/**
+ * Locates the bottom-right alignment pattern - verbatim port of reference
+ * findAlignment(): predicted position c = 1 - 3/(size-7) along the
+ * TL->BR diagonal, expanding allowance 4x -> 16x moduleSize, rows scanned
+ * middle-out, each candidate cross-checked vertically (arms bounded at
+ * 2x inner width) with the coarse totals-consistency test.
+ *
+ * @returns {{x: number, y: number, moduleSize: number}|null}
+ */
+function findAlignment(img, est) {
+    const { moduleSize } = est;
+    for (let allowanceFactor = 4; allowanceFactor <= 16; allowanceFactor *= 2) {
+        const allowance = Math.trunc(allowanceFactor * moduleSize);
+        const leftX = Math.max(0, Math.trunc(est.x) - allowance);
+        const rightX = Math.min(img.width - 1, Math.trunc(est.x) + allowance);
+        const topY = Math.max(0, Math.trunc(est.y) - allowance);
+        const bottomY = Math.min(img.height - 1, Math.trunc(est.y) + allowance);
+        if (rightX - leftX < moduleSize * 3 || bottomY - topY < moduleSize * 3) continue;
+        const winW = rightX - leftX + 1;
+        const winH = bottomY - topY + 1;
+        const xEnd = leftX + winW;
+        const middleY = Math.trunc(topY + winH / 2);
+        let result = null;
+        for (let yGen = 0; yGen < winH; yGen++) {
+            const diff = Math.trunc((yGen + 1) / 2);
+            const y = middleY + (yGen & 1 ? -diff : diff);
+            ALIGNMENT.scanLine(img, y, leftX, xEnd, (runs, x) => {
+                if (!ALIGNMENT.checkSize(runs, moduleSize)) return;
+                const total = runs.reduce((a, b) => a + b, 0);
+                const xx = ALIGNMENT.toCenter(runs, x);
+                const rVert = ALIGNMENT.runs();
+                const ix = Math.trunc(xx);
+                const vSteps = ALIGNMENT.check(img, rVert, ix, y, 0, 1, 2 * runs[1]);
+                if (vSteps === false) return;
+                const vEnd = vSteps + y;
+                const vTotal = rVert.reduce((a, b) => a + b, 0);
+                if (5 * Math.abs(vTotal - total) >= 2 * total) return;
+                if (!ALIGNMENT.checkSize(rVert, moduleSize)) return;
+                const yy = ALIGNMENT.toCenter(rVert, vEnd);
+                result = { x: xx, y: yy, moduleSize: total / ALIGNMENT.totalSize };
+                return false; // stop scanning this row
+            });
+            if (result) return result;
+        }
+    }
+    return null;
+}
+
+/**
+ * Maps symbol-grid coordinates to image pixels through the 4-point
+ * homography composed exactly as reference squareToQuadrilateral +
+ * adjugate (decode.ts transform()). from = [tl,tr,br,bl] image points,
+ * to = corresponding module-center coordinates.
+ */
+function makeHomography(from, to) {
+    const sq = (p) => {
+        const d3x = p[0].x - p[1].x + p[2].x - p[3].x;
+        const d3y = p[0].y - p[1].y + p[2].y - p[3].y;
+        if (d3x === 0 && d3y === 0) {
+            return [
+                [p[1].x - p[0].x, p[2].x - p[1].x, p[0].x],
+                [p[1].y - p[0].y, p[2].y - p[1].y, p[0].y],
+                [0.0, 0.0, 1.0]
+            ];
+        }
+        const d1x = p[1].x - p[2].x, d1y = p[1].y - p[2].y;
+        const d2x = p[3].x - p[2].x, d2y = p[3].y - p[2].y;
+        const den = d1x * d2y - d2x * d1y;
+        const p13 = (d3x * d2y - d2x * d3y) / den;
+        const p23 = (d1x * d3y - d3x * d1y) / den;
+        return [
+            [p[1].x - p[0].x + p13 * p[1].x, p[3].x - p[0].x + p23 * p[3].x, p[0].x],
+            [p[1].y - p[0].y + p13 * p[1].y, p[3].y - p[0].y + p23 * p[3].y, p[0].y],
+            [p13, p23, 1.0]
+        ];
+    };
+    const p = sq(to); // square -> target(symbol)
+    // Adjugate of p (maps symbol -> unit square)
+    const q = [
+        [
+            p[1][1] * p[2][2] - p[2][1] * p[1][2],
+            p[2][1] * p[0][2] - p[0][1] * p[2][2],
+            p[0][1] * p[1][2] - p[1][1] * p[0][2]
+        ],
+        [
+            p[2][0] * p[1][2] - p[1][0] * p[2][2],
+            p[0][0] * p[2][2] - p[2][0] * p[0][2],
+            p[1][0] * p[0][2] - p[0][0] * p[1][2]
+        ],
+        [
+            p[1][0] * p[2][1] - p[2][0] * p[1][1],
+            p[2][0] * p[0][1] - p[0][0] * p[2][1],
+            p[0][0] * p[1][1] - p[1][0] * p[0][1]
+        ]
+    ];
+    const sToQ = sq(from); // unit square -> image quad
+    // Combined M = sToQ x q  maps symbol coords -> image pixels.
+    const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let r = 0; r < 3; r++)
+        for (let cq = 0; cq < 3; cq++)
+            for (let k = 0; k < 3; k++) M[r][cq] += sToQ[r][k] * q[k][cq];
+    return M;
+}
+
+/**
+ * Decodes using one finder-corner hypothesis.
+     * @returns {{bytes: Uint8Array, size: number, version: number}|null}
+     */
+    function decodeGeometry(img, corners, pushErr) {
+        const tl = corners.tl;
+        const tr = corners.tr;
+        const bl = corners.bl;
+        const brAnchor = corners.br || null;
+
+        // Cluster-averaged module size; ray-based BWBRunLength refinement
+        // is available but produces unstable results on small-module images
+        // (see corpus data). TODO: investigate.
+        const moduleSize = (tl.module + tr.module + bl.module) / 3;
+        if (Number.isNaN(moduleSize) || moduleSize < 1.0) {
+            pushErr(new Error('qr: invalid module size'));
+            return null;
+        }
 
     const spanX = Math.abs(tr.x - tl.x);
     const spanY = Math.abs(bl.y - tl.y);
     const nFromX = Math.round(spanX / moduleSize) + 7;
     const nFromY = Math.round(spanY / moduleSize) + 7;
 
-    let size = 0;
-    for (let v = 1; v <= 6; v++) {
-        const s = 17 + v * 4;
-        if (Math.abs(s - nFromX) <= 1 && Math.abs(s - nFromY) <= 1) { size = s; break; }
+    // Size is a HYPOTHESIS, not a point estimate: corner imprecision makes
+    // single-axis spans disagree, so try every plausible version (nearest
+    // estimates first) through the full verify pipeline.
+    const est = Math.min(Math.max(Math.round((nFromX + nFromY) / 2), 21), 17 + MAX_VERSION * 4);
+    const vEst = Math.round((est - 17) / 4);
+    const candidateSizes = [];
+    for (let dv = 0; candidateSizes.length < 5 && dv <= MAX_VERSION; dv++) {
+        for (const v of [vEst - dv, vEst + dv]) {
+            if (v < 1 || v > MAX_VERSION) continue;
+            const s = 17 + v * 4;
+            if (!candidateSizes.includes(s)) candidateSizes.push(s);
+            if (candidateSizes.length >= 5) break;
+        }
     }
-    if (!size) {
-        return [null, new Error(`qr: ambiguous symbol dimensions (${nFromX}x${nFromY} modules estimated)`)];
-    }
-    const version = (size - 17) / 4;
 
-    // Refine module size from spans and sample the grid. Sub-pixel anchor
-    // bias is self-corrected by trying half-step origin offsets until the
-    // format BCH check validates (clean synthetic and real captures both).
-    const mRefX = spanX / (size - 7);
-    const mRefY = spanY / (size - 7);
-    const baseOriginX = tl.x - 3.5 * mRefX;
-    const baseOriginY = tl.y - 3.5 * mRefY;
-
-    const buildGrid = (ddx, ddy) => {
+    // Basis-vector grid: derive per-module steps from the finder centers.
+    // Finder centers sit at module coordinate (3,3) and (size-4,size-4);
+    // separation = size-7 modules. Module (r,c) center =
+    //   tl + (c-3)*exVec + (r-3)*eyVec
+    // NOTE: offset is 3, NOT 3.5 - oracle Pattern coordinates are the
+    // center of the middle dark band (module 3's center).
+    const buildGridFor = (size) => (ddx, ddy) => {
         const grid = new Uint8Array(size * size);
-        const ox = baseOriginX + ddx, oy = baseOriginY + ddy;
-        // Area-majority sampling over the central portion of each module:
-        // robust against +-half-pixel anchor jitter that breaks point reads.
+        const span = size - 7;
+        const exX = (tr.x - tl.x) / span, exY = (tr.y - tl.y) / span;
+        const eyX = (bl.x - tl.x) / span, eyY = (bl.y - tl.y) / span;
+        const ox = tl.x - 3 * (exX + eyX) + ddx;
+        const oy = tl.y - 3 * (exY + eyY) + ddy;
         for (let r = 0; r < size; r++) {
-            const y0 = Math.round(oy + (r + 0.25) * mRefY);
-            const y1 = Math.round(oy + (r + 0.75) * mRefY);
             for (let c = 0; c < size; c++) {
-                const x0 = Math.round(ox + (c + 0.25) * mRefX);
-                const x1 = Math.round(ox + (c + 0.75) * mRefX);
+                // Module center in pixel space
+                const px = ox + c * exX + r * eyX;
+                const py = oy + c * exY + r * eyY;
+                // Area-majority over the inner portion of the module; window
+                // scales with module size but never bleeds past its edge.
+                const step = Math.min(Math.abs(exX), Math.abs(exY), Math.abs(eyX), Math.abs(eyY));
+                const w = Math.max(0, Math.floor(step / 4));
                 let dark = 0, tot = 0;
-                for (let yy = y0; yy <= y1; yy++) {
-                    if (yy < 0 || yy >= img.height) continue;
-                    for (let xx = x0; xx <= x1; xx++) {
-                        if (xx < 0 || xx >= img.width) continue;
+                for (let dy2 = -w; dy2 <= w; dy2++) {
+                    for (let dx2 = -w; dx2 <= w; dx2++) {
+                        const xx = Math.round(px + dx2), yy = Math.round(py + dy2);
+                        if (xx < 0 || yy < 0 || xx >= img.width || yy >= img.height) continue;
                         dark += bwAt(img, xx, yy); tot++;
                     }
                 }
@@ -388,126 +658,285 @@ export function decodeQR(imageData) {
         return grid;
     };
 
-    let matrix = null;
-    let fmtInfo = null;
-    let fmtErr = null;
-    outer:
-    for (const ddy of [0, -0.5, 0.5, -1, 1]) {
-        for (const ddx of [0, -0.5, 0.5, -1, 1]) {
-            matrix = buildGrid(ddx, ddy);
-            const [info, err] = readFormatInfo(matrix, size);
-            if (!err) { fmtInfo = info; break outer; }
-            fmtErr = err;
-        }
-    }
-    if (!fmtInfo) return [null, fmtErr];
-
-    const reserved = buildReservedMap(size, version);
-
-    const { total, ec } = VERSION_DATA[version];
-    const codewords = new Uint8Array(total);
-    let bitIdx = 0;
-    let upward = true;
-    for (let col = size - 1; col > 0; col -= 2) {
-        if (col === 6) col--;
-        for (let step = 0; step < size; step++) {
-            const row = upward ? size - 1 - step : step;
-            for (let c = col; c >= col - 1; c--) {
-                if (reserved[row * size + c]) continue;
-                const bit = matrix[row * size + c];
-                if (bitIdx < total * 8) {
-                    codewords[bitIdx >> 3] |= bit << (7 - (bitIdx & 7));
-                }
-                bitIdx++;
+    // Homography grid through a 4th BR anchor - either the LOCATED
+    // alignment pattern (v7+) or the parallelogram estimate tr-tl+bl
+    // (reference detect(): both feed the same transform()).
+    const buildGridHomography = (size, br, toBR) => (ddx, ddy) => {
+        const grid = new Uint8Array(size * size);
+        const from = [
+            { x: tl.x, y: tl.y },
+            { x: tr.x, y: tr.y },
+            { x: br.x, y: br.y },
+            { x: bl.x, y: bl.y }
+        ];
+        const to = [
+            { x: 3.5, y: 3.5 },
+            { x: size - 3.5, y: 3.5 },
+            toBR,
+            { x: 3.5, y: size - 3.5 }
+        ];
+        const M = makeHomography(from, to);
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                const gx = c + 0.5, gy = r + 0.5;
+                const den = M[2][0] * gx + M[2][1] * gy + M[2][2];
+                const px = Math.trunc(Math.min(Math.max((M[0][0] * gx + M[0][1] * gy + M[0][2]) / den + ddx, 0), img.width - 1));
+                const py = Math.trunc(Math.min(Math.max((M[1][0] * gx + M[1][1] * gy + M[1][2]) / den + ddy, 0), img.height - 1));
+                grid[r * size + c] = bwAt(img, px, py);
             }
         }
-        upward = !upward;
+        return grid;
+    };
+
+    let lastErr = null;
+
+    /**
+     * Completes decoding for one sampled grid: format parse -> mask
+     * inversion -> zigzag extraction -> RS correction -> segment parse.
+     * Returns the payload or null (reason captured in lastErr). Used by the
+     * origin sweep below so an offset whose sloppy format lands within the
+     * Hamming tolerance cannot masquerade as a decode - RS verifies it.
+     */
+    const tryFinish = (matrix, size, version, buildGrid) => {
+        void buildGrid;
+        const [fmtInfo, fmtErr] = readFormatInfo(matrix, size);
+        if (!fmtInfo) {
+            if (!lastErr) lastErr = /** @type {Error} */ (fmtErr);
+            return null;
+        }
+
+        const reserved = buildReservedMap(size, version);
+
+        // ECL-aware block structure: real vendor codes are not always EC-M.
+        const vd = { ec: parityFor(fmtInfo.eclBits, version), blocks: blocksFor(fmtInfo.eclBits, version) };
+        const total = totalCodewords(version);
+
+        // Undo the data mask over all non-function cells.
+        const sourceGrid = Uint8Array.from(matrix);
+        applyMaskInverse(sourceGrid, reserved, size, fmtInfo.maskId);
+
+        const codewords = new Uint8Array(total);
+        let bitIdx = 0;
+        let upward = true;
+        for (let col = size - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            for (let step = 0; step < size; step++) {
+                const row = upward ? size - 1 - step : step;
+                for (let c = col; c >= col - 1; c--) {
+                    if (reserved[row * size + c]) continue;
+                    const bit = sourceGrid[row * size + c];
+                    if (bitIdx < total * 8) {
+                        codewords[bitIdx >> 3] |= bit << (7 - (bitIdx & 7));
+                    }
+                    bitIdx++;
+                }
+            }
+            upward = !upward;
+        }
+
+        // RS correction: single-block or multi-block interleaved
+        let dcw;
+        const dataLens = [];
+        for (const b of vd.blocks) for (let k = 0; k < b.count; k++) dataLens.push(b.data);
+        try {
+            if (dataLens.length === 1) {
+                const received = Int32Array.from(codewords);
+                QR_RS_DECODER.decode(received, vd.ec);
+                dcw = Uint8Array.from(received.subarray(0, total - vd.ec));
+            } else {
+                const nBlk = dataLens.length;
+                const maxD = Math.max(...dataLens);
+                const blocksRx = dataLens.map(() => new Int32Array(maxD + vd.ec));
+                let idx = 0;
+                for (let r2 = 0; r2 < maxD; r2++) for (let b2 = 0; b2 < nBlk; b2++) {
+                    if (r2 < dataLens[b2]) blocksRx[b2][r2] = codewords[idx++];
+                }
+                for (let j = 0; j < vd.ec; j++) for (let b2 = 0; b2 < nBlk; b2++) blocksRx[b2][maxD + j] = codewords[idx++];
+                dcw = new Uint8Array(dataLens.reduce((a, l) => a + l, 0));
+                let off = 0;
+                for (let b2 = 0; b2 < nBlk; b2++) {
+                    QR_RS_DECODER.decode(blocksRx[b2], vd.ec);
+                    for (let k = 0; k < dataLens[b2]; k++) dcw[off++] = blocksRx[b2][k];
+                }
+            }
+        } catch (e) {
+            const msg = 'qr-rs: ' + String(e.message || e).replace(/ReedSolomonException\("|"\)/g, '');
+            if (!lastErr || /locator|roots/.test(String(lastErr.message))) lastErr = new Error(msg);
+            return null;
+        }
+
+        // Parse byte-mode payload from the segment bitstream:
+        // 4-bit mode indicator, then 8-bit (v1-9) or 16-bit (v10+) count.
+        const getBit = (i) => (dcw[i >> 3] >> (7 - (i & 7))) & 1;
+        let pos = 0;
+        const rdBits = (n) => { let v = 0; for (let k = 0; k < n; k++) v = (v << 1) | getBit(pos++); return v; };
+
+        const mode = rdBits(4);
+        if (mode !== 4) {
+            if (!lastErr || !String(lastErr.message).includes('format')) {
+                lastErr = new Error('qr: unsupported encoding mode ' + mode + ' (only byte mode)');
+            }
+            return null;
+        }
+        const len = rdBits(version <= 9 ? 8 : 16);
+        if (pos + len * 8 > dcw.length * 8) {
+            lastErr = new Error('qr: truncated payload');
+            return null;
+        }
+        const outBytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) outBytes[i] = rdBits(8);
+        return { bytes: outBytes, size, version };
+    };
+
+    // Size hypotheses x sampler: each sampled grid is FULLY verified
+    // (format + RS + segment parse). Sampler preference mirrors reference
+    // detect(): located alignment anchor (v7+) > supplied BR anchor >
+    // parallelogram homography > affine basis grid.
+    for (const size of candidateSizes) {
+        const version = (size - 17) / 4;
+        // Parallelogram homography FIRST (handles rotation/perspective for
+        // ALL versions); alignment refinement when available; affine basis
+        // grid as last resort.
+        const builders = [];
+        builders.push(buildGridHomography(size, { x: tr.x - tl.x + bl.x, y: tr.y - tl.y + bl.y }, { x: size - 3.5, y: size - 3.5 }));
+        if (version >= 7 && alignmentCenters(version).length) {
+            const est = {
+                x: tl.x + (1 - 3 / (size - 7)) * (tr.x - tl.x + bl.x - tl.x),
+                y: tl.y + (1 - 3 / (size - 7)) * (tr.y - tl.y + bl.y - tl.y),
+                moduleSize
+            };
+            const aln = findAlignment(img, est);
+            if (aln) {
+                builders.push(buildGridHomography(size, aln, { x: size - 6.5, y: size - 6.5 }));
+            }
+        }
+        if (!builders.length && brAnchor) {
+            builders.push(buildGridHomography(size, brAnchor, { x: size - 3.5, y: size - 3.5 }));
+        }
+        builders.push(buildGridHomography(size, { x: tr.x - tl.x + bl.x, y: tr.y - tl.y + bl.y }, { x: size - 3.5, y: size - 3.5 }));
+        builders.push(buildGridFor(size));
+        for (const buildGrid of builders) {
+            for (const ddy of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) {
+                for (const ddx of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) {
+                    const result = tryFinish(buildGrid(ddx, ddy), size, version, buildGrid);
+                    if (result) return result;
+                }
+            }
+        }
     }
+    pushErr(lastErr || new Error('qr: unable to sample a decodable grid'));
+    return null;
+}
 
-    
 
-    
 
-    
-
-    
-
-    
-
-    
-
-    const [dcw, rsErr] = rsCorrectBlock(codewords, ec);
-    if (rsErr) return [null, rsErr];
-
-    // Parse byte-mode payload from the (unbyte-aligned) segment bitstream:
-    // 4-bit mode indicator, then 8-bit (v1-9) or 16-bit (v10+) char count.
-    const getBit = (i) => (dcw[i >> 3] >> (7 - (i & 7))) & 1;
-    let pos = 0;
-    const rdBits = (n) => { let v = 0; for (let k = 0; k < n; k++) v = (v << 1) | getBit(pos++); return v; };
-
-    const mode = rdBits(4);
-    if (mode !== 4) {
-        return [null, new Error('qr: unsupported encoding mode ' + mode + ' (only byte mode)')];
-    }
-    const len = rdBits(version <= 9 ? 8 : 16);
-    if (pos + len * 8 > dcw.length * 8) {
-        return [null, new Error('qr: truncated payload')];
-    }
-    const outBytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) outBytes[i] = rdBits(8);
-
-    return [{ bytes: outBytes, size, version }, null];
+/** Inverts a binary bitmap (polarity flip for dark-theme captures). */
+function negateBitmap(img) {
+    return { bw: Uint8Array.from(img.bw, (v) => (v ? 0 : 1)), width: img.width, height: img.height };
 }
 
 /**
  * @param {Uint8Array} matrix
  * @param {number} size
- * @returns {[{maskId: number}|null, Error|null]}
+ * @returns {void}
+ */
+function applyMaskInverse(matrix, reserved, size, maskId) {
+    for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+            if (reserved[row * size + col]) continue;
+            let flip = false;
+            switch (maskId) {
+                case 0: flip = (row + col) % 2 === 0; break;
+                case 1: flip = row % 2 === 0; break;
+                case 2: flip = col % 3 === 0; break;
+                case 3: flip = (row + col) % 3 === 0; break;
+                case 4: flip = (Math.floor(row / 2) + Math.floor(col / 3)) % 2 === 0; break;
+                case 5: flip = ((row * col) % 2 + (row * col) % 3) === 0; break;
+                case 6: flip = (((row * col) % 2 + (row * col) % 3) % 2) === 0; break;
+                case 7: flip = (((row + col) % 2 + (row * col) % 3) % 2) === 0; break;
+            }
+            if (flip) matrix[row * size + col] ^= 1;
+        }
+    }
+}
+
+/**
+ * All 32 canonical 15-bit format strings (4 ECL x 8 masks) with parsed
+ * meanings, precomputed from the shared spec helper. Readers match observed
+ * strips exactly first, then by Hamming distance <= FORMAT_BITS_ERROR -
+ * real captures routinely flip 1-2 cells in both copies simultaneously.
+ */
+const CANONICAL_FORMATS = (() => {
+    const out = [];
+    for (const eclBits of [EC_LEVEL_BITS.M, EC_LEVEL_BITS.L, EC_LEVEL_BITS.H, EC_LEVEL_BITS.Q]) {
+        for (let maskId = 0; maskId < 8; maskId++) {
+            out.push({ bits: formatInfoBits(eclBits, maskId), eclBits, maskId });
+        }
+    }
+    return out;
+})();
+
+const FORMAT_BITS_ERROR = 3;
+
+/** Population count (Hamming weight of xor). */
+function popcnt(x) {
+    let n = 0;
+    while (x) { x &= x - 1; n++; }
+    return n;
+}
+
+/**
+ * @param {Uint8Array} matrix
+ * @param {number} size
+ * @returns {[{eclBits: number, maskId: number}|null, Error|null]} Tuple of [format, error]
  */
 function readFormatInfo(matrix, size) {
+    // Spec bit order (ISO/IEC 18004 §7.9). Copy A wraps the top-left
+    // finder: (8,0)..(8,5),(8,7),(8,8),(7,8),(5,8)..(0,8), MSB first.
+    // NOTE: our ENCODER writes a transposed variant; these readers follow
+    // the spec so external captures decode. Roundtrip tests use the
+    // encoder's own convention via its writer, not this reader.
     const readCopyA = () => {
-        const bits = [];
-        for (let i = 0; i <= 5; i++) bits.push(matrix[i * size + 8]);
-        bits.push(matrix[7 * size + 8]);
-        bits.push(matrix[8 * size + 8]);
-        bits.push(matrix[8 * size + 7]);
-        for (let i = 5; i >= 0; i--) bits.push(matrix[8 * size + i]);
-        for (let i = size - 1; i >= size - 7; i--) bits.push(matrix[i * size + 8]);
-        for (let i = size - 8; i < size; i++) bits.push(matrix[8 * size + i]);
         let fmt = 0;
-        for (let i = 0; i < 15; i++) fmt |= bits[i] << i;
+        const put = (row, col) => { fmt = (fmt << 1) | matrix[row * size + col]; };
+        for (let i = 0; i <= 5; i++) put(8, i);
+        put(8, 7);
+        put(8, 8);
+        put(7, 8);
+        for (let i = 5; i >= 0; i--) put(i, 8);
         return fmt;
     };
 
-    const validate = (fmt) => {
-        const data = fmt ^ FMT_MASK;
-        let rem = data;
-        for (let i = 14; i >= 10; i--) {
-            if ((rem >> i) & 1) rem ^= FMT_GEN << (i - 10);
-        }
-        if (rem !== 0) return null;
-        const ecl = (data >> 13) & 3;
-        const maskId = (data >> 10) & 7;
-        if (ecl !== 0) return null; // EC level M only
-        return { maskId };
+    // Copy B: (8,size-1)..(8,size-7) then (size-8,8)..(size-1,8), MSB first.
+    const readCopyB = () => {
+        let fmt = 0;
+        const put = (row, col) => { fmt = (fmt << 1) | matrix[row * size + col]; };
+        for (let i = size - 1; i >= size - 7; i--) put(8, i);
+        for (let i = size - 8; i < size; i++) put(i, 8);
+        return fmt;
     };
 
-    const a = validate(readCopyA());
-    if (a) return [a, null];
+    const rawA = readCopyA();
+    const rawB = readCopyB();
 
-    // Copy B: mirror the second physical layout (bottom-left column strip +
-    // top-right row strip). Encoder writes identical bits; read them back.
-    const bitsB = [];
-    for (let i = size - 1; i >= size - 7; i--) bitsB.push(matrix[8 * size + i]);
-    for (let i = size - 8; i < size; i++) bitsB.push(matrix[i * size + 8]);
-    for (let i = 5; i >= 0; i--) bitsB.push(matrix[i * size + 8]);
-    bitsB.push(matrix[8 * size + 7]);
-    bitsB.push(matrix[8 * size + 8]);
-    for (let i = 7; i >= 0; i--) bitsB.push(matrix[8 * size + i]);
-    let fmtB = 0;
-    for (let i = 0; i < 15; i++) fmtB |= bitsB[i] << i;
-    const b = validate(fmtB);
-    if (b) return [b, null];
+    // Exact matches win outright.
+    for (const raw of [rawA, rawB]) {
+        const exact = CANONICAL_FORMATS.find((c) => c.bits === raw);
+        if (exact) return [{ eclBits: exact.eclBits, maskId: exact.maskId }, null];
+    }
+
+    // Otherwise nearest canonical string across BOTH copies within tolerance.
+    let best = null;
+    let bestDist = FORMAT_BITS_ERROR + 1;
+    for (const raw of [rawA, rawB]) {
+        for (const cand of CANONICAL_FORMATS) {
+            const d = popcnt(raw ^ cand.bits);
+            if (d < bestDist) { bestDist = d; best = cand; }
+        }
+    }
+    if (best && bestDist <= FORMAT_BITS_ERROR) {
+        return [{ eclBits: best.eclBits, maskId: best.maskId }, null];
+    }
 
     return [null, new Error('qr: format information failed BCH validation in both copies')];
 }
@@ -516,7 +945,7 @@ function buildReservedMap(size, version) {
     const res = new Uint8Array(size * size);
     const mark = (r, c) => { res[r * size + c] = 1; };
 
-    // Finders (incl. separators are NOT reserved in encoder; only 7x7 bodies)
+    // Finders (7x7 bodies)
     const finderAt = (tr, tc) => {
         for (let dr = 0; dr < 7; dr++) for (let dc = 0; dc < 7; dc++) mark(tr + dr, tc + dc);
     };
@@ -524,17 +953,30 @@ function buildReservedMap(size, version) {
     finderAt(0, size - 7);
     finderAt(size - 7, 0);
 
+    // Separators ringing each finder (mirrors encoder placeSeparators)
+    for (let i = 0; i < 8; i++) {
+        mark(7, i); mark(i, 7);
+        mark(7, size - 1 - i); mark(i, size - 8);
+        mark(size - 8, i); mark(size - 1 - i, 7);
+    }
+
     // Timing
     for (let i = 8; i < size - 8; i++) { mark(6, i); mark(i, 6); }
 
-    // Alignment (last two centers, matching encoder)
-    const centers = ALIGNMENT_CENTERS[version];
-    if (centers && centers.length >= 2) {
-        const cr = centers[centers.length - 2], cc = centers[centers.length - 1];
-        for (let dr = -2; dr <= 2; dr++) {
-            for (let dc = -2; dc <= 2; dc++) {
-                const rr = cr + dr, ccc = cc + dc;
-                if (rr >= 0 && rr < size && ccc >= 0 && ccc < size) mark(rr, ccc);
+    // Alignment patterns: every center combination except the three
+    // finder-corner overlaps (mirrors encoder placeAlignments)
+    const centers = alignmentCenters(version);
+    if (centers.length) {
+        const last = centers[centers.length - 1];
+        for (const ri of centers) {
+            for (const ci of centers) {
+                if ((ri === 6 && ci === 6) || (ri === 6 && ci === last) || (ri === last && ci === 6)) continue;
+                for (let dr = -2; dr <= 2; dr++) {
+                    for (let dc = -2; dc <= 2; dc++) {
+                        const rr = ri + dr, ccc = ci + dc;
+                        if (rr >= 0 && rr < size && ccc >= 0 && ccc < size) mark(rr, ccc);
+                    }
+                }
             }
         }
     }
@@ -542,13 +984,23 @@ function buildReservedMap(size, version) {
     // Dark module
     mark(size - 8, 8);
 
-    // Format areas (mirror reserveFormat)
+    // Format areas (mirror reserveFormatAreas)
     for (let i = 0; i < 9; i++) {
         if (i !== 6) { mark(i, 8); mark(8, i); }
     }
     mark(8, 8);
     for (let i = 0; i < 8; i++) { mark(size - 1 - i, 8); mark(8, size - 1 - i); }
 
+    // Version information strips (v>=7): rows 0-5 x cols [size-11,size-9]
+    // and their transpose (mirror encoder writeVersionInfo)
+    if (version >= 7) {
+        for (let y = 0; y <= 5; y++) {
+            for (let x = size - 11; x <= size - 9; x++) {
+                if (y >= 0 && y < size) { mark(y, x); mark(x, y); }
+            }
+        }
+    }
+
     return res;
 }
-
+

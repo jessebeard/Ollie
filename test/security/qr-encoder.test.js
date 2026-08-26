@@ -7,10 +7,10 @@ describe('QR encoder (ISO/IEC 18004)', () => {
 
     it('produces a matrix with correct dimensions for a short payload', () => {
         const result = encodeQR(bytes('Hello'));
-        // 'Hello' is 5 bytes → v2 EC-M → 25×25 modules
-        if (result.size !== 25) throw new Error(`expected 25×25 for v2, got ${result.size}`);
+        // 'Hello' is 5 bytes - v1 EC-M byte capacity is 14, so 21x21 modules
+        if (result.size !== 21) throw new Error(`expected 21x21 for v1, got ${result.size}`);
         if (!(result.modules instanceof Uint8Array)) throw new Error('modules must be Uint8Array');
-        if (result.modules.length !== 25 * 25) throw new Error('module grid size mismatch');
+        if (result.modules.length !== 21 * 21) throw new Error('module grid size mismatch');
     });
 
     it('selects larger versions for longer payloads', () => {

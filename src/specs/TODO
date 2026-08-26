@@ -123,3 +123,29 @@ PRF-derived symmetric key. Real 2FA offline (secret never leaves enclave),
 PQ-safe, ideal for the PWA target. UX MUST warn loudly: losing the
 authenticator = permanent vault lockout. Requires metadata.kdf2 wire-doc
 addition + golden vector regeneration.
+
+## 2026-08-25 - QR decoder: real-world fixture robustness (open)
+The decoder handles synthetic v1-v15 symbols correctly (roundtrip tests
+pass) but fails on 3 of 4 real TOTP enrollment screenshots. Remaining
+issues require production-grade CV preprocessing:
+- dropbox/github: grid sampling misalignment from anti-aliased edges;
+  needs adaptive/local binarization (Otsu) instead of global mean, or
+  sub-pixel edge-aware module sampling.
+- discord: anti-aliased edges break the run-length window matcher;
+  needs a smoothing/median pass on the binarized bitmap before scanning.
+- gitlab: RS block correction failure from accumulated sampling errors;
+  likely resolved by fixing the above two.
+Synthetic roundtrip tests (v1-v15, all scales, jitter tolerance, scattered
+damage within EC-M) pass. Only real-world captures fail. The fixture
+tests in test/security/qr-fixtures.test.js serve as acceptance criteria.
+
+
+## 2026-08-25 - QR decoder rewrite C1-C5 (committed)
+Shared ISO capacity tables v1-15 + encoder ISO conformance (C1/C2),
+Hamming-tolerant format parsing with all-level RS (C3), adaptive
+binarizer + cross-checked finders + basis-vector sampling (C4/C5).
+Result: 853/859 suite, discord fixture passes end-to-end.
+Remaining 6: dropbox/github/gitlab fixtures need adaptive block sizing
+(BLOCK=8 too coarse for ~2.4px/module images); jitter x2 needs spatially-
+correlated noise model; darkbg fixed by flat-block polarity comparison.
+

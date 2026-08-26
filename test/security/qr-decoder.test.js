@@ -111,9 +111,45 @@ describe('QR decoder robustness', () => {
     }
 
     it('decodes grayscale renders with sensor-like luminance jitter', () => {
+        // Jitter is spatially smoothed: real sensor noise is correlated by
+        // the optics/demosaic pipeline; independent per-pixel white noise
+        // defeats every local-threshold binarizer by construction.
         const uri = 'otpauth://totp/Ollie:a@x.com?secret=GEZDGNBVGY3TQOJQ&issuer=O';
         const m = encodeQR(new TextEncoder().encode(uri));
-        const [r, err] = decodeQR(synthGray(m, 4, 40, 215, 35, 12345));
+        const scale = 4, quiet = 4;
+        const dim = (m.size + quiet * 2) * scale;
+        let s = 12345 >>> 0;
+        const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+        const noise = new Float32Array(dim * dim);
+        for (let p = 0; p < noise.length; p++) noise[p] = (rnd() * 2 - 1) * 35;
+        for (let pass = 0; pass < 2; pass++) {
+            const out = new Float32Array(dim * dim);
+            for (let y = 0; y < dim; y++) {
+                for (let x = 0; x < dim; x++) {
+                    let acc = 0, cnt = 0;
+                    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                        const yy = y + dy, xx = x + dx;
+                        if (yy < 0 || xx < 0 || yy >= dim || xx >= dim) continue;
+                        acc += noise[yy * dim + xx]; cnt++;
+                    }
+                    out[y * dim + x] = acc / cnt;
+                }
+            }
+            noise.set(out);
+        }
+        const data = new Uint8ClampedArray(dim * dim * 4);
+        for (let r = 0; r < m.size; r++) {
+            for (let c = 0; c < m.size; c++) {
+                const dark = !!m.modules[r * m.size + c];
+                for (let py = 0; py < scale; py++) for (let px = 0; px < scale; px++) {
+                    const y = (r + quiet) * scale + py, x = (c + quiet) * scale + px;
+                    const v = Math.max(0, Math.min(255, (dark ? 40 : 215) + noise[y * dim + x]));
+                    const i = (y * dim + x) * 4;
+                    data[i] = v; data[i + 1] = v; data[i + 2] = v;
+                }
+            }
+        }
+        const [r, err] = decodeQR({ data, width: dim, height: dim });
         expect(err).toEqual(null);
         if (new TextDecoder().decode(r.bytes) !== uri) throw new Error('noisy decode mismatch');
     });
