@@ -30,4 +30,40 @@ describe('escapeHtml XSS Prevention', () => {
         expect(escaped.includes('>')).toBe(false);
         expect(escaped).toContain('&lt;');
     });
+
+    it('Property: escaped string length is monotonically non-decreasing compared to unescaped length', async () => {
+        await assertProperty(
+            [Arbitrary.string(0, 100)],
+            (str) => {
+                const escaped = escapeHtml(str);
+                expect(escaped.length).toBeGreaterThanOrEqual(str.length);
+            },
+            100
+        );
+    });
+
+    it('Metamorphic MR: double-escape stability and containment', async () => {
+        await assertProperty(
+            [Arbitrary.string(0, 100)],
+            (str) => {
+                const once = escapeHtml(str);
+                const twice = escapeHtml(once);
+
+                // Both once and twice must be completely sanitized of raw HTML delims
+                expect(once.includes('<')).toBe(false);
+                expect(once.includes('>')).toBe(false);
+                expect(once.includes('"')).toBe(false);
+                expect(once.includes("'")).toBe(false);
+
+                expect(twice.includes('<')).toBe(false);
+                expect(twice.includes('>')).toBe(false);
+                expect(twice.includes('"')).toBe(false);
+                expect(twice.includes("'")).toBe(false);
+
+                // Second escape expands &amp; into &amp;amp; so length(twice) >= length(once)
+                expect(twice.length).toBeGreaterThanOrEqual(once.length);
+            },
+            100
+        );
+    });
 });

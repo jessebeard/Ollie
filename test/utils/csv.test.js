@@ -1,5 +1,5 @@
 import { describe, it, expect } from '../utils/test-runner.js';
-// RED: module does not exist yet - this suite must fail until Cycle 1 GREEN.
+import { Arbitrary, assertProperty } from './pbt.js';
 import { parseCsv } from '../../src/utils/csv.js';
 
 describe('parseCsv (RFC 4180)', () => {
@@ -81,6 +81,61 @@ describe('parseCsv (RFC 4180)', () => {
             const [kpRows] = parseCsv('"ab"""', { escapeStyle: 'keepass' });
             expect(rfcRows[0][0]).toBe('ab"');
             expect(kpRows[0][0]).toBe('ab""');
+        });
+    });
+
+    describe('PBT & Robustness', () => {
+        it('Property: parseCsv never throws on arbitrary random string input', async () => {
+            await assertProperty(
+                [Arbitrary.string(0, 500)],
+                (input) => {
+                    const [rows, err] = parseCsv(input);
+                    // Must always return either valid array or typed Error
+                    if (err) {
+                        expect(err instanceof Error).toBe(true);
+                        expect(rows).toBe(null);
+                    } else {
+                        expect(Array.isArray(rows)).toBe(true);
+                        expect(err).toBe(null);
+                    }
+                },
+                100
+            );
+        });
+
+        it('Property: well-formed unquoted alphanumeric CSV preserves exact row and col counts', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 20), Arbitrary.integer(1, 5)],
+                (rowCount, colCount) => {
+                    const lines = [];
+                    for (let r = 0; r < rowCount; r++) {
+                        const cols = [];
+                        for (let c = 0; c < colCount; c++) {
+                            cols.push(`cell_${r}_${c}`);
+                        }
+                        lines.push(cols.join(','));
+                    }
+                    const csvText = lines.join('\n');
+                    const [rows, err] = parseCsv(csvText);
+                    expect(err).toBe(null);
+                    expect(rows.length).toBe(rowCount);
+                    for (let r = 0; r < rowCount; r++) {
+                        expect(rows[r].length).toBe(colCount);
+                        expect(rows[r][0]).toBe(`cell_${r}_0`);
+                    }
+                },
+                50
+            );
+        });
+
+        it('returns typed error tuple for non-string input', () => {
+            const [r1, e1] = parseCsv(null);
+            expect(r1).toBe(null);
+            expect(e1 instanceof Error).toBe(true);
+
+            const [r2, e2] = parseCsv(12345);
+            expect(r2).toBe(null);
+            expect(e2 instanceof Error).toBe(true);
         });
     });
 });

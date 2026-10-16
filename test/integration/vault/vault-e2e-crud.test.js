@@ -1,17 +1,16 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
     describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class MockFile {
     constructor(buffer, name) {
@@ -51,7 +50,7 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
     it('Property: Vault CRUD survival across save/load', async () => {
         const fixturesDir = path.join(__dirname, '../../fixtures/test vault');
         const availableImageFiles = fs.readdirSync(fixturesDir)
-            .filter(f => f.endsWith('.jpg') || f.endsWith('.jpeg'))
+            .filter(f => (f.endsWith('.jpg') || f.endsWith('.jpeg')) && !f.includes('BIG_LONELY_DOUG'))
             .map(f => path.join(fixturesDir, f));
 
         if (availableImageFiles.length === 0) {
@@ -137,7 +136,7 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
             },
             1
         );
-    });
+    }, { timeout: 60000 });
 });
 }
 

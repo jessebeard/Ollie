@@ -29,10 +29,10 @@ if (typeof document !== 'undefined') {
             };
             const originalGet = document.getElementById;
             const originalCreate = document.createElement;
-            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGet(id);
+            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGet.call(document, id);
             document.createElement = (tag) => (tag === 'input')
                 ? { type: '', accept: '', onchange: null }
-                : originalCreate(tag);
+                : originalCreate.call(document, tag);
 
             try {
                 const ui = new VaultUI();

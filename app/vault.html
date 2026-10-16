@@ -6,33 +6,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ollie Vault</title>
     <link rel="stylesheet" href="components/vault/vault.css">
+</head>
 
 <body>
     <div class="vault-app">
         <!-- Sidebar -->
         <aside class="sidebar">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <img src="components/assets/ollie-icon.svg" alt="Ollie Vault Logo" width="32" height="32"
-                    style="border-radius: 8px;">
-                Ollie Vault
-            </h2>
-
-            <div class="nav-group">
-                <button class="btn btn-secondary w-full" id="createBtn" style="width:100%; margin-bottom: 0.5rem"
-                    aria-label="Create a new Vault">✨ New Base Vault</button>
-                <button class="btn btn-secondary w-full" id="saveBtn" style="width:100%; margin-bottom: 0.5rem"
-                    aria-label="Save current vault to JPEGs">💾 Save To JPEGs</button>
-                <button class="btn btn-secondary w-full" id="importBtn"
-                    style="width:100%; margin-bottom: 0.5rem; display: none;" aria-label="Import plaintext JSON data">📥
-                    Import JSON</button>
-                <button class="btn btn-secondary w-full" id="exportBtn" style="width:100%; display: none;"
-                    aria-label="Export vault to plaintext JSON">📤 Export (Plaintext)</button>
+            <div class="sidebar-header">
+                <img src="components/assets/ollie-icon.svg" alt="Ollie Vault Logo" width="30" height="30"
+                    class="sidebar-logo">
+                <h2>Ollie Vault</h2>
             </div>
 
-            <div style="margin-top: 2rem" aria-label="Filter by tags">
-                <h4 style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase;">Tags</h4>
-                <div id="tagList" style="margin-top: 1rem" role="group" aria-label="Available Tags">
-                    <!-- Tags populated here -->
+            <nav class="nav-group">
+                <!-- Primary Actions -->
+                <div class="nav-section">
+                    <button class="nav-btn nav-btn-primary" id="createBtn" aria-label="Create a new Vault">✨ New Base Vault</button>
+                    <button class="nav-btn" id="saveBtn" aria-label="Save current vault to JPEGs">💾 Save To JPEGs</button>
+                    <button class="nav-btn" id="lockBtn" style="display: none;" aria-label="Lock current vault session">🔒 Lock Vault</button>
+                </div>
+                <!-- Management & Security Tools (visible when unlocked) -->
+                <div class="nav-section" id="unlockedNav">
+                    <button class="nav-btn" id="changePwBtn" style="display: none;" aria-label="Change Master Password">🔑 Change Password</button>
+                    <button class="nav-btn" id="totpSettingsBtn" style="display: none;" aria-label="Configure 2FA Security Gate">🛡️ 2FA Security</button>
+                    <button class="nav-btn" id="importBtn" style="display: none;" aria-label="Import JSON or CSV data">📥 Import JSON / CSV</button>
+                    <button class="nav-btn" id="exportEncryptedBtn" style="display: none;" aria-label="Export Encrypted Backup Container">📦 Backup Encrypted (.ollie)</button>
+                    <button class="nav-btn" id="exportBtn" style="display: none;" aria-label="Export vault to plaintext JSON">📤 Export (Plaintext)</button>
+                </div>
+            </nav>
+
+            <!-- Tag Filter Section -->
+            <div class="tag-section" aria-label="Filter by tags">
+                <div class="tag-section-header">
+                    <span class="tag-section-title">Tags <span id="tagCountBadge" class="badge">0</span></span>
+                    <button id="clearTagsBtn" class="tag-clear-btn" style="display: none;" aria-label="Clear all active tag filters">✕ Clear</button>
+                </div>
+                <input type="search" id="tagSearchInput" class="tag-search-input" placeholder="Filter tags..." aria-label="Search and filter tags">
+                <div id="tagList" class="tag-list" role="group" aria-label="Available Tags">
+                    <!-- Tags populated here dynamically -->
                 </div>
             </div>
         </aside>
@@ -48,7 +59,7 @@
                 </div>
 
                 <div class="header-controls">
-                    <input type="search" id="searchInput" class="search-input" placeholder="Search..."
+                    <input type="search" id="searchInput" class="search-input" placeholder="Search entries..."
                         aria-label="Search items by title, username, or URL">
                     <select id="sortSelect" class="sort-select" aria-label="Sort Entries">
                         <option value="newest">Newest First</option>
@@ -71,18 +82,15 @@
                 </div>
             </div>
 
-            <div class="status-bar"
-                style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-muted);"
-                role="status" aria-live="polite">
+            <div class="status-bar" role="status" aria-live="polite">
                 <span id="itemCount">0 Items</span>
                 <div class="capacity-meter">
                     <div class="capacity-bar">
                         <div id="capacityProgress" class="capacity-progress"></div>
                     </div>
-                    <span id="capacityText" title="Total steganographic storage capacity across loaded images">Used: 0 B
-                        / Total: 0 B</span>
+                    <span id="capacityText" title="Total steganographic storage capacity across loaded images">Used: 0 B / Total: 0 B</span>
                 </div>
-                <span>Ollie v0.2 (early alpha)</span>
+                <span>Ollie v0.3</span>
             </div>
         </main>
     </div>

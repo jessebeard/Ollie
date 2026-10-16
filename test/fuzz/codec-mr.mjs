@@ -1,7 +1,6 @@
 import { Arbitrary, assertProperty } from '../utils/pbt.js';
 import { JpegEncoder } from '../../src/codec/encoder.js';
 import { JpegDecoder } from '../../src/codec/decoder.js';
-import { F5 } from '../../src/information-theory/steganography/f5-syndrome.js';
 
 function seededRandom(seed) {
     let s = seed >>> 0;

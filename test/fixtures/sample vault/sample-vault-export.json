@@ -1,0 +1,825 @@
+{
+  "version": "3.0",
+  "entries": [
+    {
+      "id": "f6892021-5d64-4f09-aae0-8c851703031f",
+      "title": "GitHub Enterprise",
+      "url": "https://github.com",
+      "username": "admin-githubenterprise@ollie-vault.io",
+      "tags": [
+        "dev",
+        "vcs",
+        "critical"
+      ],
+      "created": "2026-08-29T18:51:26.051Z",
+      "modified": "2026-08-29T18:51:26.051Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "IdyZ61YgOBFPcCKm"
+      }
+    },
+    {
+      "id": "c0bfb1a2-a52e-4506-822e-08c3def7777b",
+      "title": "AWS Root Account",
+      "url": "https://console.aws.amazon.com",
+      "username": "admin-awsrootaccount@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "infra",
+        "critical"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "61vSpOR8RK43jejU"
+      }
+    },
+    {
+      "id": "51055279-b397-4941-896c-1bf684be6e05",
+      "title": "Google Cloud Platform",
+      "url": "https://console.cloud.google.com",
+      "username": "admin-googlecloudplatform@ollie-vault.io",
+      "tags": [
+        "cloud",
+        "prod",
+        "infra"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "R+aeKy2N3RqsxYKzBWip/9q1/82VOgAuzmPEuRurOIxycpFEfAIiWdQ3LG+cRv0/CRm1KawEN5raNuIVWkh8HFSZisEMDHJJcbrbmf53pN16CnuX+ejoBx0Bu2/QgsOmRNWiicGlDHVFJysW/1sbBaiQ/mcifKF7onL4kAa0A39qoBypHKo5Vwmx7SBx4GkO699RM85m51dZj5R/AHAX0T5Ag++Y4DLvajK7WfNodgFXobXaoSUureQtr9vnMUyvvjbYeK/dURpK7bX2PUyMha3NTRjt1pu6zydOOsVMkpLOvzj9sT03kkbm1sbzoL36gIOkrhIjz1BMGPKGLY0pGpFhjHX3VeYPfHOU+olc5E6TPuzxaTBxqpO1fyXKWjOsgbCOXXFuvBTnSGI24xfHj+F3hEk0IiIsenwiZ4lcBQLVW2zK6lMjQ8RiISYbUXkgWAS1UURzLWzSo4tSAOSv18kwExChv9nw/H2rBs1MMVCeFTg1ZTtObCP9ZoTwI2ZhQ9T7HU+WxwPW1VrynBbK4pIjz+WwySaWdHvnWxUaE3CUNSuXbgsAvCvxA+KdJzg2BMso2FnCK76bAlvajg9zcUBoIFKfGiU7ln23DcONfyzzhB5qHqhyhf1gaUjxCqYHFVgtTwjQb9/ExuizvVkS2V9FuEIG6fnbZb9AYyUIOuy1NGqCyjWIgN6kgubbEtuwNgf/z+yFdj78cYSDLTvbsU+xFQzUVoFu87ManAz7T+Dkcdj0pg0EoQLiIJokK0Jcv0GOS2KESc5hwDtk1v639mjj0xmT6R0YewedAmnT443mQpm85yPlg1jkhzBkvoCHzeDmqBkADKfyBV+naANTEnHwpTN1LWMenLZECo/c7PFwR336UlwlGb8btE7UKni+3YUQFc5uKNqqgL4Mfd92xAZxUn7eGhGRbTd3trGTUH2zCqX1k2xUa/9vCdJTD/dTv+GpQ/34LEDOFWxYP/MxLtMpoNabKUu4O4D1WdOsbw7VdUugkrY599z3l5g3lmWIt7O6gVSqb4PSkMhrfY9aLD1k12j0VNClPoPjDuhfH/tawjngPGUlolGJRrxExFc89p1dscdQHC9YNdCNMW2QJZYI406lX/nDfT0VUI5OGV0kvUTJ6OdcDlA1MknBHmNNVnT1ijTo9HgpLhUPJ0JcUddCdugC61o3XGJ6/bp/8jT0DWrjAcCJBlC1vsYE+JpCU1BjH+A46FLMo86xF8HdJQriOkBvG2vUM5bmlHX9DVcLr9nTbmcQcgy6BIGOl4PSCoOfFbfLRnwu1neX69d6MbqpSR0pN/rHBLyWMKo+S0PawRoxE6zyHjAytZI2gDCVCByHhnaEKkRXZ56FSnzdbFyB+cupg7Yu6akeuecXEVW9rlxHak6YigWsDgpjed9sH4OUgYVdWw0ZT5F7AocxlbmafsQXMPaGAm2qYyXrn/K+1NFw26DbxYae+U3SB/Drk6XzdA7C6itc8Q8dTjVjkfpngGloPKBuRnn+gJlKUbCT04KgYO6BSd6UINlgEnVG4E9ylT3PBJe/sXWh4ZMkvpEADzZcx+1Sfb+zFqHu/Uv010wSMqyDkf2VeAHDFCeVetZU7LmKnq2+DPl19lRGKQtWM2aeMuzXdmnVfwOQTsW60t5ek37AIubwDCtWVHz6RmnwyJPuCjNCJijm26HCoHQFdaapjDofPXG1hHjnEQ8pFSL9HvAr1JF7wUq7yO2RHgV/mfu3R5V0MMZ2WynoP6TC28ZYT2UEIlu8RwTahDt+/x4f/U5Pr+Dmy0Ydv3fvEmOF9xRuQun1n+KUcTa1zZ/7OMaoy4j4ZTOmwt+Vh4CwJp4tN/nKmtCJX1WpMFw2XD9ePQ077I2MG9avpkYhs6OBO4lHxUSxWN9KbJAsRRZWqbNFb/TeMD0ww0u7reAHa7VHG553IFr7PGROHLWq/tUMDj5xf3PUlLvLHf/nCOPXdYuDQgzil/7+uv6pueJr7ToD4A1yvVGCYgsjIidAuxAILWLmzZAvctQppKrKwA3pUo9cKogWAzO9kojJSlyM70EldZCbG/qeGswBUOa+Q0A0AcO/4PWOMRjJdjdFgM4oCJZ07DDVegzshIYT7JFII5QG8DXB4MriYA2baxglkHGqDVHQ5ijxuCV4qv6LBJH+D+diiZPsYjRvCpjRSOTaHZAzbBJVMH1D3Ssjr9+Fb/48keIr8WEv24mOAHi/42mmJt4W/w3BLDma8q+shT0DCevnP+5x/z8pTdUBgw==",
+        "iv": "S3O9NuIddUJM5gLE"
+      }
+    },
+    {
+      "id": "72faebfb-f11d-49ba-bf78-bb5fcc219a41",
+      "title": "Stripe Production Dashboard",
+      "url": "https://dashboard.stripe.com",
+      "username": "admin-stripeproductiondashboard@ollie-vault.io",
+      "tags": [
+        "finance",
+        "billing",
+        "critical"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "6zm7QIlaQCiyX+Wn"
+      }
+    },
+    {
+      "id": "1d138901-ddd9-442e-981c-6c0e870cd176",
+      "title": "OpenAI Platform API",
+      "url": "https://platform.openai.com",
+      "username": "admin-openaiplatformapi@ollie-vault.io",
+      "tags": [
+        "ai",
+        "dev",
+        "api"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "3CczggXxE3S1B/lR"
+      }
+    },
+    {
+      "id": "6c675993-5371-4a02-9d7c-cb8ab824621f",
+      "title": "Cloudflare Edge Admin",
+      "url": "https://dash.cloudflare.com",
+      "username": "admin-cloudflareedgeadmin@ollie-vault.io",
+      "tags": [
+        "infra",
+        "dns",
+        "security"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "o5ClGr0RLtLGlXq94IPsB/5HxIeCkv75I8SG+RZS6+QPZhlQ9+H/z2du8yoriDzCjEIx+agg6GGC06h04Neyw+8qRY/NDRSlC25jI2FufG+DS9CNI7wY91nA64zigqPHHd+KZPNx3Zr7g8YKlRtGObWq8N+2ycJktfnFISCd9ErL3yUcp9K9S29HbWOrY2rHaKVTErkmn68Hz/Ey5NrEO5ljCUiiS9ItduAyPGs/8PHb/m/DZxvg+hFnvP+dvY3sXxgn/NU/C7S0cAf+XssaEWKJ4pbLrMZy48fadAxs4CY5bKMhrp6oQlqK3/07S1VRqXQW7oxhrWPzuvk4kWyaADqL3efP6cvjxDDDE7GI2Xw4QrKSyqgprH5jRXQbiejIhY+I6+S1f38ZPcd0KKSdvvL+xC7leDdm7ZLMC5Ua/xsPvs108CS7pa19WmHiMhVJaJBbzIOpiKW282aO1sVSP4eScZDUUlk6qUoxfwL6yBiTGNKWQoEZC+bJWgtYVoBXR/KhH3Cgi3HSlRTxcq6CtHrD/afSnvq8qQGZlJynkoNZMWSB9wI1Q1D2ic53CQOj73OKnvNFFUe8BSDQq5vzJMlO5G4gGq/pFDzRNrrpsfj9r1jf3fglzKbtV6dRbNmyiBk6HFCcCiZykjNgGVtXy5IbKJ6pcCj3eRGmeeQvSp22QifVcwCHG5bRptsUWuee95tG44p4S4xcxaXWeOW3d2i11F3WWE4CX2RuYlB0+Fn9dKMLpxPin4Jzidm8PRdi6fEa/OU+QohQln5ctJjRGAnId6TySu9X5diEo696bpw4lnQwHBp8N6nBlaMqXhkjHUcBhmBgPWBoC8qKCfwSfmpNTbfxlG89ylnNATKpu1GgjYMTxsLgqdCvJhfexT5H/4WGbmyvQPIuKT+0S4RiSYp+AGkGhkVQ1qVGXoC7n2YINSV5u2M9G4jVoTd68ZhlFXVzU43dBXqLrWLOg/Chtm2bMtGDqe5PDoN/6ddUVOi7kd5iSMLt/lBmsmaL9iu981wixPjN6rTOVRH8iXkYs1yaU5NHoSJL4dVPC/ISvuBKcjXKvSyd5l88XsUlU7WCKVk9IA9smj1PWO1QrPIp5/JOrP3qt+8WV2GQXCewxWh+lTGDOBiqwJbD9pSp50tE82wvwDfa1jo9bpr3EwdK4F60kh9M3aQ8+g5auGKUc+tAqJZJV4cY4i3ar4djHzDuah1IIXbelXuBjbIWCAu8BZg6UpIgRSpzbzUkRXBfIfVXTN6k2QirntNH4qmkFLUU0TVB85QW0RwLwoCHiIdZqRbA3zzPviWVc/Msp6Sle2dsVRYUnlBcJoVVCjIp3ZL1FhD5xuJxAoOgtFzOd4isR/dMfyKkT7CMzG7fsrZcCcf+zZybiL0cYBVUpxdZzkSCbfZfIMwuUiZbPsxZ7SoWf/xt33uPyqHTwh3zR7QnwejUfTN7C6KiyMIR+Jd8bXtBLf2vgBa4Vj8GIqxeJ43iCYd0LKwVZa4u0JlHriNcZ0/vBKmpJAn2mMnloojsQM7tgA+FqB+PXou0KhQziYBqfsM//+fXzvZVO0d5YtQkj6jTl/H9oBxPBiXeHY1/J11FrMJ1jENQwrckQkeJCRhJe+e8S+ilYTbk2zRuYjw+svFe4F16s75E6Em+WdyuGkZc0vpAa3FPaWsqVFYeEjFl0T5h2KxjR3mKLJij3h+2KvS32GCSsRVzVVz/04DfkJpMim6ukyoG4y1V08eIdPfAlaYpXioWeFlfY8d/C3o0taAWwFt1VPjOVR3GfgkyJQFkwFhGlUXaUjROSrllRnDCOSaJXkUJrLzJs3BM2XpEnTsmV1bCFGX694Ad73NESBWINb9cCq+VmoH8IJT70nD4VN6rXYgvUeHsMxX3K19mZ95NW54HuTQRcBP83IBdISsgK62sHAupG4FXTV7w7l7v0FDTB70b4lYPd7Ycvu06xwWrOC5vIqFPUmeSZoBrgWVZsYHeExowA/1Avg9aF2Zt0zky/dNtEB/Y3piRjDu1LhuAmWfhKUeuYzc5igiOkDTUerrx98DuMN1+Wv+6bo3hT9qd5KuJryICCWn9u5OtxSP77kZljf1s9l5YuSfGEYOZ50wgo0habLe/ZXsSYvG6LLAC13wq365WtsXFuLAVuHUa/RpvK9ZNALgeiSRBOWfV2y+csxZZK0iFLmqJ4GhEB4dKn3wo6MOQeZVj8n47kzMFTzsLrOViDpRFM3kp+8JtAfl7BnA3aE8/c7kTXQ==",
+        "iv": "6j6djzakBA8l49VU"
+      }
+    },
+    {
+      "id": "24c3908e-acd6-42a3-83cb-353766ead0d0",
+      "title": "Slack Enterprise Grid",
+      "url": "https://slack.com",
+      "username": "admin-slackenterprisegrid@ollie-vault.io",
+      "tags": [
+        "comms",
+        "corp"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "j83tTBsICZ1tzGS7"
+      }
+    },
+    {
+      "id": "f6462859-115b-48d2-95e7-e104f68b60ef",
+      "title": "Discord Developer Portal",
+      "url": "https://discord.com/developers",
+      "username": "admin-discorddeveloperportal@ollie-vault.io",
+      "tags": [
+        "dev",
+        "bots"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "IYhCya2WUFRoM4zB"
+      }
+    },
+    {
+      "id": "4cc8ce4e-1953-4962-bcd0-54ec878c9ecf",
+      "title": "ProtonMail Secure",
+      "url": "https://mail.proton.me",
+      "username": "admin-protonmailsecure@ollie-vault.io",
+      "tags": [
+        "email",
+        "security",
+        "personal"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "H6OqRkSXVCGcyhg5"
+      }
+    },
+    {
+      "id": "0e891f5e-db97-4fa9-9dc2-5506f722b486",
+      "title": "Apple Developer ID",
+      "url": "https://developer.apple.com",
+      "username": "admin-appledeveloperid@ollie-vault.io",
+      "tags": [
+        "dev",
+        "mobile",
+        "apple"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "ZjSjJB5o/jCPT4Pa"
+      }
+    },
+    {
+      "id": "b4a94797-f374-4ec2-aca0-7f97d50e4591",
+      "title": "Microsoft 365 Admin",
+      "url": "https://admin.microsoft.com",
+      "username": "admin-microsoft365admin@ollie-vault.io",
+      "tags": [
+        "corp",
+        "email",
+        "infra"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "s3pkE5zQQE66w8OV"
+      }
+    },
+    {
+      "id": "b6ab09a8-9f74-4ea8-8abe-1e96bc1c7ef3",
+      "title": "Hetzner Cloud Console",
+      "url": "https://console.hetzner.cloud",
+      "username": "admin-hetznercloudconsole@ollie-vault.io",
+      "tags": [
+        "infra",
+        "hosting",
+        "servers"
+      ],
+      "created": "2026-08-29T18:51:26.052Z",
+      "modified": "2026-08-29T18:51:26.052Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "oncc5823uunQBV8X"
+      }
+    },
+    {
+      "id": "0ac568c5-34d6-4137-81c7-1f4e1820a737",
+      "title": "DigitalOcean Team",
+      "url": "https://cloud.digitalocean.com",
+      "username": "admin-digitaloceanteam@ollie-vault.io",
+      "tags": [
+        "infra",
+        "vps"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "p2Hi1TzoIcfEU2Yb"
+      }
+    },
+    {
+      "id": "979067b9-c7ff-4d2a-acec-b3fe86219572",
+      "title": "Vercel Enterprise",
+      "url": "https://vercel.com",
+      "username": "admin-vercelenterprise@ollie-vault.io",
+      "tags": [
+        "dev",
+        "frontend",
+        "prod"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "0Zy9GnTkRCBBeR5n"
+      }
+    },
+    {
+      "id": "d850497f-37a4-4cdb-a050-fff37050498c",
+      "title": "Supabase DB Cluster",
+      "url": "https://supabase.com",
+      "username": "admin-supabasedbcluster@ollie-vault.io",
+      "tags": [
+        "dev",
+        "database",
+        "postgres"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "dO6zoBsSF1j1XGGv"
+      }
+    },
+    {
+      "id": "d91ca489-d031-45c3-9052-c43b9fba9b0f",
+      "title": "Datadog Observability",
+      "url": "https://app.datadoghq.com",
+      "username": "admin-datadogobservability@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "infra"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "aLMCVJuIUL5qDer1"
+      }
+    },
+    {
+      "id": "1c0e4f74-3df2-46f3-8b48-c30b7d34d2ee",
+      "title": "Sentry Error Tracking",
+      "url": "https://sentry.io",
+      "username": "admin-sentryerrortracking@ollie-vault.io",
+      "tags": [
+        "monitoring",
+        "dev"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "XGAOk+pERFLsaNlf"
+      }
+    },
+    {
+      "id": "be133f3c-f9d1-41d3-992d-1228540964cb",
+      "title": "Fastly CDN Delivery",
+      "url": "https://manage.fastly.com",
+      "username": "admin-fastlycdndelivery@ollie-vault.io",
+      "tags": [
+        "infra",
+        "cdn",
+        "networking"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "wih3hoql5ECGOWxJ"
+      }
+    },
+    {
+      "id": "f75b537f-05cf-4de5-b04f-c45f2b52ed25",
+      "title": "GitLab Self-Hosted",
+      "url": "https://gitlab.internal.net",
+      "username": "admin-gitlabselfhosted@ollie-vault.io",
+      "tags": [
+        "dev",
+        "vcs",
+        "ci"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "h2BQQGs6YpXYi6DmWVl368XgE1NygZuviXO1IP32jLOun3tG9L/yJNkYvqWvlFDN61hVlwj3dys4pw/nyTaJ2NCdfb6yGt6uNAijmZ7ghllJFzLI9OqfnmG2V52yHqlqCstklnJu8Oz8IF6D8rVIx+6IWbEC+JlJvmFxjkJFqGzZwMjcdd5NO4VXy47dTYZRACSwCif9wlgHK6Wew263pII9hjv9J98molnOIht8XvQ3o8lanItjHFcwoG84clw7ibiPitt5V5fm0xlx9PmOcbLaU63xhXEnYaHWWL6Uom7u0PRySQIBFGJrG9dDeDDpB7O6eCTVcP049PeZFVNJJPbt5HgntugKlZFq2us2kW4xo3peVnvPAHMk+0hfbFjor05TQ2DpfZ3ocoH1Z2QqqyPLlvDEllkJ2lEn5u5oSZxd5TpeTVJlnFJc+DN5PUJJ9NLkXGeVm5aLwupqVA57+P86pnyKe2NRYw3CGzBejVrCjFx8IBbzx9UFWH6CGbK3U2xpCdpcYl3FRnwuDKnGugmC4+CNiOw0TjQunaqTmXnX5NPAeOFi4RujOTz2Zkmzu6ZQmm9Q6qBLib288xNWEU3BgK03nTMNXJMCD5mCcV8k1W6WA6fO0E52wdxy5YAIYVI/8ihG/2tFw0bfMoffXz/0HgFFxlP6ZQHivU2p6JxUMm3XakBZnSYEk/RasUkqK7hDybQ22fW1SiWVmjdc/DQBZkuE3v2QTAOPl+BUdlaE0d00DVmIhfd2gNWUXnHK12xBL8fK+TejkueDbmSrSVyIrOCvZ2aysC/qiWkFZNgqtM3bapsH2qBynjdQAqU9Um3/omG4ZD95Rk2hsssON2xdPaOBLtogBBgUPmTtM9zSUsA5Mnc+LBuYe+n7oR7VYK5iKh+krXvjiSFRAKJhBhfXgyRXPBEypKNGWy1dGrbfkD4H5zpVLDAuZivwI/FtrzCuAwHl1lrHYPCJusB5XIYd/PMV0J/GopnphhukRWtC9AXfkCefC/StdPqOJRzBzn1KOuVsJ8/5O6hg9m1rybco83VJWul/2qmKUiUMDEViTzCNYLSY3FdIxhOYCZmBuSRM1/zQppcHE9J+vtWczqz9PB+bYXb6FBqNWoPCLp+1UJ0PeVXL5FARg/GxElrXgPf6F8i2VuCbedGJukICp/LMSz3XdE5FODupgC0cLKSGkfF/JMQmGp6dcxgHxo5MDgbvLE78F5J22G5H511taQoRDYmS5L0sz5uHTYayRCF4ONx2ALe936ywBtu02wkoVgP/6SUWHRK0bQGtESgG7qXfAvXO4EwLUbRDWldlwqLjhLDbrfn32Yb5cp+ATxTOR0ZdCitYrSoACFZRx/3zC/n5PbxoeTrOg940QEGtdJMT80npEPjH8JGfsRkuamQYjzkk2OuC7zCc+7tPNvVgxW70XRVQbpfGsEektj5k/blVLR9S5Apo1Dl86LfX80GroQ2uzGUwRqPUYotwmJJhniftRv9vHWx31YPvNu/HsdFvndKMbM0J1RB8U9NZF+DM0egyQzYxwuA04+JYRFYMfXxer010ahpe/WT7GcAVJgSdatsRo3s2+aaDvUGvHYQeYATr2fDKk1CvNBpveHXV0L/hhZHQephWJiNnh7NGeuS7MP2OWeDeatd0rrCoz+XZrc+gW3oW6UPvqlDR63NKXP4mExAJhnBjuU2OwfuxJb77SwP8RpP9Lzr4Q3jIK0GglkVREaFxzSVGJ9298P6Jj2eJd6SeOj0A9MZ3zZnPrQj5uEAB7rnOlSHTwHb3QXl5Q8NL77SG7nWeEAxZrH82AblDIFic9fDIB7wRWFivPQ5bIpiBD6Z2LV1+vDx6OmJu1ou8oOI/rjJTqK84la477RuGhLd0UJ92Xe03Nb0neNQ4ZF5rHaSNpVGfKbHYYhF0ohzPaezB47uNEu2zjNOOGMXkaxm7rGUn5+0jXFOA+mEw/A1L7taiicfFAgB6L6agUqJ8/ngPnGO4EUvIBRCuvWvI8FSw1YhvvkY2gqVZd/XQB50Q2QOLzadJnKCKGl4gfg4VRBfsA3flsdtULWGX/o34HjKxgTt+Gefbi711oivR12ED/Ctt3izfCjqamQLyoayB/AjnXQnlBPGjHMt/hkxFvymLeWVXhZnPiXxelAErLd9M/WNrXTpxf1gXWN0+t5G7ssVcfwEoWK0+JHmjYtXZp49GBU2HiZzZcVgA73RIfvfuqm9wTBM4SCWrPlbFLxjf1d2z5hH7",
+        "iv": "lEhy+tiKCUCY9GfW"
+      }
+    },
+    {
+      "id": "6a2ade3c-28cc-4161-8a40-c348c1984251",
+      "title": "Atlassian Jira & Confluence",
+      "url": "https://id.atlassian.com",
+      "username": "admin-atlassianjiraconfluence@ollie-vault.io",
+      "tags": [
+        "corp",
+        "pm"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "i+bABH6SUmaHrJHm"
+      }
+    },
+    {
+      "id": "5935004c-2791-43c7-bc8c-b242e8acdfd7",
+      "title": "Docker Hub Registry",
+      "url": "https://hub.docker.com",
+      "username": "admin-dockerhubregistry@ollie-vault.io",
+      "tags": [
+        "dev",
+        "containers"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "f6WmRT1NxJ2IZ4P+f93gtJ4wzmmJI9b4bqjKRxgJWz3NkGW+x5+3gx581mUyIj8WB9jjGCGQgmYusTwTy3128eBKa7UTigRSEIb+Bs4ItdU1Qt59YeRObJrHlenH+Qf+wzRJeJGStg3AWQ/Ui3MgRrqUKLfV6SLXnoH6cS6FAx6HcF2ooDKNhUNbcf+IkofIHZRe4ryzLY8YUCJG8NTp2l5tQF/94sTD+/T1Hvng9WXyRoMj1ZBrfoViSvz2oWUYeVfZXSA6nyMDmq1cCYHIyeIhv5Foe5zt46NLvKfsjIsztowsIp8g933L+lzCoMpRYo367r6AXdXENbVaQ/d8UtKUTmGLOSe3kSkIyqWfHOsEW6jWpKpEdXa2NtjrMZVZEqFNaCxrEwZ3sdkv775pl4XMp3NDE+DzPriKOayix5OmyGYTWrGMULIwNcQVfatNjbquZ+PdHSmC0+wPdbEnOb1KRwm1YxhJ434yqH58MTZKMz7YYitsPAu3ZB8xirwkHJ5K8Ng5/3kd9BP6YZEVx3R/yQoClsr4wsNbSvvasHEzgms9sKzdnpjTj6hMkD5GP6Yz/yDR9m+Wyo8RC9AfnNzQo5ELD3f6o1kumlpSBOY/i+/Hp1Ms55FQ5bvBuNM/1M8s4Z0MM4/lHr+FL7NvXebCcTYFfk199skN8SqUcMmGCK2dWUjG/htP0tGqK2vFNfJu1haak9pKhnSZSj2k//WI1v1+w3guZbU6aPeJ1cPbQCL3CJAeMtocstsP9b1WVBR4Y/LcaJIwD3/JIFPncIAyBg3nCBTik5wE3gwFxewG+6Iutzwxqaog9kOM6QRberioJlJudyzb6cGUYM8GfveVwgnKtvFIu5Yer1Clgsu4+hY2QT0e+ktQu6T7f0BX0F5VblZvPBbztgEy5IN4LhDUae40ZxQ3Wj0YZNhrVLaKU0z3ZPyB5+8SeTysFv+9UjNKq1mK06Ot+LDC4frxWLor0xs+90rieh5xEU2XgwagdEu7aS9vLO88/BvM8U8yI4w6yD8PvEBril9STaQE/TtoMH2zwTzQNbbh1hOxxZds8o47BVKx/5Bl7CHhbqRVxHGGBSolia6nfEAseRmb5OsvLX01udPyQ3/kPuq7n1owTW8VhQ/DaG78JIJ54zoA3z5/mwWFa2aW3qLgr99ySKR4Pls4mJH3ot+8K5xOc2u7Gc90kzHl/LQXxjlsVLIHcQJ1NmS47eFVqf1MtFpxSV8E0IPEpNUtR4kgkefNiW7KRFAVIZxBm4Lwp23H1NGo5gLVZOyatlBk8E3hshfJaI/tIgsThuUUjUVT+FQSiTKFsDm5xcgFH7cysHDXVCdv/WYWEQrxf/zpqyZeIYSun3R2bPOsGJJmACqzXEDPnksi+Ztjb5KXpeF/ckKCbkAk+aewKvfj8pgSlxCUVMMT47HGNoZf71nxQDpsdFIHuDg2Sp2HrY1C3b8Z+AEBJx7fUXTHf5iyxhH41DQLoGx4KizHDcYcgnzRLRwBu5swnNCTvNPGs0PgPf/dSs5FvHrSDTORBJMUToZDA5aOUQYa2hBWt4IKOmTkfR2VhsNxn6HcH+6CbbAppHNgYpns/6CSmeoQ4NO8m3ifFgbEVlCuLrv5PAc5tsWq6k6wqNORUvssUL69f6970EsgReBleumHqoq+PD07iGn1hqhj9zn2gl5p4+1vYCmraJ9zYjfKcAebzMOtRKxHFVW4b0XDDc027fEhUVnvFiy+dvEiEaU7zrrrS6dXwK6iVIbyjnE4gZ5tfHz6LBhikTDpYH1THcWnrine8j8OSF7bdVVRY5GHa5bLUMItIX0ZlwBJKLyV9y4U3XP238H/LjmrDHZKa1eTAFXrY6XtzShbbmNRnDAOBRUFXH5PjZ17R9FdrBcst49RoHsa6cY/oY83os5VLRCn75+ZKBEbJqwaFFW7SA7sXLvGsvx3JdaVGy6akF8SYIHfGMt6VmW1X42hv8P2m8FicseiJS5U0DF32MVphiyUL/Ix27tNu1F1W2J3yiWIJ531B2cywBNex4h1MEZL6lxXz1n+XEJv63LaqTV84kV8Wn9cbwV/xmHVk29G8GYImyVcNnV8gCoFpZNM9ay8R5ktZGUoJbCtLLuupwaGAZN3rA2fHv6v2x6KwebCS3GrykB7yH/JJzYLEFwBETYBtATx0YV02jIWB8gMz9Ne+KH874ycrOyi18Gj8cJnys9BM9CarCEgVuxyM2Lk0ghc5iTXOxZ9QeTxTUdYEJIjvA==",
+        "iv": "2TIj1Wr+YExSCeaq"
+      }
+    },
+    {
+      "id": "f3fb4d70-692d-4db1-818e-d2ce666e5f71",
+      "title": "HashiCorp Cloud HCP",
+      "url": "https://portal.cloud.hashicorp.com",
+      "username": "admin-hashicorpcloudhcp@ollie-vault.io",
+      "tags": [
+        "infra",
+        "vault",
+        "terraform"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "BWGDCyw0nXZfwYKn"
+      }
+    },
+    {
+      "id": "3ac2347e-fe0d-48b1-9b14-9b798453b8e5",
+      "title": "Twilio Communications",
+      "url": "https://console.twilio.com",
+      "username": "admin-twiliocommunications@ollie-vault.io",
+      "tags": [
+        "api",
+        "sms",
+        "voice"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "YUJKgoj676rX/FKa"
+      }
+    },
+    {
+      "id": "f809e45d-777c-406a-86b9-6e16f9951b5d",
+      "title": "SendGrid Email API",
+      "url": "https://app.sendgrid.com",
+      "username": "admin-sendgridemailapi@ollie-vault.io",
+      "tags": [
+        "email",
+        "api"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "0UOL5Bufvw/Deje7"
+      }
+    },
+    {
+      "id": "c0f91c38-ff08-44cb-aec0-21e4ecfd017b",
+      "title": "Shopify Partner Admin",
+      "url": "https://partners.shopify.com",
+      "username": "admin-shopifypartneradmin@ollie-vault.io",
+      "tags": [
+        "ecommerce",
+        "clients"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "+2NSzwQRbhRHNHSylPjSSqd8TKxAMLI2584RzkgQq+uio3FiCRjKmiHft5SX+5qRJ4xq9UEs47bnR0AhWiaBzW/OxcRmZ9RCz54NYktp2+VrrpKEEoK1VHaUBLeQeB6mq2oWaEMPgnUjZBaQUZ+WDoa2+rVMOkL37wdMYVDAsX1e/yd3J1EgxKoi6wjkwWiQjDuUhxsf6Ivj8rjk6FLRpzVm8xtRB3HcaApmBlRiQ+82qOf5w7ePgU0dZj0pl9nNb+V7Gunt2/I3WHV5pldXea7uh1Pp6tfebw0IyY0/CE0FrF68CDvZgZSRKtLY4xcJbsfC5EIK7aG8BWpgeSf2om/hwhXR3O8SwYuLFhNWK/nprBK0xB5P6q5psUd5BjgcbRNv3yXnCsojA1qUYCqZ4qLYDXeyHAeVO4y/cP9Fon5DfkfpG3XZZKFmMizoTJXZo4jgxfnaCtQ8uz8Sa28/pb+cW2zxJzhfm09eM6kWAbhPxG9y96Uqwp3wuBYrf3VL5ameA/eyAw8LC4ZMcEkdweNIB6wFoSRGk2yAroEG57g8ScIlpnWolc9sR3QkLHime0cU6H6+yvQ77gsScvlwL81cZ6/iLyIYqbbzbQDCeyUNdqc9WqFKKNdLcXnnzJgIB+7d4/mC/zjxxibvklDnyPjtZNWCihlP+6JG5h/Ri+x4K0hatJ+APBJ6lyb1D0+7K2RTsMi3fsnWCWqB30GXJ3zi9Llhsi/3kov185Mh28NxDVVVUZC0Ruv+nGXZTW5SlCPWrnFLrRxn+EphJl0FjM52CNg3PuYrJYWvtLLZD8508dz8keF2rcURfITUQP2XT71rqgoQtmu5G7wq0paETE2tyTcuSiVcCvbB8BwNBZkc55KrU9EyqQTYNqYIU6HPP+DU9ZZRjueYnzvmXcENDPdkl2C3yzYIbC/y20jVMOGUGHY+pgSHu7O3Z7U22UpyHgwWH9XYr0aL6RC1MtAEgDLGjfMuCAcTsDrj95Xp7W7VWpVdP2TUACwE0GPxsE9kfBgiBKdWYfuOFGbgMuyLeUhfq0RmjluthRUZdJqscEyoPOQhQTkyxQab5AFWoGIvDgv/vMrRJPML2D+VJ0Qyb2sQAX5n3MA7sxjz6MI0BUL6KNBcdAAXaebe0ko5mJYQOZtNOnImCRNsC6gZVYMmi9jVPc9RkvKIpdAv4SLlHEJzb3OMLuKiN5v+mlQ+/1vajgbQi/M3HLaggbDV+nbRaDnTgkuqAat4yIDogCDyegOsHYNY3L0MjNmENDFOos+FxnSB2MNkQsegJHqwQp8pCw0ssMUpZcIycU8bs2R2r8DMt/WlAltnDekpAqTrK3KUk2XigORv4eJNVrGvvOyguneEZiFJ1dFFFL8R5IZDyd452ByKAQufClYgkbn4ReU75VRWjn88wG/pc7kyuyxbsvxmRUuVUah4Xl3Ln8NXIiwPS/9zqUmXX6ygO7Tc1TXOk+oksmz//1u3FEMP7rl3XpL6D9fljRj2E+M0Vk/n/kmk1WrRTw9klHxXzgLbQunYuSjHsq1e1j+IB49hVzWiH3HV1fs6zRzrKj/ybsuDxUBS37H9v13a/ZwtTYoJuFWhiitwn+7UER6H3pOpiJWhj7rqcmDummylwwJbhYDKDQRSdiR5f3ywlcXxzrNXQYuAJEhA+husoS/FXnRw8FAlTOSnKPesT1/RZvCTBOL8Rm8r5/bY++wLhGA5WE8YhmggMAsDGLsXfoe3J1/P4DXEI/EMspasMvWnIjPm8kWW2Nol9g5l9lAf8jaiFe+2CkIutJjCoHLwRp8gdFZM0SnyEwLcOv3Cu3zO8/lhXUyNZri6I2TOQdOECASaDDRpnmpoc9zNJnMFy/1tarmXdUil/XakGiOEi8Y0LHYiPEAD9BxAHo/INXngG4Xv0eBmWsM9C4BbCSI+c6tw4d8AVQtKji9j/j0MMlrU1i4j+AE+G2tZ9Y9dblrMvEDKDJ91eI2Pr/Wt7LUKIJia+hWm3OLR11qZ/6NdhPlU5S1tGrFaxIGTV8n23rLEuTMumLh6p3HyW92vlM6DVlOnb6eVnhfoYp2c/rDzXtEvXjBGLzynBtDxzBiixrRs96PAMv9dylX7BR/VQvtG+Cl2m2koIdHvGwQUWBDXzKQdk4dls/HFg6jhdO/U6s86Gh+YTmbzhNEAofUv9XihUPcdBqeu4rxScoIp31oFdwSG/yYr6zbj9nD7jj64zw7MuWpfIh3X4xuNGI3hw/ShY//2/BZXo/k/MMI=",
+        "iv": "LILdAS7qLjjjUmyF"
+      }
+    },
+    {
+      "id": "1990f6c7-b157-4f8c-b781-b5ba46ce7591",
+      "title": "PayPal Merchant Gateway",
+      "url": "https://paypal.com",
+      "username": "admin-paypalmerchantgateway@ollie-vault.io",
+      "tags": [
+        "finance",
+        "payments"
+      ],
+      "created": "2026-08-29T18:51:26.053Z",
+      "modified": "2026-08-29T18:51:26.053Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "uVOGODvbDp0C1aHJ"
+      }
+    },
+    {
+      "id": "8a1e4941-47eb-444b-b64d-01f315df4b2a",
+      "title": "Square Developer Portal",
+      "url": "https://developer.squareup.com",
+      "username": "admin-squaredeveloperportal@ollie-vault.io",
+      "tags": [
+        "finance",
+        "pos"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "SPaHVT3kfYLqeRew"
+      }
+    },
+    {
+      "id": "586cbb83-2cc7-4d41-941c-e8f5c58ce104",
+      "title": "Anthropic Claude Console",
+      "url": "https://console.anthropic.com",
+      "username": "admin-anthropicclaudeconsole@ollie-vault.io",
+      "tags": [
+        "ai",
+        "dev",
+        "api"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "uCyHi8Al1HS6m+vD"
+      }
+    },
+    {
+      "id": "4ab27770-667e-4bb5-94c7-bd10e959d9f3",
+      "title": "Midjourney Studio",
+      "url": "https://midjourney.com",
+      "username": "admin-midjourneystudio@ollie-vault.io",
+      "tags": [
+        "ai",
+        "graphics"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "SeES3iilSuO/Clar"
+      }
+    },
+    {
+      "id": "a29ec925-ad6d-4cd3-a1cd-3ab951ce7f90",
+      "title": "Figma Organization",
+      "url": "https://figma.com",
+      "username": "admin-figmaorganization@ollie-vault.io",
+      "tags": [
+        "design",
+        "product"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "V/wCq4761y5QfC0WeudWWMsfRknI1bSFmhi1OLdEYjaznNiQFS/lmpzNgFDMef5ZMNiFJDrwn8+7n65qhkyb4/nsqXCPhzbf4OAVEYm/cMUiw4HoOuAcDJBbMNHW2ocG0KmCNhUqWNIgafiPnqn0AIjclFVtBFvR49PCBCt0E6i0P1b0hcfAL2xjEncHCv1i+H2orqhNZQcCHixcDUWrKk/yY8Gd7pL9J2SYQkHaG9UBKDEs70TacEwD+mfB20p0GH9hC28Bup5/Oc2IlxuESAprwP2YHx6o4hP57MCftBUkmc1mPGyOB0sFbqDHkCxXm9Xkl8nCkDEZhDaab5jUVpg3oM2z5ZOcSwBvu8vwpwYD7/89E7PjDznMtJfpEU70laiU+oDTt0MfwFkbdgtk9ZaHl1c9Hl9AmbTjIqMNxct7yTSKlnaTB7Tp0T5KQePuJ9AlwbZ2gmEjKs1ubkHIY244SO1ukB/xCk0fCfBSLzSVzsAYNGwPfCcR6LkAyEPiVakpBz4CgQqOO505ibLg/gy6Hobi1PhqSeLFYDNfrbTDwvBE2EQk01QAFtC9Gh4TQUELsTromxr4wS3qZuTVAGHSdKzePSdSgOJbxVzh3+reXP95mNLVGT5HNHTaUthg3+52WjvWZ4BNuDI6Xdtuw+PYFFvRKQKJ96LCZD+0+apZMeQ6eed0D+9tvM35KXnv4taX6FGt7LlyBmsNmwKWxQ9JREFKyX2CMv/ZAEbkstX8MKxkVD81v8HA/Y8xFDtSNOVc4V1p7a9YuEHk2XrlkwyAJP0DpSlfVgeMUEJ2r3xXzZq1j8JSrg6hpsfRdZUCaH9maQ9LLK8OlFkfJw4iv/QTYDm+FS1d/3sD8YY5AP1cGaXzgzLKv8TP1k5PSgQyEJNpLlelgma6IIUnZTc7tSyO+M42XPL7xIvF8W690DBfDFI09IfHcqrmZGKmD57BPq7Wt5e4E6dxNdFQxF7RgKfk6ZUKrf8CJYVlGpdzK6MrL3PVQA3N+ekFBexAuPPSxJ9WVZts7LWn9baQucuTPge9xGauqBCWIkEkYVmY58K5NIdpXSWMGt5scZuolCjb5zLtumxyjls/CJLcqaY7lQNkdkclP/VGOqF0k8RJfykgn69JCuRiiQMA/yrtqMtQphBCDBpE32h1BNjMN6qxvSOBs49M78IkVHSUYw6SToMOgTTGa1SSDq5+b+WpQL+r26HVjC28/hBKja5Bc+60IPpXdgrZGsgWNfVC59JQKYg3HCzLR5Olv+eZgWKYPx7bJySS0zV9gTWmVeqF0hMGPtPCixPGBu0CLjpISPLV9TuPH91egjvphB8AeWEiWqEf4YP1ELDgtGULyhgrN4AJDyHJul+R1LqTtnh7DeGHNuJ+TvyOdAjz1k6jaAgYB/Qs/eu3YQ+VuR17Q2c4/9zJCggBQ7fLGrE/0WPw3f0W+h4Ek8Cpwvfd3XKrvLSzsLfGT3NABlASWx2Y9QSSVqilUZBFYllihMF7345WIIFJVu/l/v9I8yldQX1fAO7eXqUotnJgZLxYHq2y0gr31vJfqRORracahRqoAIhjlKTOWnukrH3K/L4ulrnJSeOv3DcrjH5H3s0llvyomPILWh3u/z/I/kS/ImT23miR3NJ7MAKkV4lCKNarOpeFjWwlRGhkuIIr3KsWubB9130FiqBnbbfANcwydGfiiN3mw0JsX0dLVAi2PEejQp9bCWg5gHxVoFvowGtHrM1xw/WfpGUM2GMHAiL0hEIQuMSPZ/jOGZat40xZc9lZNLhDhdjVHp/f7PLn4beQWy1l7hMZWY6tFQBUdIQJQz/SOs3bbL4LBakr9viK3ekxgGm8DGKNkhzBM+jFMKMjp9c873kdOz6PoZ+gWqAyRTxsC3IFZoCXnJLT0bKgBDR5mUP1SNnToaXQmCQr6XIMcLwGddayJ02f2rVHux+PJm4J9GGUqi7BvmH1h8njGmbGFAbgqZT49pMLIH6oTDzTZYR0/QrtKQXvts6P/CbsGdzMvCdwjnrZ5CeWQbUjsbyPORBSniALx8aO6nkGQpFjL5v8co5h6w1gJmBVEB9keoKptgee95atc+yAXi00gwJA92rIirZmAYLUcZys849uQY+cYyKUZkRzsXLNgI6gPD7ctYu/whSB/5YKqfZe5qcMXXbC/i1htNd7TyITopdL64AiCcOvJS+xPU3PlDPipY3xzIpCyNHHZJMloA5VW/Zh1CRNcGNinxD7za2EhIcIzLxp",
+        "iv": "rZMlhZMThWNs9kjL"
+      }
+    },
+    {
+      "id": "79eb9631-b4c8-43b4-a04f-19eeeea2a716",
+      "title": "Notion Workspace Admin",
+      "url": "https://notion.so",
+      "username": "admin-notionworkspaceadmin@ollie-vault.io",
+      "tags": [
+        "wiki",
+        "knowledge"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "Z+BwHMhQIRispllt"
+      }
+    },
+    {
+      "id": "27fa9070-2e72-41ab-b188-ef04ded26423",
+      "title": "Linear Issue Tracker",
+      "url": "https://linear.app",
+      "username": "admin-linearissuetracker@ollie-vault.io",
+      "tags": [
+        "pm",
+        "dev"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "eJ65as2r2H1I4nJ/"
+      }
+    },
+    {
+      "id": "e18090f6-42db-4a18-9f02-f110f1fc2dd0",
+      "title": "Loom Video Sharing",
+      "url": "https://loom.com",
+      "username": "admin-loomvideosharing@ollie-vault.io",
+      "tags": [
+        "comms",
+        "video"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "oZgvbUyaTy13sZ5N"
+      }
+    },
+    {
+      "id": "6c676b4d-5e3c-45e7-ae2f-5164ecfa3f9c",
+      "title": "Asana Portfolio",
+      "url": "https://app.asana.com",
+      "username": "admin-asanaportfolio@ollie-vault.io",
+      "tags": [
+        "pm",
+        "operations"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "vrAk4sV1VntPbrXC"
+      }
+    },
+    {
+      "id": "dff63150-9a97-4de9-9223-1affacf1cbd0",
+      "title": "Zendesk Support Desk",
+      "url": "https://zendesk.com",
+      "username": "admin-zendesksupportdesk@ollie-vault.io",
+      "tags": [
+        "support",
+        "corp"
+      ],
+      "created": "2026-08-29T18:51:26.054Z",
+      "modified": "2026-08-29T18:51:26.054Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "VgQIfiJOHNWAnetE"
+      }
+    },
+    {
+      "id": "a8167ac9-6456-44a9-b692-d1b4d5ae32e3",
+      "title": "Salesforce CRM Admin",
+      "url": "https://login.salesforce.com",
+      "username": "admin-salesforcecrmadmin@ollie-vault.io",
+      "tags": [
+        "crm",
+        "enterprise"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "d6NlYY1IqT+OAf5L"
+      }
+    },
+    {
+      "id": "a1c4dd97-c576-4352-931a-2c44f1f5851e",
+      "title": "HubSpot Marketing Hub",
+      "url": "https://app.hubspot.com",
+      "username": "admin-hubspotmarketinghub@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "sales"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "AiFquqN8prX/WUWY"
+      }
+    },
+    {
+      "id": "34dcbd0e-658e-4563-959f-0c2956613c94",
+      "title": "Dropbox Business Storage",
+      "url": "https://dropbox.com",
+      "username": "admin-dropboxbusinessstorage@ollie-vault.io",
+      "tags": [
+        "storage",
+        "backup"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "SiJgo7PVVyVt7gaW"
+      }
+    },
+    {
+      "id": "ec35cfc8-adef-450e-aa82-36818febf06b",
+      "title": "Box Enterprise Content",
+      "url": "https://account.box.com",
+      "username": "admin-boxenterprisecontent@ollie-vault.io",
+      "tags": [
+        "storage",
+        "compliance"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "+p8NhlrKOx4DylPq"
+      }
+    },
+    {
+      "id": "d35cd2a3-d3c6-4248-ae1c-f0b1ab2bbe4b",
+      "title": "Zoom Enterprise Video",
+      "url": "https://zoom.us",
+      "username": "admin-zoomenterprisevideo@ollie-vault.io",
+      "tags": [
+        "comms",
+        "meetings"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "/CrhMUKd8MofNpd4+Ls96SYtZ3VoO6WR4br5eEx8fn2ti7r/J2Tu3yt14YNKquvYBc7ezPNOmaM0rDrXFWQWn9mEgsPM1sSGdvT89bCOE/bUqXfSdLCU3VTZAu1n0IB9tYBWcdrydM5lBWliGnIOjGX5Z3/+MhuMWPnA4c2tEbm6JYgO8/G2DwkqcUNC5NvOsfk7/9zbQNRv6UVo+dkJgGmwFFMTH4KF9xpv/u1ly93xmL4toa0PtDsOrMp1/8GyJkJvFeMQzMNRti/y6mI13waxo6LlbrYCuJLT42sV4/ONNiBLIva3evA8NO2jfiAZNu2ZPwI+1M69wB7uuuvdsd3tGOIn+3OGa9uKGejEgFXQSu2nEqZQbsrJnIAxM8oJZpk94yZ6ladIQyTALLq4thUds1jaWgcLrb94Hu8O0laAclTf70hNVAVodHH5HEnMTQOXAQZy95o0WiO0tGlYiBAqTwYCjelcp0fjFIGX55fNEqv9SQkpQ16qr7lwjOEJA59DhUx+b4zs0SxtfWtMv+w7AMdL4sWj5GZi2PjXzkK7Z1009nu3ltNyrroG5geu8bjKisCHbT4NK0ISYC9KqihjcG2E9YN6LvoKq7xgZ/ycpGp/DyAluQtoCsSbhZXQBVIAO0xPa+1ps4Jd5KbQNAwpEKhsingkx5TMWL8cc5TZ300VDiVIUJuEJDfMi5h8pfl0/JPOf6UHC+z82G19zjLasUStu5P+ihHgqNeB3TG37+qs7f0EpQtgabxIpdI6jtsGrOtRKMPQnGmy+p3w73xW38NFUGZZqI9V1ni8VW87jLqzGpjjTdb7Bau522BQ/UH0jeFEYMPDRRF/8vsO6GD/d+9Qg6/aUK9NdqmpkIyax0fMs3t1r5HZXEqdVXuEtPSsxReS6xUfAdntLEdsu+cy80EShSQmDfPrFVZIOKZO20rgwko0cFwW2juUoNztzQ+rSiuwg/xZHOojbvwcEM8OB1/TVO3uDC8ROJSj5tg5O17ZWjfN/E7YPdo+2iC8rcJyYyh9lXImN9tZfSrbsfG/7aj5wGxpn1LNj+vwmWuFnFgmnDiZUcBD8llmkji/57HJwcM7YIbhFVjsgDHTUunJp1YQt5OrZ4uxkVDX83kyAX4Yzkdb5GAhT/0dSqMpzwX3/J/R0jWlbhluVAdW0nOKD+McwBex9+OTDVWVOoxxFtLw1Rym7BVJt2s/EqGITIBR1yh0xWwbTWKMQ1PeQUV5QxSNmh4I1OwbTbJ8QsCqEi69J8zDQV771lMCvHFhqbQWE1RwRkgbkEh4m7QW9LYhQ8J2FxUpwUC4VnMQFoQbwHXojPOjSAUfKeW9Y/9utCr2Eb7wQEVa7pnVlqffNjbiTniBT4Yk+yS/LUJ3qrmW5ZkR5tP7R2VAQAcrEkzlh4Yk6z5NprdIn8qGoio3LYpJHZNpCbyguw/T7+KBAZVXmdoQhxv62maK8TqRcuKF7iCNnzhxcjCqBvw89HLmIgkFM9IyWGYdBjhOwe0VQNzJ+l0qCz1oXDPvx6iRG1+/w0Pg7mcltQd1aAZz1zoBgYMtSZ+uib+SNTYwqrNu4kPkDadNS0yX5RA6uNn7a6iD824+/Do5ZXbo7MOiyUdMCiAj1Faxzoa7Kh3nb2Di35H0L49NCcJWLJqBEAhUh8ZbL48iebm8k6z6mdqQPu2Ji+lmRKE6e/J7LwQv3eK/+jLXVt+RYWP7H5pxrGiAMdOrtleNG6OapTwc5K1EKz8kd4S0HE6pPYCK+C5/PrlPUUlkC4MmPfn1yg4BrSYxFsVpkQhht+hjxSpVZEqICH+1hh+qyEql7H1P3GKc3caHLqbHYXAqofeyYj9t1Gwd3uz7U8QoyJZPupRF/PP4r3/2GrCzs8JKzbfNJWlr/NKe/FfkO8C5rOh/U42rB60DMwuS5/wPDU9Qmy3tUFE6vR+TlHPyT7v5c8pkptCHib57bY7IgS4hhZ+QW8RFG3wRXffQWgzyDEOvnFzo5qeM1Ba7uTp6VJftCMa+bVspviCkggFytDXwziKA0+BzGuXduU25GR6ijWJtl11EJsHKC7h9oiiemnONh5v54tiUJQJRiNLOFzF99MKp9sRK4I709HLIkJMfpQ6aHk/SOWK/tZHX0/bmfk0CHayrU1XN1nLyB49X0B9K6ZeDPbTCVphlLzSRJww02XZVuonIA/1PSVyNJXHG2n+WZz442PngZXS8+e3+DMA0kET1CZ4s9gAgXCziu+OytL2NsuHIRldqCsbyolQ=",
+        "iv": "PHrlOhJ7HYKSWKoz"
+      }
+    },
+    {
+      "id": "3a222a09-e37f-475d-9c0b-a4d0da437615",
+      "title": "Mailchimp Campaigns",
+      "url": "https://mailchimp.com",
+      "username": "admin-mailchimpcampaigns@ollie-vault.io",
+      "tags": [
+        "marketing",
+        "newsletters"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "RZ9W8SLtELKFwn6L"
+      }
+    },
+    {
+      "id": "0baf3b76-a984-47b6-9dfb-38d4dc121445",
+      "title": "Reddit Admin Account",
+      "url": "https://reddit.com",
+      "username": "admin-redditadminaccount@ollie-vault.io",
+      "tags": [
+        "social",
+        "community"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "sJ19/qrnboodk6gQ"
+      }
+    },
+    {
+      "id": "faa595f4-cfca-49ae-86c5-8c7315190476",
+      "title": "X / Twitter Developer API",
+      "url": "https://developer.x.com",
+      "username": "admin-xtwitterdeveloperapi@ollie-vault.io",
+      "tags": [
+        "social",
+        "api"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "A1Apdoq14OEi8OWS"
+      }
+    },
+    {
+      "id": "e62e4f3b-c334-48ea-a37f-cf5474ed0b8d",
+      "title": "LinkedIn Corporate",
+      "url": "https://linkedin.com",
+      "username": "admin-linkedincorporate@ollie-vault.io",
+      "tags": [
+        "social",
+        "recruiting"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "iqPocMHlC0ojxjFq"
+      }
+    },
+    {
+      "id": "95eca943-e9bd-4e4f-af4c-68d436202fb8",
+      "title": "Spotify Family & Studio",
+      "url": "https://spotify.com",
+      "username": "admin-spotifyfamilystudio@ollie-vault.io",
+      "tags": [
+        "media",
+        "audio"
+      ],
+      "created": "2026-08-29T18:51:26.055Z",
+      "modified": "2026-08-29T18:51:26.055Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "h6dQ0DK31Kiq8W/d"
+      }
+    },
+    {
+      "id": "cee6bc45-99d7-4152-a03a-864a7d0d11d1",
+      "title": "Netflix Studio Hub",
+      "url": "https://netflix.com",
+      "username": "admin-netflixstudiohub@ollie-vault.io",
+      "tags": [
+        "media",
+        "streaming"
+      ],
+      "created": "2026-08-29T18:51:26.056Z",
+      "modified": "2026-08-29T18:51:26.056Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "8eEBbA0PBwuJxs3u"
+      }
+    },
+    {
+      "id": "265deb09-183c-44bf-9613-0918ecffbc4b",
+      "title": "Steam Gaming Network",
+      "url": "https://store.steampowered.com",
+      "username": "admin-steamgamingnetwork@ollie-vault.io",
+      "tags": [
+        "gaming",
+        "personal"
+      ],
+      "created": "2026-08-29T18:51:26.056Z",
+      "modified": "2026-08-29T18:51:26.056Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "JFdewm/ij0WnqSFM"
+      }
+    },
+    {
+      "id": "76999f61-51ff-454a-a2a3-029356c1e93a",
+      "title": "Ubiquiti UniFi Site Manager",
+      "url": "https://unifi.ui.com",
+      "username": "admin-ubiquitiunifisitemanager@ollie-vault.io",
+      "tags": [
+        "hardware",
+        "network",
+        "iot"
+      ],
+      "created": "2026-08-29T18:51:26.056Z",
+      "modified": "2026-08-29T18:51:26.056Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "ma3oXeJ4FvCtomZN"
+      }
+    },
+    {
+      "id": "5eaea265-c2a5-43a6-8c91-21862726dbf1",
+      "title": "1Password Master Team",
+      "url": "https://my.1password.com",
+      "username": "admin-1passwordmasterteam@ollie-vault.io",
+      "tags": [
+        "security",
+        "vault",
+        "corp"
+      ],
+      "created": "2026-08-29T18:51:26.056Z",
+      "modified": "2026-08-29T18:51:26.056Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "Ralu2p6HXH3wjmJg"
+      }
+    },
+    {
+      "id": "d792370b-1b0a-4773-ae45-c9f6862ed881",
+      "title": "Tailscale Zero-Trust Mesh",
+      "url": "https://login.tailscale.com",
+      "username": "admin-tailscalezerotrustmesh@ollie-vault.io",
+      "tags": [
+        "network",
+        "vpn",
+        "security"
+      ],
+      "created": "2026-08-29T18:51:26.056Z",
+      "modified": "2026-08-29T18:51:26.056Z",
+      "_encrypted": {
+        "ciphertext": "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",
+        "iv": "p3zFbno38BqNxxbH"
+      }
+    }
+  ]
+}

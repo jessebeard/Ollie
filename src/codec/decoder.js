@@ -24,7 +24,8 @@ import { upsampleChroma } from '../algebraic/mappings/upsampling.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData } from '../algebraic/mappings/block-assembly.js';
 
 import { parseSpiffHeader } from '../automata/parsers/spiff-parser.js';
-import { F5 } from '../information-theory/steganography/f5-syndrome.js';
+import { StegoEngine } from '../information-theory/steganography/stego-engine.js';
+import { base64ToBytes } from '../utils/encoding.js';
 import { logger } from '../utils/logger.js';
 
 export class JpegDecoder {
@@ -256,16 +257,23 @@ export class JpegDecoder {
                     }
                 }
 
-                extractedSecretData = await F5.extractAuto(allBlocks, options);
-                if (extractedSecretData) {
-
-                    if (extractedSecretData instanceof Uint8Array) {
-                        logger.debug(`Extracted secret data (legacy): ${extractedSecretData.length} bytes`);
-                    } else if (extractedSecretData.data) {
-                        logger.debug(`Extracted secret data (container): ${extractedSecretData.data.length} bytes`);
-                        logger.debug('Metadata:', extractedSecretData.metadata);
-
+                const [extractedPayload, extractErr] = await StegoEngine.extract(allBlocks, options.password, options);
+                if (!extractErr && extractedPayload) {
+                    try {
+                        const parsed = JSON.parse(new TextDecoder().decode(extractedPayload));
+                        if (parsed && parsed.data) {
+                            const [rawBytes] = base64ToBytes(parsed.data);
+                            extractedSecretData = {
+                                data: rawBytes,
+                                metadata: parsed.metadata
+                            };
+                        } else {
+                            extractedSecretData = extractedPayload;
+                        }
+                    } catch {
+                        extractedSecretData = extractedPayload;
                     }
+                    logger.debug('Successfully extracted Format v4 secret payload.');
                 }
             } catch (e) {
                 logger.warn('Failed to extract secret data:', e);
@@ -276,7 +284,7 @@ export class JpegDecoder {
         if (assembleErr) return [null, assembleErr];
 
         if (extractedSecretData) {
-            if (extractedSecretData.metadata) {
+            if (!(extractedSecretData instanceof Uint8Array) && typeof extractedSecretData === 'object' && extractedSecretData.metadata) {
                 result.secretData = extractedSecretData.data;
                 result.secretMetadata = extractedSecretData.metadata;
             } else {
@@ -326,143 +334,148 @@ export class JpegDecoder {
      * @param {Object} scanHeader - Parsed scan header
      */
     decodeScan(scanData, scanHeader) {
-        const bitReader = new BitReader(scanData);
-        const { mcuCols, mcuRows } = this.frameHeader;
-        const restartInterval = this.restartInterval;
-        const totalMCUs = mcuCols * mcuRows;
+        try {
+            const bitReader = new BitReader(scanData);
+            const { mcuCols, mcuRows } = this.frameHeader;
+            const restartInterval = this.restartInterval;
+            const totalMCUs = mcuCols * mcuRows;
 
-        const { Ss, Se } = scanHeader;
+            const { Ss, Se } = scanHeader;
 
-        const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
+            const dcPredictors = new Array(this.frameHeader.components.length).fill(0);
 
-        // Precompute scan component metadata to avoid redundant lookups in the hot loop
-        const scanComponentMetadata = scanHeader.components.map(scanComp => {
-            const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
-            const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
-            const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
-            const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
-            const compState = this.components[scanComp.selector];
-            const blocksInMCU = frameComp ? frameComp.hSampling * frameComp.vSampling : 0;
-            const blocksH = compState ? compState.blocksH : 0;
+            // Precompute scan component metadata to avoid redundant lookups in the hot loop
+            const scanComponentMetadata = scanHeader.components.map(scanComp => {
+                const frameComp = this.frameHeader.components.find(c => c.id === scanComp.selector);
+                const compIndex = this.frameHeader.components.findIndex(c => c.id === scanComp.selector);
+                const dcTable = this.huffmanTables.get(`0_${scanComp.dcTableId}`);
+                const acTable = this.huffmanTables.get(`1_${scanComp.acTableId}`);
+                const compState = this.components[scanComp.selector];
+                const blocksInMCU = frameComp ? frameComp.hSampling * frameComp.vSampling : 0;
+                const blocksH = compState ? compState.blocksH : 0;
 
-            return {
-                scanComp,
-                frameComp,
-                compIndex,
-                dcTable,
-                acTable,
-                blocksInMCU,
-                blocksH,
-                blocksArr: compState ? compState.blocks : null
-            };
-        });
+                return {
+                    scanComp,
+                    frameComp,
+                    compIndex,
+                    dcTable,
+                    acTable,
+                    blocksInMCU,
+                    blocksH,
+                    blocksArr: compState ? compState.blocks : null
+                };
+            });
 
-        // Validate precomputed metadata
-        for (const meta of scanComponentMetadata) {
-            if (!meta.frameComp) return new Error(`Scan component ${meta.scanComp.selector} not found in frame header`);
-            if (Ss === 0 && !meta.dcTable) return new Error(`Missing DC Huffman table for component ${meta.scanComp.selector}`);
-            if (Se > 0 && !meta.acTable) return new Error(`Missing AC Huffman table for component ${meta.scanComp.selector}`);
-        }
+            // Validate precomputed metadata
+            for (const meta of scanComponentMetadata) {
+                if (!meta.frameComp) return new Error(`Scan component ${meta.scanComp.selector} not found in frame header`);
+                if (Ss === 0 && !meta.dcTable) return new Error(`Missing DC Huffman table for component ${meta.scanComp.selector}`);
+                if (Se > 0 && !meta.acTable) return new Error(`Missing AC Huffman table for component ${meta.scanComp.selector}`);
+            }
 
-        let mcusSinceRestart = 0;
-        let expectedRstMarker = 0xD0; // Start with RST0
+            let mcusSinceRestart = 0;
+            let expectedRstMarker = 0xD0; // Start with RST0
 
-        for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
+            for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {
 
-            // Handle Restart Interval
-            if (restartInterval > 0 && mcusSinceRestart === restartInterval) {
-                // Align to byte boundary
-                bitReader.alignToByte();
+                // Handle Restart Interval
+                if (restartInterval > 0 && mcusSinceRestart === restartInterval) {
+                    // Align to byte boundary
+                    bitReader.alignToByte();
 
-                // Consume fill bytes (0xFF) before the actual marker
-                while (bitReader.byteOffset < bitReader.data.length && bitReader.data[bitReader.byteOffset] === 0xFF && bitReader.data[bitReader.byteOffset + 1] === 0xFF) {
-                    bitReader.byteOffset++;
+                    // Consume fill bytes (0xFF) before the actual marker
+                    while (bitReader.byteOffset < bitReader.data.length && bitReader.data[bitReader.byteOffset] === 0xFF && bitReader.data[bitReader.byteOffset + 1] === 0xFF) {
+                        bitReader.byteOffset++;
+                    }
+
+                    if (bitReader.byteOffset + 1 >= bitReader.data.length) {
+                        return new Error("Unexpected end of data while looking for RST marker");
+                    }
+
+                    const ff = bitReader.data[bitReader.byteOffset];
+                    const marker = bitReader.data[bitReader.byteOffset + 1];
+
+                    if (ff !== 0xFF || marker !== expectedRstMarker) {
+                        logger.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
+
+                        // Attempt to resync: Scan forward for the next RST marker
+                        let foundMarker = false;
+                        const SEARCH_LIMIT = 512;
+
+                        for (let i = 0; i < SEARCH_LIMIT; i++) {
+                            if (bitReader.byteOffset + i + 1 >= bitReader.data.length) break;
+
+                            const b0 = bitReader.data[bitReader.byteOffset + i];
+                            const b1 = bitReader.data[bitReader.byteOffset + i + 1];
+
+                            if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {
+                                logger.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
+                                bitReader.byteOffset += (i + 2);
+                                bitReader.bitOffset = 0;
+                                expectedRstMarker = (b1 + 1);
+                                if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
+                                foundMarker = true;
+                                break;
+                            }
+                        }
+
+                        if (!foundMarker) {
+                            logger.error('Failed to resync: No RST marker found within search limit.');
+                        }
+                    } else {
+                        // Correct marker found, advance the pointers manually
+                        bitReader.byteOffset += 2;
+                        bitReader.bitOffset = 0;
+
+                        expectedRstMarker++;
+                        if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
+                    }
+
+                    // Always reset predictors after a restart interval
+                    dcPredictors.fill(0);
+                    mcusSinceRestart = 0;
+                    // DO NOT `continue` the loop, as we still need to process the current MCU index.
                 }
 
-                if (bitReader.byteOffset + 1 >= bitReader.data.length) {
-                    return new Error("Unexpected end of data while looking for RST marker");
-                }
+                const mcuRow = Math.floor(mcuIndex / mcuCols);
+                const mcuCol = mcuIndex % mcuCols;
 
-                const ff = bitReader.data[bitReader.byteOffset];
-                const marker = bitReader.data[bitReader.byteOffset + 1];
+                for (let c = 0; c < scanComponentMetadata.length; c++) {
+                    const meta = scanComponentMetadata[c];
+                    const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH, blocksArr } = meta;
 
-                if (ff !== 0xFF || marker !== expectedRstMarker) {
-                    logger.warn(`RST mismatch: Found 0x${ff.toString(16)} 0x${marker.toString(16)}, Expected 0xFF 0x${expectedRstMarker.toString(16)} at MCU ${mcuIndex}`);
+                    for (let i = 0; i < blocksInMCU; i++) {
+                        const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
+                        const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
+                        const blockIndex = blockRow * blocksH + blockCol;
 
-                    // Attempt to resync: Scan forward for the next RST marker
-                    let foundMarker = false;
-                    const SEARCH_LIMIT = 512;
+                        if (!blocksArr || !Number.isInteger(blockIndex) || blockIndex < 0 || blockIndex >= blocksArr.length) {
+                            return new Error(`Block index ${blockIndex} out of range for component ${scanComp.selector} (have ${blocksArr ? blocksArr.length : 0} blocks)`);
+                        }
 
-                    for (let i = 0; i < SEARCH_LIMIT; i++) {
-                        if (bitReader.byteOffset + i + 1 >= bitReader.data.length) break;
+                        const block = blocksArr[blockIndex];
 
-                        const b0 = bitReader.data[bitReader.byteOffset + i];
-                        const b1 = bitReader.data[bitReader.byteOffset + i + 1];
+                        const [blockResult, blockErr] = decodeBlock(
+                            bitReader,
+                            dcTable,
+                            acTable,
+                            dcPredictors[compIndex],
+                            block,
+                            Ss,
+                            Se
+                        );
+                        if (blockErr) return blockErr;
 
-                        if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {
-                            logger.warn(`Resync: Found RST${b1 & 0x7} (0xFF${b1.toString(16)}) at offset +${i}`);
-                            bitReader.byteOffset += (i + 2);
-                            bitReader.bitOffset = 0;
-                            expectedRstMarker = (b1 + 1);
-                            if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
-                            foundMarker = true;
-                            break;
+                        if (Ss === 0) {
+                            dcPredictors[compIndex] = blockResult.dc;
                         }
                     }
-
-                    if (!foundMarker) {
-                        logger.error('Failed to resync: No RST marker found within search limit.');
-                    }
-                } else {
-                    // Correct marker found, advance the pointers manually
-                    bitReader.byteOffset += 2;
-                    bitReader.bitOffset = 0;
-
-                    expectedRstMarker++;
-                    if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;
                 }
-
-                // Always reset predictors after a restart interval
-                dcPredictors.fill(0);
-                mcusSinceRestart = 0;
-                // DO NOT `continue` the loop, as we still need to process the current MCU index.
+                mcusSinceRestart++;
             }
-
-            const mcuRow = Math.floor(mcuIndex / mcuCols);
-            const mcuCol = mcuIndex % mcuCols;
-
-            for (let c = 0; c < scanComponentMetadata.length; c++) {
-                const meta = scanComponentMetadata[c];
-                const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH, blocksArr } = meta;
-
-                for (let i = 0; i < blocksInMCU; i++) {
-                    const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);
-                    const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);
-                    const blockIndex = blockRow * blocksH + blockCol;
-
-                    if (!blocksArr || !Number.isInteger(blockIndex) || blockIndex < 0 || blockIndex >= blocksArr.length) {
-                        return new Error(`Block index ${blockIndex} out of range for component ${scanComp.selector} (have ${blocksArr ? blocksArr.length : 0} blocks)`);
-                    }
-
-                    const block = blocksArr[blockIndex];
-
-                    const [blockResult, blockErr] = decodeBlock(
-                        bitReader,
-                        dcTable,
-                        acTable,
-                        dcPredictors[compIndex],
-                        block,
-                        Ss,
-                        Se
-                    );
-                    if (blockErr) return blockErr;
-
-                    if (Ss === 0) {
-                        dcPredictors[compIndex] = blockResult.dc;
-                    }
-                }
-            }
-            mcusSinceRestart++;
+            return null;
+        } catch (err) {
+            return err instanceof Error ? err : new Error(String(err));
         }
     }
 

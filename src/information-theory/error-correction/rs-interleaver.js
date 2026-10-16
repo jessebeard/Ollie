@@ -140,10 +140,9 @@ export class ErrorCorrection {
         const recoveredChunks = [];
         for (let i = 0; i < blockCount; i++) {
             const block = blocks[i];
-            try {
-                decoder.decode(block, parityBytes);
-            } catch (e) {
-                return [null, new Error(`ECC recovery failed on block ${i}: ${e.message}`)];
+            const [, decErr] = decoder.decodeTuple(block, parityBytes);
+            if (decErr) {
+                return [null, new Error(`ECC recovery failed on block ${i}: ${decErr.message}`)];
             }
 
             const chunk = new Uint8Array(dataBytes);
@@ -254,10 +253,9 @@ export class ErrorCorrection {
             toDecode[i] = receivedData[i];
         }
 
-        try {
-            decoder.decode(toDecode, parityBytes);
-        } catch (e) {
-            return [null, new Error(`ECC recovery failed on legacy block: ${e.message}`)];
+        const [, decErr] = decoder.decodeTuple(toDecode, parityBytes);
+        if (decErr) {
+            return [null, new Error(`ECC recovery failed on legacy block: ${decErr.message}`)];
         }
 
         const dataLength = receivedData.length - parityBytes;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { assembleBlocks, componentsToImageData, grayscaleToImageData, cropImageData } from '../../../src/algebraic/mappings/block-assembly.js';
 
 describe('Block Assembly', () => {
@@ -171,5 +172,44 @@ describe('Block Assembly', () => {
         for (let i = 0; i < 100; i++) {
             expect(result[i]).toBe(128);
         }
+    });
+
+    describe('PBT & Dimension Invariants', () => {
+        it('Property: assembleBlocks always produces buffer of exact length width * height', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 48), Arbitrary.integer(1, 48)],
+                (w, h) => {
+                    const blocksAcross = Math.ceil(w / 8);
+                    const blocksDown = Math.ceil(h / 8);
+                    const totalBlocks = blocksAcross * blocksDown;
+
+                    const blocks = Array.from({ length: totalBlocks }, () => new Float32Array(64).fill(42));
+                    const assembled = assembleBlocks(blocks, w, h, blocksAcross);
+
+                    expect(assembled.length).toBe(w * h);
+                },
+                50
+            );
+        });
+
+        it('Property: uniform blocks assemble into strictly uniform image plane', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 32), Arbitrary.integer(1, 32), Arbitrary.integer(0, 255)],
+                (w, h, fillVal) => {
+                    const blocksAcross = Math.ceil(w / 8);
+                    const blocksDown = Math.ceil(h / 8);
+                    const totalBlocks = blocksAcross * blocksDown;
+
+                    const blocks = Array.from({ length: totalBlocks }, () => new Float32Array(64).fill(fillVal));
+                    const assembled = assembleBlocks(blocks, w, h, blocksAcross);
+
+                    expect(assembled.length).toBe(w * h);
+                    for (let i = 0; i < assembled.length; i++) {
+                        expect(assembled[i]).toBe(fillVal);
+                    }
+                },
+                40
+            );
+        });
     });
 });

@@ -13,9 +13,8 @@ describe('HMAC-SHA256 primitive', () => {
 
         const [mac, signErr] = await signBytes(key, bytes('manifest payload v1'));
         expect(signErr).toBe(null);
-        if (!(mac instanceof Uint8Array) || mac.length !== 32) {
-            throw new Error('expected 32-byte HMAC-SHA256 digest');
-        }
+        expect(mac).toBeInstanceOf(Uint8Array);
+        expect(mac).toHaveLength(32);
 
         const [ok, verifyErr] = await verifyBytes(key, bytes('manifest payload v1'), mac);
         expect(verifyErr).toBe(null);
@@ -52,10 +51,10 @@ describe('HMAC-SHA256 primitive', () => {
 
     it('rejects empty and non-byte key material via tuple', async () => {
         const [, errEmpty] = await importHmacKey(new Uint8Array(0));
-        if (!(errEmpty instanceof Error)) throw new Error('empty key must fail closed');
+        expect(errEmpty).toBeInstanceOf(Error);
 
         const [, errType] = await importHmacKey('not-bytes');
-        if (!(errType instanceof Error)) throw new Error('non-bytes key must fail closed');
+        expect(errType).toBeInstanceOf(Error);
     });
 
     it('verify returns false (not error) for malformed mac lengths', async () => {

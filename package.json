@@ -1,7 +1,7 @@
 {
   "name": "ollie",
   "version": "0.2.0",
-  "description": "Pure JavaScript JPEG codec with F5 steganography, Reed-Solomon error correction, and an encrypted password vault hidden inside carrier photos.",
+  "description": "Pure JavaScript JPEG codec with STC and J-UNIWARD steganography, Reed-Solomon error correction, and an encrypted password vault hidden inside carrier photos.",
   "type": "module",
   "main": "bundle.js",
   "scripts": {

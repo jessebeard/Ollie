@@ -4,6 +4,12 @@
 **Author:** ox-alpha (independent second-pass review)
 **Scope:** Full sweep of `src/`, `app/`, specs, test infrastructure; suite re-run (515/515 green at time of review).
 
+> **Note (added 2026-08-31 by Cy4 audit):** `src/information-theory/steganography/jsteg.js`
+> has been removed from the source tree. The jsteg references in §2 (JSDoc rot,
+> dead exports, code duplication between `f5-syndrome.js` and `jsteg.js`) are
+> moot for the current codebase — `f5-syndrome.js` is the sole steganographic
+> extraction path. See `docs/audits/Cy4-Codebuddy-audit.md` finding Cy4-5.
+
 ---
 
 ## 0. Relationship to the Previous Audits (2026-08-20)

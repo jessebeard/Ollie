@@ -1,6 +1,6 @@
 # Code Quality Specs
 
-1. **No Dependencies/Third-Party Libraries**: The project must be built entirely in plain JavaScript with no external dependencies or frameworks unless absolutely necessary and documented.
+1. **No Dependencies/Third-Party Libraries**: The project must be built entirely in plain JavaScript with no external dependencies or frameworks unless absolutely necessary and documented. (Explicit approved exception: `src/vendor/argon2/` vendored OpenPGP.js Argon2id WASM engine with inlined binaries to mitigate cryptographic side-channel timing attacks and provide memory-hard key derivation).
 2. **Strict Mode**: All files must utilize `"use strict";` or be executed as ES Modules to guarantee secure scoping and avoid accidental globals.
 3. **Defensive Programming**: Functions must validate parameters and boundaries explicitly. Methods taking objects should define expected types clearly.
 4. **Environment Agnosticism**: Core logic (e.g. hashing, encoding, decoding) must execute agnostically and run efficiently on both browser engines and Node.js instances.

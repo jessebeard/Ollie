@@ -81,7 +81,13 @@ export function canonicalManifestBytes(manifest) {
         };
     }
 
-    if (manifest.share !== undefined) {
+    if (manifest.shares !== undefined) {
+        core.shares = manifest.shares.map(s => ({
+            index: s.index,
+            threshold: s.threshold,
+            data: s.data
+        }));
+    } else if (manifest.share !== undefined) {
         core.share = {
             index: manifest.share.index,
             threshold: manifest.share.threshold,
@@ -125,7 +131,18 @@ export function validateManifestStructure(m) {
     if (!Number.isInteger(m.revision) || m.revision < 0) return new Error('manifest: bad revision');
     if (!isNonEmptyString(m.created, 40)) return new Error('manifest: bad created');
 
-    if (m.share !== undefined) {
+    if (m.shares !== undefined) {
+        if (!Array.isArray(m.shares) || m.shares.length < 1) {
+            return new Error('manifest: malformed shares array');
+        }
+        for (const s of m.shares) {
+            if (!s || !Number.isInteger(s.index) || s.index < 1 ||
+                !Number.isInteger(s.threshold) || s.threshold < 1 ||
+                !isNonEmptyString(s.data, 512)) {
+                return new Error('manifest: malformed share envelope in shares');
+            }
+        }
+    } else if (m.share !== undefined) {
         const s = m.share;
         if (!s || !Number.isInteger(s.index) || s.index < 1 ||
             !Number.isInteger(s.threshold) || s.threshold < 1 ||
@@ -157,6 +174,7 @@ export function validateManifestStructure(m) {
  * @param {string} spec.password - Master password (MAC key source)
  * @param {string} [spec.created] - ISO timestamp override (tests)
  * @param {{index: number, threshold: number, data: string}} [spec.share] - CSS envelope (H2)
+ * @param {Array<{index: number, threshold: number, data: string}>} [spec.shares] - Per-carrier CSS key shares (erasure sets)
  * @param {{algo: string, iterations: number, salt: string}} [spec.kdf] - Reuse one KDF block across a carrier set
  * @param {{k: number, n: number, size: number}} [spec.ec] - Erasure-coding parameters for threshold sets
  * @returns {Promise<[Object|null, Error|null]>}
@@ -182,10 +200,18 @@ export async function createManifest(spec) {
             return [null, new Error('manifest: password required for signing')];
         }
 
-        const [salt, saltErr] = spec.kdf
-            ? [base64ToBytes(spec.kdf.salt), null]
-            : await KeyDerivation.generateSalt();
-        if (saltErr) return [null, saltErr];
+        let salt;
+        let saltErr = null;
+        if (spec.kdf) {
+            const [b, err] = base64ToBytes(spec.kdf.salt);
+            salt = b;
+            saltErr = err;
+        } else {
+            const [b, err] = await KeyDerivation.generateSalt();
+            salt = b;
+            saltErr = err;
+        }
+        if (saltErr || !salt) return [null, saltErr || new Error('manifest: failed to resolve salt')];
 
         const kdf = spec.kdf
             ? {
@@ -215,7 +241,13 @@ export async function createManifest(spec) {
         if (spec.ec !== undefined) {
             unsigned.ec = { k: spec.ec.k, n: spec.ec.n, size: spec.ec.size };
         }
-        if (spec.share !== undefined) {
+        if (spec.shares !== undefined) {
+            unsigned.shares = spec.shares.map(s => ({
+                index: s.index,
+                threshold: s.threshold,
+                data: s.data
+            }));
+        } else if (spec.share !== undefined) {
             unsigned.share = {
                 index: spec.share.index,
                 threshold: spec.share.threshold,

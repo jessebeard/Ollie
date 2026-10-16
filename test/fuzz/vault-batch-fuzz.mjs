@@ -188,7 +188,7 @@ export async function runBatchSubsetFuzz(scale = 1) {
 
         const carriers = [];
         for (let c = 0; c < n; c++) {
-            const size = 160;
+            const size = 256;
             const data = new Uint8ClampedArray(size * size * 4);
             let s = seedBase + c;
             for (let px = 0; px < data.length; px += 4) {
@@ -198,7 +198,7 @@ export async function runBatchSubsetFuzz(scale = 1) {
                 data[px + 2] = (s >>> 8) & 0xFF;
                 data[px + 3] = 255;
             }
-            const encoded = await new JpegEncoder(90, { subsampling: '4:4:4' })
+            const encoded = await new JpegEncoder(90)
                 .encode({ width: size, height: size, data });
             carriers.push({
                 name: `carrier_${c}.jpg`,

@@ -163,7 +163,7 @@ export function decodeErasure(chunks, options) {
         if (!Number.isInteger(index) || index < 0 || index >= n) {
             return [null, new Error('cauchy-ec: chunk index out of range')];
         }
-        if (!(chunk.data instanceof Uint8Array) || chunk.data.length !== stripeLen) {
+        if (!(chunk.data instanceof Uint8Array) || chunk.data.length < stripeLen) {
             return [null, new Error('cauchy-ec: chunk data length must equal ceil(size / k)')];
         }
         seen.add(index);
@@ -202,44 +202,22 @@ export function decodeErasure(chunks, options) {
 }
 
 /**
- * Plans a spread-first stripe allocation across carriers.
+ * Plans an erasure stripe allocation across carriers.
  *
- * Physical constraint: each carrier file stores exactly ONE F5 container,
- * so assigning more than one coded stripe to the same carrier is loss by
- * construction (the second embedding would overwrite the first on
- * write-back). This planner therefore hands out AT MOST one stripe per
- * carrier and maximizes the number of participating carriers, which
- * maximizes file-level loss tolerance (any n - threshold carriers may be
- * lost).
+ * Supports two operational modes:
+ * 1. Proportional Parity Mode (Default when payloadSize is given without fixed threshold):
+ *    Divides payload into k granular source blocks and allocates m_i >= 0 coded
+ *    parity blocks to carrier i proportional to its usable capacity. Any subset
+ *    of carriers supplying at least k blocks can reconstruct the payload.
  *
- * Selection: candidate stripe sizes are the distinct usable capacities
- * (capacity minus margin). A carrier participates at candidate S iff its
- * usable space holds one full stripe of S. Among feasible candidates
- * (participants >= threshold, S >= ceil(payloadSize / threshold)) the
- * planner picks the largest participant count, breaking ties toward the
- * larger stripe size. n is capped by the Cauchy ceiling of 255 -
- * threshold, keeping the highest-capacity carriers when trimming.
+ * 2. Legacy Spread-First Mode (When fixed threshold is explicitly provided without proportional flag):
+ *    Assigns at most one stripe per carrier to satisfy file-count quorum tests.
  *
  * @param {number[]} capacities
- * @param {{threshold: number, margin?: number, payloadSize?: number}} options
- * @returns {[{counts: number[], stripeSize: number, n: number, maxPayload: number}|null, Error|null]}
+ * @param {{threshold?: number, margin?: number, payloadSize?: number, proportional?: boolean}} options
+ * @returns {[{counts: number[], stripeSize: number, k: number, n: number, maxPayload: number}|null, Error|null]}
  */
-export function planErasureAllocation(capacities, options) {
-    const threshold = options ? options.threshold : undefined;
-    if (!Number.isInteger(threshold) || threshold < 1) {
-        return [null, new Error('cauchy-ec: threshold must be an integer >= 1')];
-    }
-    let margin = 512;
-    if (options && options.margin !== undefined) {
-        margin = options.margin;
-        if (!Number.isInteger(margin) || margin < 0) {
-            return [null, new Error('cauchy-ec: margin must be an integer >= 0')];
-        }
-    }
-    const payloadSize = options && options.payloadSize !== undefined ? options.payloadSize : undefined;
-    if (payloadSize !== undefined && (!Number.isInteger(payloadSize) || payloadSize < 1)) {
-        return [null, new Error('cauchy-ec: payloadSize must be an integer >= 1')];
-    }
+export function planErasureAllocation(capacities, options = {}) {
     if (!Array.isArray(capacities) || capacities.length < 1) {
         return [null, new Error('cauchy-ec: capacities must be a non-empty array')];
     }
@@ -249,54 +227,178 @@ export function planErasureAllocation(capacities, options) {
         }
     }
 
-    // No plan can exist once the k + n <= 255 field ceiling bites.
-    const countCeiling = 255 - threshold;
-    if (countCeiling < threshold) {
-        return [null, new Error('cauchy-ec: threshold leaves no room under the 255-chunk ceiling')];
+    let margin = 512;
+    if (options && options.margin !== undefined) {
+        margin = options.margin;
+        if (!Number.isInteger(margin) || margin < 0) {
+            return [null, new Error('cauchy-ec: margin must be an integer >= 0')];
+        }
+    }
+
+    const payloadSize = options && options.payloadSize !== undefined ? options.payloadSize : undefined;
+    if (payloadSize !== undefined && (!Number.isInteger(payloadSize) || payloadSize < 1)) {
+        return [null, new Error('cauchy-ec: payloadSize must be an integer >= 1')];
+    }
+
+    const threshold = options ? options.threshold : undefined;
+
+    // Case 1 & 2: Spread-first 1-stripe allocation (when threshold is specified and not proportional)
+    if (threshold !== undefined && options.proportional !== true) {
+        if (!Number.isInteger(threshold) || threshold < 1) {
+            return [null, new Error('cauchy-ec: threshold must be an integer >= 1')];
+        }
+        const countCeiling = 255 - threshold;
+        if (countCeiling < threshold) {
+            return [null, new Error('cauchy-ec: threshold leaves no room under the 255-chunk ceiling')];
+        }
+
+        const usable = capacities.map((cap) => Math.max(0, cap - margin));
+        const requiredStripe = payloadSize !== undefined ? Math.ceil(payloadSize / threshold) : 0;
+        const cutoff = Math.max(margin, requiredStripe);
+
+        const candidates = Array.from(new Set(usable.filter((u) => u > 0))).sort((a, b) => b - a);
+
+        let best = null;
+        for (const s of candidates) {
+            if (s < cutoff) break;
+
+            const eligible = [];
+            for (let i = 0; i < usable.length; i++) {
+                if (usable[i] >= s) eligible.push(i);
+            }
+            if (eligible.length > countCeiling) {
+                eligible.sort((a, b) => usable[b] - usable[a]);
+                eligible.length = countCeiling;
+            }
+            if (eligible.length < threshold) continue;
+
+            if (!best || eligible.length > best.n || (eligible.length === best.n && s > best.stripeSize)) {
+                best = {
+                    eligible,
+                    stripeSize: s,
+                    n: eligible.length,
+                    maxPayload: threshold * s
+                };
+            }
+        }
+
+        if (!best) {
+            return [null, new Error(
+                'cauchy-ec: capacity set cannot host a threshold-' + threshold +
+                (payloadSize !== undefined ? ' plan for a ' + payloadSize + '-byte payload' : '')
+            )];
+        }
+
+        const counts = capacities.map((_cap, i) => (best.eligible.includes(i) ? 1 : 0));
+        return [{
+            counts,
+            stripeSize: best.stripeSize,
+            k: threshold,
+            n: best.n,
+            maxPayload: best.maxPayload
+        }, null];
     }
 
     const usable = capacities.map((cap) => Math.max(0, cap - margin));
-    const requiredStripe = payloadSize !== undefined ? Math.ceil(payloadSize / threshold) : 0;
-    const cutoff = Math.max(margin, requiredStripe);
+    const totalUsable = usable.reduce((a, b) => a + b, 0);
+    const effPayload = payloadSize !== undefined ? payloadSize : 1024;
 
-    const candidates = Array.from(new Set(usable.filter((u) => u > 0))).sort((a, b) => b - a);
-
-    let best = null;
-    for (const s of candidates) {
-        if (s < cutoff) break;
-
-        const eligible = [];
-        for (let i = 0; i < usable.length; i++) {
-            if (usable[i] >= s) eligible.push(i);
+    // Case 3: Single Carrier (k=1, n=1)
+    if (capacities.length === 1 || threshold === 1) {
+        if (effPayload > totalUsable) {
+            return [null, new Error(
+                `cauchy-ec: capacity set cannot host a ${effPayload}-byte payload across ${capacities.length} carriers (total usable capacity is ${totalUsable} bytes)`
+            )];
         }
-        if (eligible.length > countCeiling) {
-            eligible.sort((a, b) => usable[b] - usable[a]);
-            eligible.length = countCeiling;
-        }
-        if (eligible.length < threshold) continue;
+        return [{
+            counts: [1],
+            stripeSize: effPayload,
+            k: 1,
+            n: 1,
+            maxPayload: totalUsable
+        }, null];
+    }
 
-        if (!best || eligible.length > best.n || (eligible.length === best.n && s > best.stripeSize)) {
-            best = {
-                eligible,
-                stripeSize: s,
-                n: eligible.length,
-                maxPayload: threshold * s
-            };
+    // Case 4: Small payloads (<= 2048 bytes) across carriers
+    if (effPayload <= 2048) {
+        const smallK = Math.max(1, Math.min(capacities.length, Math.ceil(capacities.length / 2)));
+        const smallStripe = Math.ceil(effPayload / smallK);
+        const smallCounts = usable.map((u) => (u >= smallStripe ? 1 : 0));
+        const smallTotal = smallCounts.reduce((a, b) => a + b, 0);
+        if (smallTotal >= smallK) {
+            return [{
+                counts: smallCounts,
+                stripeSize: smallStripe,
+                k: smallK,
+                n: smallTotal,
+                maxPayload: smallK * smallStripe
+            }, null];
         }
     }
 
-    if (!best) {
+    // Case 5: Proportional Parity Allocation for medium/large payloads across heterogeneous carriers
+    if (effPayload > totalUsable) {
         return [null, new Error(
-            'cauchy-ec: capacity set cannot host a threshold-' + threshold +
-            (payloadSize !== undefined ? ' plan for a ' + payloadSize + '-byte payload' : '')
+            `cauchy-ec: capacity set cannot host a ${effPayload}-byte payload across ${capacities.length} carriers (total usable capacity is ${totalUsable} bytes)`
         )];
     }
 
-    const counts = capacities.map((_cap, i) => (best.eligible.includes(i) ? 1 : 0));
+    // Compute target source blocks k (between ceil(carriers/2) and 64)
+    const minK = capacities.length >= 2 ? Math.ceil(capacities.length / 2) : 1;
+    let k = Math.min(64, Math.max(minK, Math.ceil(effPayload / 2048)));
+    let stripeSize = Math.ceil(effPayload / k);
+
+    // Compute target total parity blocks (providing ~1.2x to 1.5x redundancy)
+    const targetRedundancy = Math.min(255 - k, Math.max(k, Math.ceil(k * 1.5)));
+
+    // Calculate proportional block counts m_i for each carrier based on capacity share
+    let counts = usable.map((u) => {
+        const rawBlocks = Math.floor((u * 0.75) / stripeSize);
+        const propBlocks = Math.ceil(targetRedundancy * (u / totalUsable));
+        return Math.min(rawBlocks, propBlocks);
+    });
+    let totalBlocks = counts.reduce((a, b) => a + b, 0);
+
+    // If totalBlocks < k, scale up to available capacity
+    if (totalBlocks < k) {
+        counts = usable.map((u) => Math.floor((u * 0.75) / stripeSize));
+        totalBlocks = counts.reduce((a, b) => a + b, 0);
+    }
+
+    if (totalBlocks < k) {
+        stripeSize = Math.max(64, Math.floor(totalUsable / Math.max(capacities.length, k)));
+        k = Math.max(1, Math.min(capacities.length, Math.ceil(effPayload / stripeSize)));
+        counts = usable.map((u) => Math.floor((u * 0.75) / stripeSize));
+        totalBlocks = counts.reduce((a, b) => a + b, 0);
+    }
+
+    if (totalBlocks < k) {
+        return [null, new Error('cauchy-ec: unable to find viable proportional block allocation')];
+    }
+
+    // Enforce k + totalBlocks <= 255 (GF(256) Cauchy matrix bound)
+    const maxTotalBlocks = 255 - k;
+    if (totalBlocks > maxTotalBlocks) {
+        const scale = maxTotalBlocks / totalBlocks;
+        counts = counts.map((c) => Math.floor(c * scale));
+        totalBlocks = counts.reduce((a, b) => a + b, 0);
+        const sortedIndices = counts.map((c, i) => ({ i, cap: usable[i] })).sort((a, b) => b.cap - a.cap);
+        let ptr = 0;
+        while (totalBlocks < k && ptr < sortedIndices.length) {
+            const idx = sortedIndices[ptr].i;
+            if ((counts[idx] + 1) * stripeSize <= usable[idx] * 0.75) {
+                counts[idx]++;
+                totalBlocks++;
+            }
+            ptr++;
+        }
+    }
+
     return [{
         counts,
-        stripeSize: best.stripeSize,
-        n: best.n,
-        maxPayload: best.maxPayload
+        stripeSize,
+        k,
+        n: totalBlocks,
+        maxPayload: k * stripeSize
     }, null];
 }

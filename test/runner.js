@@ -87,17 +87,27 @@ global.document = {
         };
     },
     createElement: (tag) => {
+        const classes = new Set();
         const element = {
             tagName: tag.toUpperCase(),
             style: {},
+            className: '',
             classList: {
-                add: () => { },
-                remove: () => { },
-                contains: () => false,
-                toggle: () => { }
+                add: (...c) => c.forEach(x => classes.add(x)),
+                remove: (...c) => c.forEach(x => classes.delete(x)),
+                contains: (x) => classes.has(x) || (element.className && element.className.split(/\s+/).includes(x)),
+                toggle: (x, force) => {
+                    if (force !== undefined) {
+                        if (force) classes.add(x); else classes.delete(x);
+                    } else {
+                        if (classes.has(x)) classes.delete(x); else classes.add(x);
+                    }
+                }
             },
             addEventListener: () => { },
+            removeEventListener: () => { },
             appendChild: () => { },
+            remove: () => { },
             getAttribute: () => null,
             setAttribute: () => { },
             removeAttribute: () => { },
@@ -112,9 +122,13 @@ global.document = {
     querySelector: () => {
         return {
             addEventListener: () => { },
+            removeEventListener: () => { },
+            appendChild: () => { },
+            remove: () => { },
             style: {},
-            classList: { add: () => { }, remove: () => { }, toggle: () => { } },
-            textContent: ''
+            classList: { add: () => { }, remove: () => { }, toggle: () => { }, contains: () => false },
+            textContent: '',
+            innerHTML: ''
         };
     },
     querySelectorAll: () => [],
@@ -173,6 +187,7 @@ async function runTests() {
         await import('./automata/parsers/dht-automaton.test.js');
         await import('./automata/parsers/dqt-automaton.test.js');
         await import('./automata/entropy-coding/huffman-decoder-fsm.test.js');
+        await import('./automata/entropy-coding/huffman-optimized-fsm.test.js');
         await import('./algebraic/mappings/inverse-zigzag.test.js');
         await import('./algebraic/quantization/inverse-quantization.test.js');
         await import('./algebraic/discrete-cosine/inverse-dct.test.js');
@@ -184,12 +199,17 @@ async function runTests() {
         await import('./codec/decoder/rst-markers.test.js');
         await import('./utils/bit-reader.test.js');
         await import('./automata/bit-streams/bit-core.test.js');
+        await import('./automata/bit-streams/bit-writer.test.js');
         await import('./utils/marker-parser.test.js');
 
         await import('./information-theory/steganography/chunk-manager.test.js');
-        await import('./codec/steganography/result-contracts.test.js');
-        await import('./codec/steganography/format-v2.test.js');
-        await import('./information-theory/steganography/f5-syndrome.test.js');
+        await import('./codec/decoder/spiff-parsing.test.js');
+        await import('./vendor/argon2id.test.js');
+        await import('./information-theory/cryptography/kdf-chain.test.js');
+        await import('./information-theory/steganography/opaque-container.test.js');
+        await import('./information-theory/steganography/stc-matrix.test.js');
+        await import('./information-theory/steganography/juniward.test.js');
+        await import('./information-theory/steganography/stego-engine.test.js');
         await import('./codec/steganography/batch-process.test.js');
         await import('./information-theory/error-correction/rs-interleaver.test.js');
         await import('./codec/capacity-scanner.test.js');
@@ -211,10 +231,17 @@ async function runTests() {
         await import('./fuzz/parser-fuzz.test.js');
         await import('./fuzz/codec-mr.test.js');
         await import('./fuzz/vault-batch.test.js');
+        await import('./fuzz/stego-fuzz.test.js');
+        await import('./fuzz/steganography-mr.test.js');
+        await import('./fuzz/csv-fuzz.test.js');
+        await import('./fuzz/utils-fuzz.test.js');
+        await import('./fuzz/qr-fuzz.test.js');
+        await import('./fuzz/juniward-mr.test.js');
+        await import('./utils/test-runner.test.js');
+        await import('./utils/test-runner.pbt.js');
         await import('./utils/base32.test.js');
-        await import('./security/coded-header.test.js');
+        await import('./utils/encoding.test.js');
         await import('./security/totp.test.js');
-        await import('./security/extreme-universal.test.js');
         await import('./security/encrypted-container.test.js');
         await import('./security/qr-encoder.test.js');
         await import('./security/qr-capacity.test.js');
@@ -222,8 +249,8 @@ async function runTests() {
         await import('./security/qr-binarizer.test.js');
         await import('./security/qr-decoder.test.js');
         await import('./security/qr-fixtures.test.js');
-        await import('./security/format-v3.test.js');
         await import('./security/cauchy-ec.test.js');
+        await import('./security/proportional-cauchy-ec.test.js');
 
         await import('./integration/error-correction/reed-solomon-integration.test.js');
         await import('./information-theory/error-correction/galois-field.test.js');
@@ -242,7 +269,6 @@ async function runTests() {
         await import('./codec/orchestration/orchestrator.test.js');
 
         await import('./security/secure-id-generation.test.js');
-        await import('./security/forged-metadata.test.js');
         await import('./security/chunk-integrity.test.js');
         await import('./security/decoder-hardening.test.js');
         await import('./security/capacity-consistency.test.js');
@@ -256,10 +282,13 @@ async function runTests() {
         await import('./security/drop-zone-pagination.test.js');
         await import('./security/drop-zone-folders.test.js');
         await import('./utils/atomic-writer.test.js');
+        await import('./utils/compression.test.js');
+        await import('./utils/crc32.test.js');
         await import('./utils/csv.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/csv-import.test.js');
         await import('./structures/vault/immutable-vault.test.js');
+        await import('./structures/vault/key-wrapping.test.js');
         await import('./structures/vault/revision-tracking.test.js');
         await import('./structures/vault/encrypted-export.test.js');
         await import('./scripts/cli.test.js');
@@ -274,12 +303,29 @@ async function runTests() {
         await import('./integration/vault/vault-save-permission.test.js');
         await import('./integration/vault/vault-csv-import-ui.test.js');
         await import('./integration/vault/vault-totp-form.test.js');
+        await import('./integration/vault/vault-totp-display.test.js');
         
         await import('./integration/vault/vault-qr-scan.test.js');
         await import('./integration/vault/vault-tierb-flow.test.js');
         await import('./integration/vault/vault-spread-save.test.js');
+        await import('./structures/vault/password-rotation.test.js');
+        await import('./information-theory/cryptography/pbkdf2-benchmark.test.js');
+        await import('./fuzz/kdf-fuzz.test.js');
+        await import('./integration/vault/vault-ui-redesign.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");
+
+        // Dedicated PBT Suite
+        await import('./pbt/algebraic.pbt.js');
+        await import('./pbt/automata.pbt.js');
+        await import('./pbt/codec.pbt.js');
+        await import('./pbt/crypto.pbt.js');
+        await import('./pbt/ecc.pbt.js');
+        await import('./pbt/secret-sharing.pbt.js');
+        await import('./pbt/steganography.pbt.js');
+        await import('./pbt/qr.pbt.js');
+        await import('./pbt/vault.pbt.js');
+        await import('./pbt/utils.pbt.js');
 
         await executeTests();
         const stats = getStats();
@@ -290,6 +336,12 @@ async function runTests() {
         console.log(`  \x1b[31mFailed: ${stats.failed}\x1b[0m`);
 
         if (stats.failed > 0) {
+            console.log(`\n\x1b[31mFailed Test Details:\x1b[0m`);
+            const { getTestResults } = await import('./utils/test-runner.js');
+            const failed = getTestResults().filter(r => r.status === 'fail');
+            failed.forEach(f => {
+                console.log(`  ✗ [${f.suite}] ${f.test}: ${f.error}`);
+            });
             process.exit(1);
         } else {
             process.exit(0);

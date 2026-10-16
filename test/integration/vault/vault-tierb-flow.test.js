@@ -4,6 +4,44 @@ import { codeFromOtpauthUri } from '../../../src/information-theory/cryptography
 
 const PASSWORD = 'tier-b-pw';
 
+// Mock DOM environment for Node.js
+if (typeof document === 'undefined') {
+    global.document = {
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        getElementById: (id) => ({
+            style: {},
+            classList: { add: () => {}, remove: () => {}, has: () => false },
+            addEventListener: () => {},
+            appendChild: () => {},
+            querySelectorAll: () => [],
+            querySelector: () => null,
+            remove: () => {},
+            textContent: '',
+            innerHTML: '',
+            value: ''
+        }),
+        body: { classList: { toggle: () => {} } },
+        createElement: (tag) => {
+            if (tag === 'canvas') return { width: 0, height: 0, getContext: () => ({ fillRect: () => {} }), style: {}, toDataURL: () => 'data:image/png;base64,x' };
+            return {
+                style: {},
+                classList: { add: () => {}, remove: () => {}, has: () => false },
+                addEventListener: () => {},
+                appendChild: () => {},
+                querySelectorAll: () => [],
+                querySelector: () => null,
+                remove: () => {},
+                className: '',
+                innerHTML: '',
+                textContent: ''
+            };
+        }
+    };
+}
+
 describe('Tier B TOTP gate UI flows', () => {
 
     it('createVault enrolls the gate when accepted and shows the QR once', async () => {
@@ -21,20 +59,23 @@ describe('Tier B TOTP gate UI flows', () => {
             searchInput: { value: '', addEventListener: () => {} },
             sortSelect: { value: 'newest', addEventListener: () => {} }
         };
+        const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
         const origGet = document.getElementById;
         const origCreate = document.createElement;
-        document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : origGet(id);
-        document.createElement = (tag) => {
-            if (tag === 'canvas') return { width: 0, height: 0, getContext: () => ({ fillRect: () => {} }), style: {}, toDataURL: () => 'data:image/png;base64,x' };
-            if (tag === 'div') {
-                return {
-                    className: '', innerHTML: '', style: {},
-                    appendChild: () => {}, addEventListener: () => {}, remove: () => {},
-                    querySelector: () => null
-                };
-            }
-            return origCreate(tag);
-        };
+        document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : origGet.call(document, id);
+        if (isNode) {
+            document.createElement = (tag) => {
+                if (tag === 'canvas') return { width: 0, height: 0, getContext: () => ({ fillRect: () => {} }), style: {}, toDataURL: () => 'data:image/png;base64,x' };
+                if (tag === 'div') {
+                    return {
+                        className: '', innerHTML: '', style: {},
+                        appendChild: () => {}, addEventListener: () => {}, remove: () => {},
+                        querySelector: () => null
+                    };
+                }
+                return origCreate.call(document, tag);
+            };
+        }
 
         try {
             const ui = new VaultUI();
@@ -52,10 +93,13 @@ describe('Tier B TOTP gate UI flows', () => {
             // Disclaimer language must be present in the confirmation copy
             expect(/shoulder|weak access control/i.test(confirms[0])).toBe(true);
             // Gate enrolled on the live vault
-            if (!ui.vault.metadata.totpGate) throw new Error('gate not enrolled');
+            expect(ui.vault.metadata.totpGate).toBeDefined();
             // Enrollment summary shown with scan instructions
             expect(alerts.some(a => /authenticator/i.test(a))).toBe(true);
         } finally {
+            if (typeof document !== 'undefined') {
+                document.querySelectorAll('.qr-overlay, .modal-overlay').forEach(el => el.remove());
+            }
             document.getElementById = origGet;
             document.createElement = origCreate;
         }
@@ -77,7 +121,7 @@ describe('Tier B TOTP gate UI flows', () => {
             sortSelect: { value: 'newest', addEventListener: () => {} }
         };
         const origGet = document.getElementById;
-        document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : origGet(id);
+        document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : origGet.call(document, id);
         try {
             const ui = Object.create(VaultUI.prototype);
             ui.vault = new PasswordVault([], null, true, PASSWORD);
@@ -88,7 +132,7 @@ describe('Tier B TOTP gate UI flows', () => {
 
             await ui.enrollTotpGateFlow();
 
-            if (ui.vault.metadata.totpGate) throw new Error('gate enrolled despite decline');
+            expect(ui.vault.metadata.totpGate).toBeUndefined();
         } finally {
             document.getElementById = origGet;
         }

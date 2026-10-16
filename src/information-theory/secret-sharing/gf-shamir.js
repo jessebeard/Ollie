@@ -9,10 +9,13 @@
  * tuples and never throw.
  */
 import { gfMultiply, gfInverse } from './gf256.js';
+import { getCrypto } from '../cryptography/crypto-provider.js';
 
 function defaultRandom(n) {
+    const [cryptoObj, cryptoErr] = getCrypto();
+    if (cryptoErr) throw cryptoErr;
     const out = new Uint8Array(n);
-    globalThis.crypto.getRandomValues(out);
+    cryptoObj.getRandomValues(out);
     return out;
 }
 

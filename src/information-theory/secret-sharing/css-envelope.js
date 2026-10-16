@@ -8,20 +8,13 @@
  * is a fixed 32-byte key share regardless of payload size.
  */
 import { splitSecret, combineShares } from './gf-shamir.js';
-
-/**
- * @returns {[Crypto|null, Error|null]}
- */
-function getCryptoOrError() {
-    if (typeof globalThis === 'undefined' || !globalThis.crypto || !globalThis.crypto.subtle) {
-        return [null, new Error('Web Crypto API is not available. Please use a modern browser or Node.js 19+.')];
-    }
-    return [globalThis.crypto, null];
-}
+import { getCrypto } from '../cryptography/crypto-provider.js';
 
 function defaultRandom(n) {
+    const [cryptoObj, cryptoErr] = getCrypto();
+    if (cryptoErr) throw cryptoErr;
     const out = new Uint8Array(n);
-    globalThis.crypto.getRandomValues(out);
+    cryptoObj.getRandomValues(out);
     return out;
 }
 
@@ -40,7 +33,7 @@ export async function sealPayload(payload, options) {
         return [null, new Error('css-envelope: payload must be a non-empty Uint8Array')];
     }
 
-    const [cryptoObj, cryptoErr] = getCryptoOrError();
+    const [cryptoObj, cryptoErr] = getCrypto();
     if (cryptoErr) return [null, cryptoErr];
 
     const random = options && typeof options.random === 'function' ? options.random : defaultRandom;
@@ -84,11 +77,11 @@ export async function sealPayload(payload, options) {
  *
  * @param {Object} envelope - {iv: Uint8Array(12), ciphertext: Uint8Array}
  * @param {Array<{index: number, data: Uint8Array}>} shares
- * @param {{threshold?: number}} [options]
+ * @param {{threshold?: number, total?: number}} [options]
  * @returns {Promise<[Uint8Array|null, Error|null]>}
  */
 export async function openEnvelope(envelope, shares, options = {}) {
-    const [cryptoObj, cryptoErr] = getCryptoOrError();
+    const [cryptoObj, cryptoErr] = getCrypto();
     if (cryptoErr) return [null, cryptoErr];
 
     if (!envelope || !(envelope.iv instanceof Uint8Array) || envelope.iv.length !== 12 ||

@@ -276,6 +276,16 @@ describe('JpegDecoder Integration', async () => {
         expect(err.message.includes('quantization table') || err.message.includes('Quantization')).toBe(true);
     });
 
+    it('returns error tuple when scan data is truncated during decode', async () => {
+        const jpegBytes = await loadFixture('solid-black-8x8.jpg');
+        // Truncate the scan data near the end of the file
+        const truncated = jpegBytes.subarray(0, jpegBytes.length - 15);
+        const decoder = new JpegDecoder();
+        const [res, err] = await decoder.decode(truncated);
+        expect(res).toBeNull();
+        expect(err instanceof Error).toBe(true);
+    });
+
     describe('Property-Based Fuzzing', () => {
         it('should never throw an unhandled exception on random garbage (PBT)', async () => {
             await assertProperty(
@@ -285,7 +295,7 @@ describe('JpegDecoder Integration', async () => {
                     // Just ensuring it doesn't throw. We expect [null, error] 99.9% of the time,
                     // or [result, null] if by miracle it's a valid JPEG.
                     try {
-                        const [res, err] = await decoder.decode(garbageBytes, { skipExtraction: true });
+                        await decoder.decode(garbageBytes, { skipExtraction: true });
                         return true;
                     } catch (e) {
                         return false; // Test fails if it throws

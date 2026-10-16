@@ -38,11 +38,15 @@ if (typeof document === 'undefined') {
     global.window = {
         addEventListener: () => {}
     };
-    global.navigator = {
-        clipboard: {
-            writeText: async () => {}
-        }
-    };
+    if (typeof global.navigator === 'undefined') {
+        try {
+            global.navigator = { clipboard: { writeText: async () => {} } };
+        } catch (_) {}
+    } else if (global.navigator && !global.navigator.clipboard) {
+        try {
+            global.navigator.clipboard = { writeText: async () => {} };
+        } catch (_) {}
+    }
 }
 
 describe('Vault Capacity UI Integration', () => {
@@ -65,8 +69,10 @@ describe('Vault Capacity UI Integration', () => {
             if (id === 'addBtn') return { addEventListener: () => {} };
             if (id === 'createBtn') return { addEventListener: () => {} };
             if (id === 'saveBtn') return { addEventListener: () => {} };
+            if (id === 'importBtn') return { style: {}, addEventListener: () => {} };
+            if (id === 'exportBtn') return { style: {}, addEventListener: () => {} };
             if (id === 'loadingOverlay') return { style: {}, querySelector: () => ({ textContent: '' }) };
-            return originalGetElementById(id);
+            return originalGetElementById.call(document, id);
         };
 
         const ui = new VaultUI();
@@ -129,7 +135,7 @@ describe('Vault Capacity UI Integration', () => {
             'exportBtn': { style: {}, addEventListener: () => {} }
         };
 
-        document.getElementById = (id) => elements[id] || originalGetElementById(id);
+        document.getElementById = (id) => elements[id] || originalGetElementById.call(document, id);
 
         const ui = new VaultUI();
         

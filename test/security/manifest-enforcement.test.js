@@ -17,8 +17,8 @@ class MockFile {
 }
 
 async function makeCarriers(count) {
-    const width = 320;
-    const height = 320;
+    const width = 256;
+    const height = 256;
     const data = new Uint8ClampedArray(width * height * 4);
     let seed = 1234567;
     for (let i = 0; i < data.length; i += 4) {
@@ -28,7 +28,7 @@ async function makeCarriers(count) {
         data[i + 2] = (seed >>> 8) & 0xFF;
         data[i + 3] = 255;
     }
-    const encoder = new JpegEncoder(90, { subsampling: '4:4:4' });
+    const encoder = new JpegEncoder(90);
     const out = [];
     for (let i = 0; i < count; i++) {
         const jpegBytes = await encoder.encode({ width, height, data });
@@ -38,8 +38,6 @@ async function makeCarriers(count) {
 }
 
 async function savedVault(carriers, password = 'test-pw') {
-    // Payload sized to fill every carrier (window measured for 96px q90
-    // carriers): big enough to span >2 chunks, small enough to fit all 3.
     let vault = new PasswordVault([], null, true, password);
     for (let i = 0; i < 2; i++) {
         [vault] = await vault.addEntry({
@@ -47,7 +45,7 @@ async function savedVault(carriers, password = 'test-pw') {
             username: 'user@example.com',
             password: 'secret-password-value',
             url: 'https://example.com/entry/path',
-            notes: 'n'.repeat(600)
+            notes: 'n'.repeat(100)
         });
     }
     const [results, err] = await vault.save(carriers, password);
@@ -68,21 +66,20 @@ describe('manifest enforcement across batch pipeline', () => {
             const [res, decErr] = await decoder.decode(
                 new Uint8Array(await file.arrayBuffer()), { password: 'test-pw' }
             );
-            if (decErr) throw decErr;
+            expect(decErr).toBe(null);
             const m = res.secretMetadata && res.secretMetadata.manifest;
-            if (!m) throw new Error(`carrier ${file.name} has no manifest stamped`);
+            expect(m).not.toBe(null);
             seen.push(m);
         }
 
         const strip = (x) => { const c = { ...x }; delete c.share; delete c.mac; return JSON.stringify(c); };
         for (const m of seen.slice(1)) {
-            if (strip(seen[0]) !== strip(m)) throw new Error('manifests disagree on non-share fields');
+            expect(strip(m)).toBe(strip(seen[0]));
         }
         const shareIdx = new Set(seen.map(m => m.share && m.share.index));
-        if (shareIdx.size !== seen.length) throw new Error(`share indices must be distinct ( vs )`);
-        if (seen[0].total !== stego.length || seen[0].entries.length !== stego.length) {
-            throw new Error('manifest does not describe the full carrier set');
-        }
+        expect(shareIdx.size).toBe(seen.length);
+        expect(seen[0].total).toBe(stego.length);
+        expect(seen[0].entries).toHaveLength(stego.length);
     });
 
     it('fails closed when carriers carry no manifest (legacy set)', async () => {
@@ -92,7 +89,7 @@ describe('manifest enforcement across batch pipeline', () => {
         let vault = new PasswordVault([], null, true, 'legacy-pw');
         [vault] = await vault.addEntry({ title: 'e', username: 'u', password: 'p' });
         const [, , kdfErr] = await vault._resolveSessionKey();
-        if (kdfErr) throw kdfErr;
+        expect(kdfErr).toBe(null);
 
         const docBytes = new TextEncoder().encode(JSON.stringify({
             metadata: vault.metadata,
@@ -104,16 +101,12 @@ describe('manifest enforcement across batch pipeline', () => {
         const [results, embErr] = await embedder.embed(docBytes, carriers, {
             password: 'legacy-pw', filename: 'vault.json'
         });
-        if (embErr) throw embErr;
+        expect(embErr).toBe(null);
         const stego = results.map((r, i) => new MockFile(r.data, `stego_${i}.jpg`));
 
         const [, loadErr] = await PasswordVault.load(stego, 'legacy-pw');
-        if (!(loadErr instanceof Error)) {
-            throw new Error('legacy manifest-less carrier set was accepted');
-        }
-        if (!/manifest/i.test(loadErr.message)) {
-            throw new Error(`rejection should cite the manifest: ${loadErr.message}`);
-        }
+        expect(loadErr).toBeInstanceOf(Error);
+        expect(loadErr.message).toMatch(/manifest/i);
     });
 
     it('rejects when one carrier disagrees with the others (swap attempt)', async () => {
@@ -125,18 +118,16 @@ describe('manifest enforcement across batch pipeline', () => {
         const otherStego = await savedVault(otherCarriers, 'test-pw');
 
         const mixed = [otherStego[0], ...stego.slice(1)].filter(Boolean);
-        if (mixed.length < 2) throw new Error('test setup did not produce enough carriers');
+        expect(mixed.length).toBeGreaterThanOrEqual(2);
 
         const [, loadErr] = await PasswordVault.load(mixed, 'test-pw');
-        if (!(loadErr instanceof Error)) {
-            throw new Error('mixed carrier sets were accepted');
-        }
+        expect(loadErr).toBeInstanceOf(Error);
     });
 
     it('wrong password never yields a silent load', async () => {
-        const carriers = await makeCarriers(2);
+        const carriers = await makeCarriers(3);
         const stego = await savedVault(carriers);
         const [, loadErr] = await PasswordVault.load(stego, 'incorrect');
-        if (!(loadErr instanceof Error)) throw new Error('wrong password accepted');
+        expect(loadErr).toBeInstanceOf(Error);
     });
 });

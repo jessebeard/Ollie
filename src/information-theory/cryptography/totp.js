@@ -5,6 +5,7 @@
  */
 
 import { decodeBase32 } from '../../utils/base32.js';
+import { getCrypto } from './crypto-provider.js';
 
 /**
  * Generates an HMAC-based one-time password.
@@ -33,9 +34,8 @@ export async function hotp(key, counter, options = {}) {
         return [null, new Error(`totp: unsupported algorithm ${algorithm}`)];
     }
 
-    if (typeof globalThis === 'undefined' || !globalThis.crypto || !globalThis.crypto.subtle) {
-        return [null, new Error('Web Crypto API is not available')];
-    }
+    const [cryptoObj, cryptoErr] = getCrypto();
+    if (cryptoErr) return [null, cryptoErr];
 
     try {
         // Build the 8-byte big-endian moving factor
@@ -46,7 +46,7 @@ export async function hotp(key, counter, options = {}) {
             c = Math.floor(c / 256);
         }
 
-        const hmacKey = await globalThis.crypto.subtle.importKey(
+        const hmacKey = await cryptoObj.subtle.importKey(
             'raw',
             /** @type {BufferSource} */ (key),
             { name: 'HMAC', hash: algorithm },
@@ -54,7 +54,7 @@ export async function hotp(key, counter, options = {}) {
             ['sign']
         );
 
-        const digest = await globalThis.crypto.subtle.sign(
+        const digest = await cryptoObj.subtle.sign(
             'HMAC',
             hmacKey,
             /** @type {BufferSource} */ (counterBytes)

@@ -2,37 +2,46 @@
 
 **Ollie** hides an AES-256-GCM-encrypted password vault inside ordinary JPEG photos.
 The photos look normal, upload to any image host, and survive social-media re-encoding —
-but together they carry a tamper-evident, fault-tolerant, post-quantum-resistant secret.
+while carrying a tamper-evident, fault-tolerant, post-quantum-resistant secret.
 
-Everything is pure JavaScript: no dependencies, no WebAssembly, no build step.
-Every algorithm is hand-implemented in readable modules with exhaustive tests,
-so the entire security envelope can be audited end-to-end by one person in an afternoon.
+Everything is plain JavaScript with zero runtime npm dependencies. A single, auditable,
+vendored WebAssembly binary (`src/vendor/argon2/` from OpenPGP.js) provides side-channel
+timing-attack-immune Argon2id memory-hard key derivation. Every algorithm is hand-implemented
+in readable modules with exhaustive tests, so the entire security envelope can be audited
+end-to-end by one person in an afternoon.
 
-### Feature highlights
+---
 
-- Steganographic multi-carrier storage with threshold (k-of-n) recovery: lose
-  carriers and the vault still loads
-- Live TOTP (RFC 6238) codes rendered on entry cards with countdown and
-  click-to-copy; secrets accepted as bare Base32 or full `otpauth://` URIs
-- CSV import from Firefox, Chrome/Google Password Manager, Apple Passwords,
-  KeePass, KeePassXC, Bitwarden, and LastPass exports
-- Tamper-evident carrier manifests, whole-container Reed-Solomon ECC, atomic
-  write-back with rollback
+### Feature Highlights
 
-Ollie implements the following published standards natively:
+- **Format v4 Steganography:** Rate-distortion optimal **Syndrome-Trellis Codes (STC)** combined with **J-UNIWARD** spatial Daubechies 8-tap (db8) wavelet distortion modeling and anti-SCA key randomization.
+- **Zero Plaintext Metadata & Zero-Length Opaque Framing:** No unencrypted headers, magic bytes, length counters, or salt metadata are exposed in the carrier. Ciphertexts are padded with CSPRNG noise to discrete power-of-two buckets ($256\text{B} \dots 128\text{KB}$).
+- **Argon2id Key Derivation Chain (RFC 9106):** High-work-factor memory-hard password hashing ($t=3, m=64\text{MB}, p=1$) + RFC 5869 HKDF domain separation for AES keys, IVs, STC matrices, and distortion seeds.
+- **Multi-Carrier Storage with Threshold ($k$-of-$n$) Recovery:** Cauchy MDS erasure coding over $\text{GF}(256)$ and Shamir secret sharing: lose carriers down to the threshold and the vault still loads.
+- **Live TOTP (RFC 6238):** Live 2FA codes rendered directly on entry cards with progress countdown and click-to-copy; secrets accepted as bare Base32 or full `otpauth://` URIs.
+- **Universal CSV Import:** Direct password migration from Firefox, Chrome / Google Password Manager, Apple Passwords, KeePass, KeePassXC, Bitwarden, and LastPass exports.
+- **Tamper-Evident Carrier Manifests:** Whole-container HMAC authentication, revision counters, and atomic write-back with automatic rollback on partial write failure.
 
-| Standard | What we implement |
+---
+
+### Published Standards Implemented
+
+| Standard | What We Implement |
 |----------|------------------|
 | ITU-T T.81 / ISO/IEC 10918-1 | Baseline sequential DCT JPEG encoder and decoder |
 | FIPS 197 | AES-256-GCM authenticated encryption |
 | FIPS 180-4 | SHA-256 secure hash algorithm |
 | RFC 2104 | HMAC-SHA-256 message authentication |
-| RFC 2898 (PKCS #5 v2.1) | PBKDF2-HMAC-SHA-256 key derivation |
+| **RFC 9106** | **Argon2id memory-hard password hashing ($t=3, m=64\text{MB}, p=1$)** |
+| **RFC 5869** | **HKDF (HMAC-SHA-256) domain separation expansion** |
+| RFC 2898 (PKCS #5 v2.1) | PBKDF2-HMAC-SHA-256 key derivation (vault internal document store) |
 | NIST SP 800-38D | GCM authenticated encryption mode |
+| **IEEE TIFS 2011** | **Syndrome-Trellis Codes (STC) dual-trellis Viterbi matrix encoding** |
+| **EURASIP 2014** | **J-UNIWARD spatial Daubechies db8 wavelet distortion modeling** |
 | RFC 4226 | HMAC-based one-time password (HOTP) |
 | **RFC 6238** | **Time-based one-time password (TOTP)** |
 | RFC 4648 | Base32 data encoding |
-| ISO/IEC 18004 | QR Code bar code symbology |
+| ISO/IEC 18004 | QR Code bar code symbology (encoder and decoder) |
 
 ---
 
@@ -41,51 +50,51 @@ Ollie implements the following published standards natively:
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions, TDD workflow,
 and how to get oriented in the codebase.
 
-## Security model
+## Security Model
 
-### Optional TOTP gate (Tier B)
+### Optional TOTP Gate (Tier B)
 
-Vault creation can enroll a TOTP code gate. **This is weak access control,
+Vault creation can enroll an optional TOTP code gate. **This is access control for the UI session,
 not extra encryption**: the secret lives inside the encrypted vault document,
-so anyone who has your master password can bypass it trivially. It exists only
+so anyone who has your master password can decrypt the vault file directly. It exists
 to deter shoulder-surfing and opportunistic access to an unlocked session.
 The enrollment dialog states this disclaimer verbatim.
 
 | Property | Mechanism |
 |----------|-----------|
-| Confidentiality | AES-256-GCM per entry + AES-256-GCM container envelope |
-| Key derivation | PBKDF2-HMAC-SHA-256, 600 000 iterations, per-vault salt |
-| Tamper detection | HMAC-SHA-256 carrier manifests (password-gated) |
-| Loss tolerance | Cauchy erasure coding + Shamir secret sharing (any *k* of *n* carriers) |
-| Replay detection | Strictly increasing revision counter bound into authenticated manifest |
-| Size-lie defense | Carrier-bounded framing validation before any allocation |
-| Post-quantum resistance | Symmetric-only cryptography: AES-256, SHA-256, HMAC-SHA-256 |
+| Confidentiality | AES-256-GCM per entry + AES-256-GCM opaque container envelope |
+| Key Derivation | Argon2id ($t=3, m=64\text{MB}, p=1$) $\to$ HKDF-Expand (RFC 5869) |
+| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 16$) + J-UNIWARD spatial wavelet costs |
+| Length Hiding | Zero-length framing + CSPRNG noise bucket padding ($256\text{B} \dots 128\text{KB}$) |
+| Tamper Detection | HMAC-SHA-256 carrier manifests (password-gated) |
+| Loss Tolerance | Cauchy MDS erasure coding + Shamir secret sharing (any $k$ of $n$ carriers) |
+| Replay Detection | Strictly increasing revision counter bound into authenticated manifest |
+| Size-Lie Defense | Carrier-bounded framing validation before any memory allocation |
+| Post-Quantum Resistance | Symmetric-only cryptography: AES-256, SHA-256, HMAC-SHA-256, Argon2id |
 
 **No asymmetric cryptography is used anywhere.** RSA, ECC, and Ed25519 are all broken
 by Shor's algorithm on a sufficiently large quantum computer. Ollie restricts itself to
 symmetric primitives, which Grover's algorithm only weakens quadratically (AES-256
 retains ~128-bit quantum security). This is documented as a constitutional rule in
-`src/specs/rules/constitution.md`.
+[`src/specs/rules/constitution.md`](src/specs/rules/constitution.md).
 
-### What Ollie does NOT protect against
+### What Ollie Does NOT Protect Against
 
 - A keylogger capturing your master password as you type it
 - Someone with both your password AND enough surviving carriers
-- Quantum computers running Grover's algorithm with > 2^128 logical qubits
-  (not expected in the foreseeable future)
+- Quantum computers running Grover's algorithm with $> 2^{128}$ logical qubits
 
 ---
 
-## Quick start
+## Quick Start
 
 ```bash
 git clone https://github.com/your-repo/ollie.git
 cd ollie
-npm install          # dev tooling only; zero runtime dependencies
-npm test             # 675 tests, all green
+npm test             # Full suite: 874 tests, all green
 ```
 
-Open `app/vault.html` in a browser (or serve via `npm run serve`) to use the visual vault.
+Open `app/vault.html` in a modern browser (or serve locally via `npm run serve`) to use the visual vault.
 
 ### Headless CLI (Node 22+)
 
@@ -105,7 +114,7 @@ node scripts/cli.mjs save --fromExport vault.json --imagesDir ./photos --outDir 
 
 ---
 
-## How it works
+## How It Works
 
 ```mermaid
 flowchart LR
@@ -113,21 +122,24 @@ flowchart LR
     SEAL["CSS envelope<br/>(random DEK + Shamir split)"]
     EC["Cauchy erasure coding<br/>(n coded stripes)"]
     MANIFEST["HMAC-authenticated manifests<br/>(per-carrier share + set identity)"]
-    F5["F5 steganography<br/>(matrix encoding over AC coeffs)"]
+    OPAQUE["Opaque Framing<br/>(Deflate + CSPRNG bucket padding)"]
+    STC["Stego Engine<br/>(J-UNIWARD + STC Trellis)"]
     CARRIER["JPEG carrier photos"]
 
-    DOC --> SEAL --> EC --> F5 --> CARRIER
-    MANIFEST --> F5
+    DOC --> SEAL --> EC --> OPAQUE --> STC --> CARRIER
+    MANIFEST --> OPAQUE
 ```
 
 1. **Seal**: the vault document is encrypted under a fresh random 256-bit DEK (AES-256-GCM).
-2. **Split**: the DEK is Shamir-secret-shared across carriers over GF(256).
+2. **Split**: the DEK is Shamir-secret-shared across carriers over $\text{GF}(256)$.
 3. **Code**: the sealed envelope is Cauchy-erasure-coded into coded stripes distributed
    proportionally across carriers by capacity.
-4. **Embed**: each stripe + its key share + an HMAC-authenticated manifest are embedded
-   into a JPEG photo via F5 matrix encoding over DCT coefficients.
-5. **Authenticate**: every carrier carries a copy of the signed manifest; on load, all
-   copies must agree, authenticate under the password, and bind every extracted chunk.
+4. **Opaque Frame**: each stripe + its key share + signed manifest are compressed, CRC-32-checked,
+   and padded with CSPRNG noise into a zero-length bucket ($256\text{B} \dots 128\text{KB}$) encrypted via AES-256-GCM.
+5. **Embed**: the wire envelope is embedded into JPEG DCT AC coefficients using Syndrome-Trellis Codes
+   (STC) with distortion costs calculated via J-UNIWARD spatial Daubechies db8 wavelets.
+6. **Authenticate**: every carrier carries an authenticated manifest; on load, all
+   copies must agree, verify under the password, and bind every extracted chunk.
 
 Any `threshold` carriers recover the vault. Fewer reveal nothing.
 Tampered, swapped, rolled-back, or corrupted sets fail closed.
@@ -136,109 +148,52 @@ For the complete byte-level specification see [`src/specs/container-wire-format.
 
 ---
 
-## Project structure
+## Project Structure
 
-```
+```text
 src/
   algebraic/            # Pure math transforms (DCT, quantization, zigzag, color)
   automata/             # Bit-level FSMs (readers, writers, Huffman codecs, parsers)
-  codec/                # JPEG encoder, decoder, transcoder, capacity scanner
+  codec/                # JPEG encoder, decoder, transcoder, capacity scanner, QR
   information-theory/
-    cryptography/       # AES-GCM, PBKDF2, HMAC, SHA-256, WebCrypto provider
+    cryptography/       # KDF chain (Argon2id + HKDF), AES-GCM, PBKDF2, HMAC, TOTP
     error-correction/   # Reed-Solomon over GF(256), interleaver, profiles
     secret-sharing/     # Shamir, CSS envelope, Cauchy erasure codec, GF(256)
-    steganography/      # F5 syndrome, batch embedder/extractor, manifests, chunks
-  structures/vault/     # Immutable vault model, secure records
-  utils/                # CRC32, encoding, logger, URL safety, atomic writer, escape HTML
-  specs/                # Normative specifications and project rules
-app/                    # Browser UI (vault page)
-scripts/                # CLI, dev server, golden-vector generator, fuzz driver
-test/                   # 675+ tests: unit, integration, security, conformance, PBT
-docs/audits/            # Historical audit reports
-src/specs/WIREFRAME.md # Complete mermaid.js architecture diagram
+    steganography/      # StegoEngine, OpaqueContainer, STCMatrix, JUniward, manifests, chunks
+  structures/vault/     # Immutable vault model, secure records, CSV import
+  utils/                # Compression, CRC32, encoding, logger, URL safety, atomic writer
+  vendor/               # Vendored OpenPGP.js Argon2id WASM SIMD/non-SIMD engine
+  specs/                # Normative specifications, project rules, living wireframe
+app/                    # Browser UI (vault page, test runner)
+scripts/                # CLI, dev server, golden-vector generator
+test/                   # 874 tests: unit, integration, security, conformance, PBT
+src/specs/WIREFRAME.md  # Complete mermaid.js architecture diagram
 ```
 
 ---
 
-## Auditing this codebase
+## Auditing This Codebase
 
-Ollie is designed to be audited. Here's how to approach it:
+Ollie is designed to be audited:
 
 1. **Read the spec first**: [`src/specs/container-wire-format.md`](src/specs/container-wire-format.md)
-   defines the exact byte layout at every layer. If the code doesn't match the spec, that's a bug.
-
-2. **Follow the data flow**: plaintext → CSS seal → erasure code → F5 embed → carrier.
-   Each step is a separate module with a narrow interface. Start from `f5-syndrome.js`
-   (`embedContainer` / `extractContainer`) and work outward.
-
-3. **Check the crypto surface**: everything lives in `information-theory/cryptography/`.
-   There are exactly four primitives: AES-GCM, PBKDF2, HMAC-SHA256, and SHA-256.
-   No other cryptographic operations exist in the codebase.
-
-4. **Verify the claims**: run `npm test` (675 assertions), then `npm run fuzz --scale=10`
-   for deeper property-based exploration. Golden vectors in `test/conformance/golden-vectors.json`
-   pin bit-exact wire format behavior.
-
-5. **Review the audit trail**: three independent audits are archived in `docs/audits/`
-   with findings tracked through remediation waves A–K (see git history).
+   defines the exact byte layout at every layer.
+2. **Follow the data flow**: plaintext $\to$ CSS seal $\to$ Cauchy erasure code $\to$ Opaque bucket framing $\to$ STC / J-UNIWARD embed $\to$ carrier.
+3. **Check the crypto surface**: everything lives in `information-theory/cryptography/` and `src/vendor/argon2/`.
+   Primitives: Argon2id, HKDF-Expand, AES-256-GCM, HMAC-SHA256, SHA-256.
+4. **Verify the claims**: run `npm test` (874 assertions).
+5. **Inspect the WASM binary**: `src/vendor/argon2/` contains the unmodified OpenPGP.js Argon2id WASM binary alongside its original MIT license, inlined as base64 to ensure zero-network offline operation.
 
 ---
 
 ## Testing
 
-> **Language convention:** Ollie is 100% vanilla JavaScript with JSDoc type annotations.
-> No TypeScript source exists. The optional `typecheck` script runs `tsc --checkJs`
-> purely as a JSDoc linter — it validates annotations, compiles nothing, and emits nothing.
-
 ```bash
-npm test               # Full suite: 675 tests
+npm test               # Full suite: 874 tests
 PBT_SEED=N npm test   # Reproducible property-based runs
-npm run fuzz           # Long-run fuzz driver (all suites, scalable iterations)
 npm run lint           # ESLint
 npm run typecheck      # Validates JSDoc type annotations (no TypeScript)
 ```
-
-Test families:
-
-| Family | Count | Purpose |
-|--------|-------|---------|
-| Unit | ~350 | Per-module correctness |
-| Integration | ~80 | Cross-module pipelines |
-| Security | ~60 | Forged input rejection, hardening, XSS/scheme injection |
-| Conformance | 13 | Bit-exact golden vectors for frozen wire format |
-| Property-based | 12 | Seeded invariant fuzzing of ECC/F5/container/chunk layers |
-| Fuzz | ~20 | Structure-aware mutation, differential testing, model-based sequences |
-| UI | ~15 | Vault UI interactions |
-
-CI runs lint + JSDoc validation + seeded tests + fuzz smoke + stale-vector guard on every push.
-
----
-
-## Design principles
-
-These are codified in [`src/specs/rules/`](src/specs/rules/) and enforced by convention:
-
-1. **Zero runtime dependencies.** Dev tooling (ESLint, JSDoc type validation) is documented exception.
-2. **Result tuples everywhere.** `[value|null, error|null]` — never throw for predictable failures.
-3. **Post-quantum symmetric-only crypto.** No asymmetric primitives (see constitution).
-4. **Fail closed.** Invalid input, corruption, or tampering produces an explicit error, never partial output.
-5. **TDD red-green-refactor.** Tests are written before implementation.
-6. **Living architecture wireframe.** Structural changes update `WIREFRAME.md` in the same commit.
-7. **Auditable above all.** Every design decision has a rationale traceable in specs, comments, or git history.
-
----
-
-## Roadmap
-
-Completed remediation waves (see git history):
-
-- **A–G**: Audit closeout, wire format conformance, seeded PBT, tooling/CI
-- **H1–H2**: Signed carrier manifests, CSS threshold recovery
-- **I**: Erasure-coded carrier sets
-- **J1–J5**: Full-stack fuzzing and metamorphic testing
-- **K**: Whole-container ECC framing (format v3)
-
-Remaining items are tracked in `src/specs/TODO`.
 
 ---
 

@@ -43,7 +43,7 @@ if (typeof document !== 'undefined') {
                 'sortSelect': { value: 'newest', addEventListener: () => {} }
             };
             const originalGetElementById = document.getElementById;
-            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGetElementById(id);
+            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGetElementById.call(document, id);
 
             try {
                 const ui = new VaultUI();
@@ -100,7 +100,7 @@ if (typeof document !== 'undefined') {
                 'sortSelect': { value: 'newest', addEventListener: () => {} }
             };
             const originalGetElementById = document.getElementById;
-            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGetElementById(id);
+            document.getElementById = (id) => (id in elements && elements[id]) ? elements[id] : originalGetElementById.call(document, id);
 
             try {
                 const ui = new VaultUI();

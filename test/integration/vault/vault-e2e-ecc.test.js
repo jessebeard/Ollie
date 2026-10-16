@@ -3,17 +3,16 @@ import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js'
 import { JpegDecoder } from '../../../src/codec/decoder.js';
 import { JpegEncoder } from '../../../src/codec/encoder.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
     describe('PasswordVault E2E Steganography (ECC Deep Recovery)', () => {
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class MockFile {
     constructor(buffer, name) {

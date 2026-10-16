@@ -72,22 +72,22 @@ describe('QR adaptive binarization', () => {
             }
         }
         const [img, err] = binarize({ data, width: w, height: w });
-        if (err) throw err;
+        expect(err).toBe(null);
         let leftDark = 0, rightDark = 0;
         for (let y = 28; y < 36; y++) {
             for (let x = 8; x < 16; x++) if (img.bw[y * w + x] === 1) leftDark++;
             for (let x = 40; x < 48; x++) if (img.bw[y * w + x] === 1) rightDark++;
         }
-        if (leftDark < 60) throw new Error(`left dark square lost (${leftDark}/64)`);
-        if (rightDark < 60) throw new Error(`right dark square lost (${rightDark}/64)`);
+        expect(leftDark).toBeGreaterThanOrEqual(60);
+        expect(rightDark).toBeGreaterThanOrEqual(60);
         // Light regions must stay light on BOTH halves
         let leftLightOk = 0, rightLightOk = 0;
         for (let y = 28; y < 36; y++) {
             if (img.bw[y * w + 20] === 0) leftLightOk++;
             if (img.bw[y * w + 56] === 0) rightLightOk++;
         }
-        if (leftLightOk < 7) throw new Error('left light background binarized dark');
-        if (rightLightOk < 7) throw new Error('right light background binarized dark');
+        expect(leftLightOk).toBeGreaterThanOrEqual(7);
+        expect(rightLightOk).toBeGreaterThanOrEqual(7);
     });
 
     it('decodes grayscale renders with sensor-like luminance jitter', () => {
@@ -120,6 +120,13 @@ describe('QR adaptive binarization', () => {
             noise.set(out);
         }
         const data = new Uint8ClampedArray(dim * dim * 4);
+        for (let y = 0; y < dim; y++) {
+            for (let x = 0; x < dim; x++) {
+                const v = Math.max(0, Math.min(255, 215 + noise[y * dim + x]));
+                const i = (y * dim + x) * 4;
+                data[i] = v; data[i + 1] = v; data[i + 2] = v;
+            }
+        }
         for (let r = 0; r < m.size; r++) {
             for (let c = 0; c < m.size; c++) {
                 const dark = !!m.modules[r * m.size + c];
@@ -133,7 +140,7 @@ describe('QR adaptive binarization', () => {
         }
         const [r2, err] = decodeQR({ data, width: dim, height: dim });
         expect(err).toEqual(null);
-        if (new TextDecoder().decode(r2.bytes) !== uri) throw new Error('noisy decode mismatch');
+        expect(new TextDecoder().decode(r2.bytes)).toBe(uri);
     });
 
     it('decodes a QR rendered under a strong horizontal illumination gradient', () => {
@@ -141,8 +148,8 @@ describe('QR adaptive binarization', () => {
         const m = encodeQR(new TextEncoder().encode(uri));
         const img = synthGradient(m, 4, 70, 220, 25, 95);
         const [result, err] = decodeQR(img);
-        if (err) throw new Error(`gradient decode failed: ${err.message}`);
-        if (new TextDecoder().decode(result.bytes) !== uri) throw new Error('payload mismatch');
+        expect(err).toBe(null);
+        expect(new TextDecoder().decode(result.bytes)).toBe(uri);
     });
 
     it('decodes a QR on a DARK background (dark-theme screenshot)', () => {
@@ -166,7 +173,7 @@ describe('QR adaptive binarization', () => {
             }
         }
         const [result, err] = decodeQR({ data, width: dim, height: dim });
-        if (err) throw new Error(`inverted decode failed: ${err.message}`);
-        if (new TextDecoder().decode(result.bytes) !== uri) throw new Error('payload mismatch');
+        expect(err).toBe(null);
+        expect(new TextDecoder().decode(result.bytes)).toBe(uri);
     });
 });

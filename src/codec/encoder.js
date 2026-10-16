@@ -5,7 +5,8 @@ import { quantize, getScaledQuantizationTables } from '../algebraic/quantization
 import { zigZag } from '../algebraic/mappings/forward-zigzag.js';
 import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from '../automata/entropy-coding/huffman-encoder-fsm.js';
 import { BitWriter } from '../automata/bit-streams/bit-writer.js';
-import { F5 } from '../information-theory/steganography/f5-syndrome.js';
+import { StegoEngine } from '../information-theory/steganography/stego-engine.js';
+import { bytesToBase64 } from '../utils/encoding.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -40,54 +41,26 @@ export class JpegEncoder {
     }
 
     /**
-     * Embeds secret data into blocks with automatic ECC fallback.
+     * Embeds secret data into blocks using Format v4 StegoEngine.
      */
     async embedSecretData(allBlocks) {
-        const userEccSetting = this.options.metadata?.ecc;
-        const userEccProfile = this.options.metadata?.eccProfile;
+        const metadata = this.options.metadata || {};
+        const capacity = StegoEngine.calculateCapacity(allBlocks);
 
-        let useEcc = userEccSetting !== false;
-        const eccProfile = userEccProfile || 'Medium';
-
-        logger.debug(`ECC settings: ecc=${useEcc}, profile=${eccProfile}`);
-
-        const metadata = {
-            ecc: useEcc,
-            eccProfile: eccProfile,
-            ...this.options.metadata
-        };
-
-        let capacity = F5.calculateCapacity(allBlocks, {
-            format: 'container',
-            metadata: metadata,
-            ecc: useEcc,
-            eccProfile: eccProfile,
-            encrypted: !!this.options.password
-        });
-
-        // Auto-fallback to no-ECC if ECC capacity is insufficient
-        if (capacity < this.options.secretData.length && useEcc && userEccSetting !== true) {
-            logger.debug(`ECC capacity (${capacity} bytes) insufficient, trying without ECC...`);
-            useEcc = false;
-            metadata.ecc = false;
-            capacity = F5.calculateCapacity(allBlocks, {
-                format: 'container',
-                metadata: metadata,
-                ecc: false,
-                encrypted: !!this.options.password
-            });
-            logger.debug(`No-ECC capacity: ${capacity} bytes`);
-        }
-
-        logger.debug(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes (ECC: ${useEcc})`);
+        logger.debug(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes`);
 
         if (this.options.secretData.length > capacity) {
             return [null, new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`)];
         }
 
-        const result = await F5.embedContainer(allBlocks, this.options.secretData, metadata, { password: this.options.password });
-        if (!result) {
-            return [null, new Error('Failed to embed secret data into image.')];
+        const carrierPayload = new TextEncoder().encode(JSON.stringify({
+            data: bytesToBase64(this.options.secretData),
+            metadata: metadata
+        }));
+
+        const [ok, embedErr] = await StegoEngine.embed(allBlocks, carrierPayload, this.options.password);
+        if (embedErr || !ok) {
+            return [null, new Error(`Failed to embed secret data into image: ${embedErr ? embedErr.message : 'unknown error'}`)];
         }
         return [true, null];
     }

@@ -1,4 +1,4 @@
-﻿
+
 
 import { GenericGF, GenericGFPoly } from './galois-field.js';
 
@@ -23,11 +23,11 @@ export class ReedSolomonEncoder {
 
     encode(toEncode, ecBytes) {
         if (ecBytes === 0) {
-            throw new Error('IllegalArgumentException("No error correction bytes")');
+            throw new Error('reed-solomon: ecBytes must be greater than zero');
         }
         const dataBytes = toEncode.length - ecBytes;
         if (dataBytes <= 0) {
-            throw new Error('IllegalArgumentException("No data bytes provided")');
+            throw new Error('reed-solomon: no data bytes provided');
         }
         const generator = this.buildGenerator(ecBytes);
         const infoCoefficients = new Int32Array(dataBytes);
@@ -51,6 +51,24 @@ export class ReedSolomonDecoder {
     }
 
     decode(received, twoS) {
+        const [, err] = this.decodeTuple(received, twoS);
+        if (err) {
+            throw err;
+        }
+    }
+
+    /**
+     * @param {Int32Array|Uint8Array|Array} received
+     * @param {number} twoS
+     * @returns {[Int32Array|Uint8Array|Array|null, Error|null]}
+     */
+    decodeTuple(received, twoS) {
+        if (!received || !(received instanceof Int32Array || received instanceof Uint8Array || Array.isArray(received))) {
+            return [null, new Error('reed-solomon: invalid received buffer')];
+        }
+        if (typeof twoS !== 'number' || twoS <= 0 || !Number.isInteger(twoS)) {
+            return [null, new Error('reed-solomon: twoS must be a positive integer')];
+        }
         const poly = new GenericGFPoly(this.field, received);
         const syndromeCoefficients = new Int32Array(twoS);
         let noError = true;
@@ -63,25 +81,40 @@ export class ReedSolomonDecoder {
         }
 
         if (noError) {
-            return;
+            return [received, null];
         }
         const syndrome = new GenericGFPoly(this.field, syndromeCoefficients);
-        const sigmaOmega = this.runEuclideanAlgorithm(this.field.buildMonomial(twoS, 1), syndrome, twoS);
+        const [sigmaOmega, euclidErr] = this.runEuclideanAlgorithmTuple(this.field.buildMonomial(twoS, 1), syndrome, twoS);
+        if (euclidErr) {
+            return [null, euclidErr];
+        }
         const sigma = sigmaOmega[0];
         const omega = sigmaOmega[1];
-        const errorLocations = this.findErrorLocations(sigma);
+        const [errorLocations, locErr] = this.findErrorLocationsTuple(sigma);
+        if (locErr) {
+            return [null, locErr];
+        }
         const errorMagnitudes = this.findErrorMagnitudes(omega, errorLocations);
         for (let i = 0; i < errorLocations.length; i++) {
             const position = received.length - 1 - this.field.log(errorLocations[i]);
             if (position < 0) {
-                throw new Error('ReedSolomonException("Bad error location")');
+                return [null, new Error('reed-solomon: bad error location')];
             }
             received[position] = GenericGF.addOrSubtract(received[position], errorMagnitudes[i]);
         }
+        return [received, null];
     }
 
     runEuclideanAlgorithm(a, b, R) {
-        
+        const [res, err] = this.runEuclideanAlgorithmTuple(a, b, R);
+        if (err) throw err;
+        return res;
+    }
+
+    /**
+     * @returns {[Array|null, Error|null]}
+     */
+    runEuclideanAlgorithmTuple(a, b, R) {
         if (a.degree < b.degree) {
             const temp = a;
             a = b;
@@ -100,8 +133,7 @@ export class ReedSolomonDecoder {
             tLast = t;
 
             if (rLast.isZero()) {
-                
-                throw new Error('ReedSolomonException("r_{i-1} was zero")');
+                return [null, new Error('reed-solomon: r_{i-1} was zero')];
             }
             r = rLastLast;
             let q = this.field.zero;
@@ -117,26 +149,34 @@ export class ReedSolomonDecoder {
             t = q.multiply(tLast).addOrSubtract(tLastLast);
 
             if (r.degree >= rLast.degree) {
-                throw new Error('IllegalStateException("Division algorithm failed to reduce polynomial?")');
+                return [null, new Error('reed-solomon: division algorithm failed to reduce polynomial')];
             }
         }
 
         const sigmaTildeAtZero = t.getCoefficient(0);
         if (sigmaTildeAtZero === 0) {
-            throw new Error('ReedSolomonException("sigmaTilde(0) was zero")');
+            return [null, new Error('reed-solomon: sigmaTilde(0) was zero')];
         }
 
         const inverse = this.field.inverse(sigmaTildeAtZero);
         const sigma = t.multiply(inverse);
         const omega = r.multiply(inverse);
-        return [sigma, omega];
+        return [[sigma, omega], null];
     }
 
     findErrorLocations(errorLocator) {
-        
+        const [res, err] = this.findErrorLocationsTuple(errorLocator);
+        if (err) throw err;
+        return res;
+    }
+
+    /**
+     * @returns {[Int32Array|null, Error|null]}
+     */
+    findErrorLocationsTuple(errorLocator) {
         const numErrors = errorLocator.degree;
         if (numErrors === 1) { 
-            return new Int32Array([errorLocator.getCoefficient(1)]);
+            return [new Int32Array([errorLocator.getCoefficient(1)]), null];
         }
         const result = new Int32Array(numErrors);
         let e = 0;
@@ -147,13 +187,12 @@ export class ReedSolomonDecoder {
             }
         }
         if (e !== numErrors) {
-            throw new Error('ReedSolomonException("Error locator degree does not match number of roots")');
+            return [null, new Error('reed-solomon: error locator degree does not match number of roots')];
         }
-        return result;
+        return [result, null];
     }
 
     findErrorMagnitudes(errorEvaluator, errorLocations) {
-        
         const s = errorLocations.length;
         const result = new Int32Array(s);
         for (let i = 0; i < s; i++) {

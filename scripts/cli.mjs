@@ -227,8 +227,10 @@ export function parseArgs(argv) {
     return args;
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
-    process.argv[1] && path.basename(process.argv[1]) === 'cli.mjs') {
+if (process.argv[1] && (
+    import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
+    path.basename(process.argv[1]) === 'cli.mjs'
+)) {
     const [, , command, ...rest] = process.argv;
     const args = parseArgs(rest);
 

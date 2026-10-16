@@ -9,17 +9,15 @@ function makeUnlocked() {
 
 describe('TOTP gate (Tier B access control)', () => {
     it('enableTotpGate returns an enrollment URI and stores the gate', async () => {
-
         const v = makeUnlocked();
         const [gate, err] = await v.enableTotpGate();
         expect(err).toBe(null);
-        if (!gate.uri.startsWith('otpauth://totp/')) throw new Error('bad uri');
-        if (!gate.vault.metadata.totpGate || !gate.vault.metadata.totpGate.secret) throw new Error('gate missing: ' + JSON.stringify({ keys: Object.keys(gate), md: gate.vault ? gate.vault.metadata : null }));
-        if (!gate.uri.includes(gate.vault.metadata.totpGate.secret)) throw new Error('URI does not carry the stored secret');
+        expect(gate.uri).toMatch(/^otpauth:\/\/totp\//);
+        expect(gate.vault.metadata.totpGate && gate.vault.metadata.totpGate.secret).toBeTruthy();
+        expect(gate.uri).toContain(gate.vault.metadata.totpGate.secret);
 
         // Immutability: original instance untouched, new one carries the gate
-        if (v.metadata.totpGate) throw new Error('original instance was mutated');
-        void gate;
+        expect(v.metadata.totpGate).toBeUndefined();
     });
 
     it('verifyTotpGate accepts the live code and +-1 window, rejects others', async () => {
@@ -35,15 +33,15 @@ describe('TOTP gate (Tier B access control)', () => {
         const [prev] = await codeFromOtpauthUri(gate.uri, { now: NOW - 30 });
 
         const [okNow] = await v.verifyTotpGate(cur, { now: NOW });
-        console.error('[t2] cur=', cur, 'okNow=', JSON.stringify(okNow), 'secret=', v.metadata.totpGate.secret);
-        if (!okNow.valid) throw new Error('current code rejected');
+        expect(okNow.valid).toBe(true);
         const [okPrev] = await v.verifyTotpGate(prev, { now: NOW, window: 1 });
-        if (!okPrev.valid) throw new Error('window code rejected');
+        expect(okPrev.valid).toBe(true);
 
         const [farCode] = await codeFromOtpauthUri(gate.uri, { now: NOW + 3000 });
-        await v.verifyTotpGate(farCode, { now: NOW, window: 1 });
+        const [farRes] = await v.verifyTotpGate(farCode, { now: NOW, window: 1 });
+        expect(farRes.valid).toBe(false);
         const [badRes] = await v.verifyTotpGate('000000', { now: NOW });
-        if (badRes.valid) throw new Error('garbage code accepted');
+        expect(badRes.valid).toBe(false);
     });
 
     it('persists the gate across encrypted export/import', async () => {
@@ -55,8 +53,8 @@ describe('TOTP gate (Tier B access control)', () => {
 
         const [restored, impErr] = await PasswordVault.importEncrypted(json, PASSWORD);
         expect(impErr).toBe(null);
-        if (!restored.metadata.totpGate) throw new Error('gate lost across export/import');
-        if (!gate.uri.includes(restored.metadata.totpGate.secret)) throw new Error('secret changed');
+        expect(restored.metadata.totpGate).toBeDefined();
+        expect(gate.uri).toContain(restored.metadata.totpGate.secret);
     });
 
     it('disableTotpGate removes the gate', async () => {
@@ -65,17 +63,17 @@ describe('TOTP gate (Tier B access control)', () => {
         v = gate.vault;
         const [cleared, err] = await v.disableTotpGate();
         expect(err).toBe(null);
-        if (cleared.metadata.totpGate !== undefined) throw new Error('gate survived disable');
+        expect(cleared.metadata.totpGate).toBeUndefined();
     });
 
     it('refuses gate operations on locked vaults', async () => {
         const locked = new PasswordVault([], null, false, null);
         const [, e1] = await locked.enableTotpGate();
-        if (!(e1 instanceof Error)) throw new Error('enable on locked accepted');
+        expect(e1).toBeInstanceOf(Error);
         const [, e2] = await locked.verifyTotpGate('123456');
-        if (!(e2 instanceof Error)) throw new Error('verify on locked accepted');
+        expect(e2).toBeInstanceOf(Error);
         const [, e3] = await locked.disableTotpGate();
-        if (!(e3 instanceof Error)) throw new Error('disable on locked accepted');
+        expect(e3).toBeInstanceOf(Error);
     });
 
     it('rejects malformed codes as {valid:false} without throwing', async () => {
@@ -83,7 +81,7 @@ describe('TOTP gate (Tier B access control)', () => {
         const [gate] = await v.enableTotpGate();
         v = gate.vault;
         const [res] = await v.verifyTotpGate('not-a-code');
-        if (res.valid !== false) throw new Error('malformed code should be invalid');
+        expect(res.valid).toBe(false);
     });
 });
 

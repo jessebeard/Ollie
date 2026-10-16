@@ -14,6 +14,12 @@
 | MEDIUM | Correctness defect in a supported path, or contract violation with realistic trigger |
 | LOW | Hygiene, dead code, or edge conditions unlikely to occur in production |
 
+> **Note (added 2026-08-31 by Cy4 audit):** `src/information-theory/steganography/jsteg.js`
+> has been removed from the source tree. Findings S-3 and S-4 (Jsteg legacy
+> fallback, uncaught throws) and the jsteg references in A-2 are moot for the
+> current codebase — `f5-syndrome.js` is the sole steganographic extraction path.
+> See `docs/audits/Cy4-Codebuddy-audit.md` finding Cy4-5.
+
 ## Threat model (why this audit is security-shaped)
 
 Ollie persists encrypted vaults in JPEG carriers and (roadmap) **publishes those carriers to public clear-web image hosts** as decentralized backups. Consequence: *any third party can submit a forged carrier to any client that decodes it.* The decoder path is an unauthenticated, remote, adversarial input surface. In JS this converts memory-safety-style bugs (unvalidated allocation sizes, OOB reads) into remote DoS, and missing integrity checks into silent forgery. Every finding below is assessed against that model.

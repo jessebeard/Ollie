@@ -38,17 +38,13 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
 
     it('matches golden EC-M total codeword counts for v1-v15', () => {
         for (let v = 1; v <= MAX_VERSION; v++) {
-            if (totalCodewords(v) !== GOLDEN_TOTALS[v - 1]) {
-                throw new Error(`v${v}: total ${totalCodewords(v)} != golden ${GOLDEN_TOTALS[v - 1]}`);
-            }
+            expect(totalCodewords(v)).toBe(GOLDEN_TOTALS[v - 1]);
         }
     });
 
     it('matches golden EC-M parity codewords per block for v1-v15', () => {
         for (let v = 1; v <= MAX_VERSION; v++) {
-            if (ecMParity(v) !== GOLDEN_EC_PER_BLOCK[v - 1]) {
-                throw new Error(`v${v}: ec/block ${ecMParity(v)} != golden ${GOLDEN_EC_PER_BLOCK[v - 1]}`);
-            }
+            expect(ecMParity(v)).toBe(GOLDEN_EC_PER_BLOCK[v - 1]);
         }
     });
 
@@ -58,12 +54,8 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
             const countSum = blocks.reduce((a, b) => a + b.count, 0);
             const total = blocks.reduce((a, b) => a + b.count * b.data, 0) +
                           countSum * ecMParity(v);
-            if (countSum !== GOLDEN_BLOCK_COUNTS[v - 1]) {
-                throw new Error(`v${v}: block count ${countSum} != golden ${GOLDEN_BLOCK_COUNTS[v - 1]}`);
-            }
-            if (total !== GOLDEN_TOTALS[v - 1]) {
-                throw new Error(`v${v}: derived total ${total} != golden ${GOLDEN_TOTALS[v - 1]}`);
-            }
+            expect(countSum).toBe(GOLDEN_BLOCK_COUNTS[v - 1]);
+            expect(total).toBe(GOLDEN_TOTALS[v - 1]);
         }
     });
 
@@ -71,9 +63,7 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
         for (let v = 1; v <= MAX_VERSION; v++) {
             const blocks = ecMBlocks(v);
             for (let i = 1; i < blocks.length; i++) {
-                if (blocks[i].data < blocks[i - 1].data) {
-                    throw new Error(`v${v}: block order violates shorter-first`);
-                }
+                expect(blocks[i].data >= blocks[i - 1].data).toBe(true);
             }
         }
     });
@@ -81,9 +71,7 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
     it('data codewords equal totals minus all parity', () => {
         for (let v = 1; v <= MAX_VERSION; v++) {
             const expectData = GOLDEN_TOTALS[v - 1] - GOLDEN_EC_PER_BLOCK[v - 1] * GOLDEN_BLOCK_COUNTS[v - 1];
-            if (dataCodewords(v) !== expectData) {
-                throw new Error(`v${v}: data ${dataCodewords(v)} != expected ${expectData}`);
-            }
+            expect(dataCodewords(v)).toBe(expectData);
         }
     });
 
@@ -101,7 +89,7 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
         ];
         for (const [v, want] of spot) {
             const got = ecMBlocks(v);
-            expect(JSON.stringify(got)).toEqual(JSON.stringify(want));
+            expect(got).toEqual(want);
         }
     });
 
@@ -112,9 +100,9 @@ describe('QR capacity table: ISO/IEC 18004 golden values', () => {
             [11, [6, 30, 54]], [14, [6, 26, 46, 66]], [15, [6, 26, 48, 70]]
         ];
         for (const [v, want] of centers) {
-            expect(JSON.stringify(alignmentCenters(v))).toEqual(JSON.stringify(want));
+            expect(alignmentCenters(v)).toEqual(want);
         }
-        expect(JSON.stringify(alignmentCenters(1))).toEqual(JSON.stringify([]));
+        expect(alignmentCenters(1)).toEqual([]);
     });
 });
 
@@ -133,11 +121,7 @@ describe('QR format/version information KATs', () => {
     it('produces golden 15-bit format strings for EC-M masks 0-7', () => {
         const golden = [21522, 20773, 24188, 23371, 17913, 16590, 20375, 19104];
         for (let mask = 0; mask < 8; mask++) {
-            if (formatInfoBits(EC_LEVEL_BITS.M, mask) !== golden[mask]) {
-                throw new Error(
-                    `EC-M mask${mask}: got ${formatInfoBits(EC_LEVEL_BITS.M, mask)}, golden ${golden[mask]}`
-                );
-            }
+            expect(formatInfoBits(EC_LEVEL_BITS.M, mask)).toBe(golden[mask]);
         }
     });
 
@@ -156,18 +140,42 @@ describe('QR format/version information KATs', () => {
 
     it('rejects out-of-range versions in helpers', () => {
         for (const fn of [symbolSize, ecMBlocks, ecMParity, totalCodewords, dataCodewords, alignmentCenters]) {
-            let threw = false;
-            try { fn(0); } catch { threw = true; }
-            if (!threw) throw new Error('version 0 accepted');
-            threw = false;
-            try { fn(MAX_VERSION + 1); } catch { threw = true; }
-            if (!threw) throw new Error('version above max accepted');
+            expect(() => fn(0)).toThrow();
+            expect(() => fn(MAX_VERSION + 1)).toThrow();
         }
     });
 
     it('versionInfoBits rejects versions below 7', () => {
-        let threw = false;
-        try { versionInfoBits(6); } catch { threw = true; }
-        if (!threw) throw new Error('version 6 accepted by versionInfoBits');
+        expect(() => versionInfoBits(6)).toThrow();
+    });
+
+    describe('PBT & Monotonicity Properties', () => {
+        it('Property: data and total codeword capacities are strictly monotonic with version', () => {
+            for (let v = 1; v < MAX_VERSION; v++) {
+                expect(dataCodewords(v + 1)).toBeGreaterThan(dataCodewords(v));
+                expect(totalCodewords(v + 1)).toBeGreaterThan(totalCodewords(v));
+            }
+        });
+
+        it('Property: alignment pattern coordinates are strictly bounded within symbol dimensions', () => {
+            for (let v = 1; v <= MAX_VERSION; v++) {
+                const size = symbolSize(v);
+                const centers = alignmentCenters(v);
+                for (const coord of centers) {
+                    expect(coord).toBeGreaterThanOrEqual(6);
+                    expect(coord).toBeLessThan(size - 6);
+                }
+            }
+        });
+
+        it('Property: format info bits always fit within 15 bits', () => {
+            for (const level of Object.values(EC_LEVEL_BITS)) {
+                for (let mask = 0; mask < 8; mask++) {
+                    const bits = formatInfoBits(level, mask);
+                    expect(bits).toBeGreaterThanOrEqual(0);
+                    expect(bits).toBeLessThan(1 << 15);
+                }
+            }
+        });
     });
 });

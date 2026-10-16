@@ -183,8 +183,8 @@ describe('TOTP entry validation', () => {
     it('rejects malformed totp values with a typed error', async () => {
         for (const bad of ['otpauth://hotp/x?secret=AB', 'not a secret!!']) {
             const err = PasswordVault.validateEntryInput({ title: 'T', totp: bad });
-            if (!(err instanceof Error)) throw new Error(`accepted '${bad}'`);
-            if (!err.message.toLowerCase().includes('totp')) throw new Error('error must mention totp');
+            expect(err).toBeInstanceOf(Error);
+            expect(err.message.toLowerCase()).toContain('totp');
         }
     });
 
@@ -200,9 +200,7 @@ describe('TOTP entry validation', () => {
         const [sessionKey] = await next._getSessionKey();
         const [plain, decErr] = await next.entries[0].decrypt(sessionKey);
         expect(decErr).toBe(null);
-        if (plain.totp !== 'otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP') {
-            throw new Error(`stored unnormalized: ${plain.totp}`);
-        }
+        expect(plain.totp).toBe('otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP');
     });
 
     it('drops empty-string totp instead of storing blanks', async () => {
@@ -213,12 +211,12 @@ describe('TOTP entry validation', () => {
         const [plain] = await next.entries[0].decrypt(sessionKey);
         // SecureEntry reconstructs string fields as '' when absent; the
         // storage contract is "falsy means no TOTP configured".
-        if (plain.totp) throw new Error(`expected absent totp, got '${plain.totp}'`);
+        expect(plain.totp).toBeFalsy();
     });
 
     it('rejects garbage totp at the addEntry boundary', async () => {
         const vault = new PasswordVault([], null, true, PASSWORD);
         const [, err] = await vault.addEntry({ title: 'Bad', password: 'pw', totp: 'not a secret!!' });
-        if (!(err instanceof Error)) throw new Error('garbage totp accepted');
+        expect(err).toBeInstanceOf(Error);
     });
 });

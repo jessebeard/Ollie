@@ -9,6 +9,12 @@
 - **Medium** — maintainability issue likely to cause bugs
 - **Low** — style / nit
 
+> **Note (added 2026-08-31 by Cy4 audit):** `src/information-theory/steganography/jsteg.js`
+> has been removed from the source tree. All findings below that cite `jsteg.js`
+> (C23, C34, S3, I3, and the JSTG magic references in S20) are moot for the
+> current codebase — `f5-syndrome.js` is the sole steganographic extraction path.
+> See `docs/audits/Cy4-Codebuddy-audit.md` finding Cy4-5.
+
 ## Summary
 
 | Category | Critical | High | Medium | Low | Total |

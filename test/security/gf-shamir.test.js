@@ -29,13 +29,12 @@ describe('gf-shamir splitting', () => {
 
     it('produces total shares with valid indices and secret-length data', async () => {
         const shares = await makeShares(bytes('the secret'), 3, 5);
-        if (shares.length !== 5) throw new Error(`expected 5 shares, got ${shares.length}`);
+        expect(shares).toHaveLength(5);
         const indices = shares.map(s => s.index).sort((a, b) => a - b);
         expect(indices).toEqual([1, 2, 3, 4, 5]);
         for (const s of shares) {
-            if (!(s.data instanceof Uint8Array) || s.data.length !== 10) {
-                throw new Error('share data must be secret-length bytes');
-            }
+            expect(s.data).toBeInstanceOf(Uint8Array);
+            expect(s.data).toHaveLength(10);
         }
     });
 
@@ -55,9 +54,7 @@ describe('gf-shamir splitting', () => {
         ];
         for (const [secret, opts] of cases) {
             const [, err] = await splitSecret(secret, { ...opts, random: seededRandom(1) });
-            if (!(err instanceof Error)) {
-                throw new Error(`accepted secret/opts ${JSON.stringify(opts)} len=${secret.length}`);
-            }
+            expect(err).toBeInstanceOf(Error);
         }
     });
 });
@@ -92,20 +89,20 @@ describe('gf-shamir combination', () => {
         const secret = bytes('too few');
         const shares = await makeShares(secret, 3, 5);
         const [, err] = combineShares(shares.slice(0, 2), { threshold: 3 });
-        if (!(err instanceof Error)) throw new Error('sub-threshold combination accepted');
+        expect(err).toBeInstanceOf(Error);
     });
 
     it('rejects duplicate, zero, and out-of-range share indices', async () => {
         const shares = await makeShares(bytes('idx checks'), 2, 3);
 
         const dup = [{ index: 1, data: shares[0].data }, { index: 1, data: shares[1].data }];
-        if (combineShares(dup, { threshold: 2 })[1] === null) throw new Error('duplicate index accepted');
+        expect(combineShares(dup, { threshold: 2 })[1]).toBeInstanceOf(Error);
 
         const zeroIdx = [{ index: 0, data: shares[0].data }, { index: 2, data: shares[1].data }];
-        if (combineShares(zeroIdx, { threshold: 2 })[1] === null) throw new Error('index 0 accepted');
+        expect(combineShares(zeroIdx, { threshold: 2 })[1]).toBeInstanceOf(Error);
 
         const bigIdx = [{ index: 1, data: shares[0].data }, { index: 99, data: shares[1].data }];
-        if (combineShares(bigIdx, { threshold: 2 })[1] === null) throw new Error('out-of-range index accepted');
+        expect(combineShares(bigIdx, { threshold: 2 })[1]).toBeInstanceOf(Error);
     });
 
     it('roundtrips arbitrary byte payloads (property)', async () => {
@@ -113,12 +110,10 @@ describe('gf-shamir combination', () => {
             [Arbitrary.byteArray(1, 128)],
             async (secret) => {
                 const [shares, err] = await splitSecret(secret, { threshold: 2, total: 3, random: seededRandom(secret.length + 7) });
-                if (err) throw err;
+                expect(err).toBe(null);
                 const [out, outErr] = combineShares([shares[2], shares[0]], { threshold: 2 });
-                if (outErr) throw outErr;
-                if (Array.from(out).join() !== Array.from(secret).join()) {
-                    throw new Error('roundtrip mismatch');
-                }
+                expect(outErr).toBe(null);
+                expect(out).toEqual(secret);
             },
             40
         );

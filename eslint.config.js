@@ -34,7 +34,11 @@ const browserGlobals = {
     requestAnimationFrame: 'readonly',
     getComputedStyle: 'readonly',
     Event: 'readonly',
-    CustomEvent: 'readonly'
+    CustomEvent: 'readonly',
+    WebAssembly: 'readonly',
+    CompressionStream: 'readonly',
+    DecompressionStream: 'readonly',
+    Response: 'readonly'
 };
 
 const nodeGlobals = {
@@ -44,12 +48,13 @@ const nodeGlobals = {
     URL: 'readonly',
     URLSearchParams: 'readonly',
     TextEncoder: 'readonly',
-    TextDecoder: 'readonly'
+    TextDecoder: 'readonly',
+    performance: 'readonly'
 };
 
 export default [
     {
-        ignores: ['node_modules/', 'test/fixtures/', '**/*.min.js', 'docs/']
+        ignores: ['node_modules/', 'test/fixtures/', '**/*.min.js', 'docs/', 'src/vendor/']
     },
 
     // --- Library code: strictest tier ---

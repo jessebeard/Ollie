@@ -1,4 +1,4 @@
-﻿
+
 
 export class GenericGF {
     constructor(primitive, size, b) {
@@ -28,7 +28,7 @@ export class GenericGF {
 
     buildMonomial(degree, coefficient) {
         if (degree < 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: degree must be non-negative');
         }
         if (coefficient === 0) {
             return this.zero;
@@ -52,14 +52,14 @@ export class GenericGF {
 
     log(a) {
         if (a === 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: log(0) is undefined');
         }
         return this.logTable[a];
     }
 
     inverse(a) {
         if (a === 0) {
-            throw new Error("ArithmeticException()");
+            throw new Error('galois-field: division by zero');
         }
         return this.expTable[this.size - this.logTable[a] - 1];
     }
@@ -91,7 +91,7 @@ export class GenericGF {
 export class GenericGFPoly {
     constructor(field, coefficients) {
         if (coefficients.length === 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: coefficients cannot be empty');
         }
         this.field = field;
         const coefficientsLength = coefficients.length;
@@ -154,7 +154,7 @@ export class GenericGFPoly {
 
     addOrSubtract(other, buf) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (this.isZero()) {
             return other;
@@ -191,7 +191,7 @@ export class GenericGFPoly {
 
     multiplyGenericGFPoly(other) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (this.isZero() || other.isZero()) {
             return this.field.zero;
@@ -227,7 +227,7 @@ export class GenericGFPoly {
 
     multiplyByMonomial(degree, coefficient) {
         if (degree < 0) {
-            throw new Error('IllegalArgumentException()');
+            throw new Error('galois-field: degree must be non-negative');
         }
         if (coefficient === 0) {
             return this.field.zero;
@@ -242,10 +242,10 @@ export class GenericGFPoly {
 
     divide(other) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (other.isZero()) {
-            throw new Error('IllegalArgumentException("Divide by 0")');
+            throw new Error('galois-field: division by zero');
         }
 
         let quotient = this.field.getZero();

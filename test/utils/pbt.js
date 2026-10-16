@@ -235,12 +235,12 @@ function shrinkArray(value, minLength) {
 
 export const Arbitrary = {
     integer: (min = -1000, max = 1000) => ({
-        generate: () => getRandomInt(min, max),
+        generate: () => getRandomInt(min, max + 1),
         shrink: (value) => shrinkInteger(value, min, max)
     }),
 
     positiveInteger: (max = 10000) => ({
-        generate: () => getRandomInt(1, max),
+        generate: () => getRandomInt(1, max + 1),
         shrink: (value) => shrinkInteger(value, 1, max)
     }),
 
@@ -251,7 +251,7 @@ export const Arbitrary = {
 
     byteArray: (minLength = 1, maxLength = 1024) => ({
         generate: () => {
-            const len = getRandomInt(minLength, maxLength);
+            const len = getRandomInt(minLength, maxLength + 1);
             const arr = new Uint8Array(len);
             for (let i = 0; i < len; i++) {
                 arr[i] = getRandomInt(0, 256);
@@ -368,13 +368,228 @@ export const Arbitrary = {
         shrink: (value) => value ? [false] : []
     }),
 
+    float: (min = -1000, max = 1000) => ({
+        generate: () => nextRandom() * (max - min) + min,
+        shrink: (value) => shrinkInteger(Math.trunc(value), min, max)
+    }),
+
+    bytes: (minLength = 1, maxLength = 1024) => ({
+        generate: () => {
+            const len = getRandomInt(minLength, maxLength + 1);
+            const arr = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                arr[i] = getRandomInt(0, 256);
+            }
+            return arr;
+        },
+        shrink: (value) => shrinkByteArray(value, minLength)
+    }),
+
+    jsonValue: (maxDepth = 2) => ({
+        generate: () => {
+            const types = ['null', 'boolean', 'integer', 'string', 'array', 'object'];
+            const choose = types[getRandomInt(0, maxDepth <= 0 ? 4 : types.length)];
+            switch (choose) {
+                case 'null': return null;
+                case 'boolean': return nextRandom() > 0.5;
+                case 'integer': return getRandomInt(-1000, 1000);
+                case 'string': return 's_' + getRandomInt(0, 1000);
+                case 'array': {
+                    const len = getRandomInt(0, 4);
+                    const arr = [];
+                    for (let i = 0; i < len; i++) arr.push(Arbitrary.jsonValue(maxDepth - 1).generate());
+                    return arr;
+                }
+                case 'object':
+                default: {
+                    const len = getRandomInt(0, 3);
+                    const obj = {};
+                    for (let i = 0; i < len; i++) obj['k' + i] = Arbitrary.jsonValue(maxDepth - 1).generate();
+                    return obj;
+                }
+            }
+        },
+        shrink: (value) => {
+            if (value === null || typeof value === 'boolean') return [];
+            if (typeof value === 'number') return shrinkInteger(value, -1000, 1000);
+            if (typeof value === 'string') return shrinkString(value, 0);
+            if (Array.isArray(value)) return shrinkArray(value, 0);
+            return [];
+        }
+    }),
+
+    uint8Array: (exactLength) => ({
+        generate: () => {
+            const arr = new Uint8Array(exactLength);
+            for (let i = 0; i < exactLength; i++) arr[i] = getRandomInt(0, 256);
+            return arr;
+        },
+        shrink: (value) => {
+            const candidates = [];
+            // Zero out trailing half
+            if (value.length > 0) {
+                const zeroed = new Uint8Array(value);
+                zeroed.fill(0, Math.floor(value.length / 2));
+                candidates.push(zeroed);
+                // All zeros
+                const allZero = new Uint8Array(value.length);
+                candidates.push(allZero);
+            }
+            return candidates;
+        }
+    }),
+
+    dctBlock: () => ({
+        generate: () => {
+            const block = new Int16Array(64);
+            // DC coefficient
+            block[0] = getRandomInt(-2048, 2047);
+            // Sparse AC coefficients
+            const nonZeroACs = getRandomInt(0, 20);
+            for (let i = 0; i < nonZeroACs; i++) {
+                const idx = getRandomInt(1, 64);
+                block[idx] = getRandomInt(-256, 256);
+            }
+            return block;
+        },
+        shrink: (value) => {
+            const candidates = [];
+            // Halve all non-zero coefficients toward 0
+            const halved = new Int16Array(64);
+            let hasNonZero = false;
+            for (let i = 0; i < 64; i++) {
+                halved[i] = Math.trunc(value[i] / 2);
+                if (halved[i] !== 0) hasNonZero = true;
+            }
+            if (hasNonZero) candidates.push(halved);
+            // All-zero block
+            candidates.push(new Int16Array(64));
+            return candidates;
+        }
+    }),
+
+    pixelBlock: (w, h) => ({
+        generate: () => {
+            const len = w * h * 4;
+            const buf = new Uint8Array(len);
+            for (let i = 0; i < len; i += 4) {
+                buf[i] = getRandomInt(0, 256);     // R
+                buf[i + 1] = getRandomInt(0, 256); // G
+                buf[i + 2] = getRandomInt(0, 256); // B
+                buf[i + 3] = 255;                  // A
+            }
+            return buf;
+        },
+        shrink: (value) => {
+            const candidates = [];
+            // All black (RGB=0, A=255)
+            const black = new Uint8Array(value.length);
+            for (let i = 0; i < value.length; i += 4) black[i + 3] = 255;
+            candidates.push(black);
+            return candidates;
+        }
+    }),
+
+    oneOf: (...values) => ({
+        generate: () => {
+            if (values.length === 0) throw new Error('Arbitrary.oneOf requires at least one value');
+            return values[getRandomInt(0, values.length)];
+        },
+        shrink: (value) => {
+            const idx = values.indexOf(value);
+            if (idx > 0) return [values[0]];
+            return [];
+        }
+    }),
+
+    record: (spec) => ({
+        generate: () => {
+            const res = {};
+            for (const key of Object.keys(spec)) {
+                res[key] = spec[key].generate();
+            }
+            return res;
+        },
+        shrink: (value) => {
+            const candidates = [];
+            for (const key of Object.keys(spec)) {
+                if (typeof spec[key].shrink === 'function') {
+                    const fieldShrinks = spec[key].shrink(value[key]);
+                    for (const candidateField of fieldShrinks) {
+                        candidates.push({ ...value, [key]: candidateField });
+                    }
+                }
+            }
+            return candidates;
+        }
+    }),
+
+    frequency: (pairs) => {
+        const totalWeight = pairs.reduce((sum, [w]) => sum + w, 0);
+        return {
+            generate: () => {
+                let r = nextRandom() * totalWeight;
+                for (const [weight, gen] of pairs) {
+                    if (r < weight) return gen.generate();
+                    r -= weight;
+                }
+                return pairs[pairs.length - 1][1].generate();
+            },
+            shrink: (value) => {
+                // Shrink with first generator if possible
+                const firstGen = pairs[0][1];
+                if (typeof firstGen.shrink === 'function') {
+                    return firstGen.shrink(value);
+                }
+                return [];
+            }
+        };
+    },
+
+    suchthat: (gen, pred, maxAttempts = 100) => ({
+        generate: () => {
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const candidate = gen.generate();
+                if (pred(candidate)) return candidate;
+            }
+            throw new Error(`suchthat could not satisfy predicate after ${maxAttempts} attempts`);
+        },
+        shrink: (value) => {
+            if (typeof gen.shrink !== 'function') return [];
+            return gen.shrink(value).filter(pred);
+        }
+    }),
+
+    bitSequence: (minBits = 1, maxBits = 64) => ({
+        generate: () => {
+            const length = getRandomInt(minBits, maxBits + 1);
+            const bits = [];
+            for (let i = 0; i < length; i++) {
+                bits.push(nextRandom() > 0.5 ? 1 : 0);
+            }
+            return { bits, length };
+        },
+        shrink: (value) => {
+            const candidates = [];
+            if (value.length > minBits) {
+                const half = Math.max(minBits, Math.floor(value.length / 2));
+                candidates.push({ bits: value.bits.slice(0, half), length: half });
+            }
+            // All zeros
+            if (value.bits.some(b => b === 1)) {
+                candidates.push({ bits: new Array(value.length).fill(0), length: value.length });
+            }
+            return candidates;
+        }
+    }),
+
     array: (arbitraryGen, minLength = 0, maxLength = 50) => ({
         generate: () => {
             // Resolve the element generator: supports { generate } objects and plain functions
             const genFn = (arbitraryGen && typeof arbitraryGen.generate === 'function')
                 ? () => arbitraryGen.generate()
                 : (typeof arbitraryGen === 'function' ? arbitraryGen : () => arbitraryGen);
-            const len = getRandomInt(minLength, maxLength);
+            const len = getRandomInt(minLength, maxLength + 1);
             const arr = new Array(len);
             for (let i = 0; i < len; i++) {
                 arr[i] = genFn();

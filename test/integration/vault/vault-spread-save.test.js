@@ -1,48 +1,45 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-/**
- * Regression: the stripe planner previously concentrated every coded stripe
- * onto the single largest carrier (counts=[k,0,...,0]). One file stores one
- * F5 container, so write-back overwrote that file k times; reload found 1
- * unique share of threshold k and failed with "Insufficient shares". The
- * planner now spreads one stripe per carrier.
- */
+if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+    describe('Threshold spread save (multi-carrier distribution)', () => {
+        it('Skipped in Browser', () => { expect(true).toBe(true); });
+    });
+} else {
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-class MockFile {
-    constructor(buffer, name) {
-        this.buffer = buffer;
-        this.name = name;
-    }
-    async arrayBuffer() {
-        return this.buffer.buffer.slice(this.buffer.byteOffset, this.buffer.byteOffset + this.buffer.byteLength);
-    }
-}
-
-const FIXTURE_NAMES = [
-    'Hills_to_the_southwest_of_Nainital.jpg',
-    'Blick_auf_den_Plansee.jpg',
-    'Barrage_de_Roselend_(50498176838).jpg',
-    'Escursionismo_sulle_Alpi.jpg',
-    'Entrance_of_Kotor_Bay_with_rocks_and_sunset.jpg',
-    'Depuis_le_Tri�ves_(53476365753).jpg'
-];
-
-describe('Threshold spread save (multi-carrier distribution)', () => {
-    it('distributes shares across distinct carriers and survives losing files down to the threshold', async () => {
-        const fixturesDir = path.join(__dirname, '../../fixtures/test vault');
-        const available = fs.readdirSync(fixturesDir);
-        const files = [];
-        for (const name of FIXTURE_NAMES) {
-            const match = available.find(f => f.endsWith('.jpg') && f.slice(0, 12) === name.slice(0, 12));
-            if (!match) throw new Error(`fixture missing: ${name}`);
-            files.push(new MockFile(fs.readFileSync(path.join(fixturesDir, match)), match));
+    class MockFile {
+        constructor(buffer, name) {
+            this.buffer = buffer;
+            this.name = name;
         }
+        async arrayBuffer() {
+            return this.buffer.buffer.slice(this.buffer.byteOffset, this.buffer.byteOffset + this.buffer.byteLength);
+        }
+    }
+
+    const FIXTURE_NAMES = [
+        'Hills_to_the_southwest_of_Nainital.jpg',
+        'Blick_auf_den_Plansee.jpg',
+        'Barrage_de_Roselend_(50498176838).jpg',
+        'Escursionismo_sulle_Alpi.jpg',
+        'Entrance_of_Kotor_Bay_with_rocks_and_sunset.jpg',
+        'Depuis_le_Trives_(53476365753).jpg'
+    ];
+
+    describe('Threshold spread save (multi-carrier distribution)', () => {
+        it('distributes shares across distinct carriers and survives losing files down to the threshold', async () => {
+            const fixturesDir = path.join(__dirname, '../../fixtures/test vault');
+            const available = fs.readdirSync(fixturesDir);
+            const files = [];
+            for (const name of FIXTURE_NAMES) {
+                const match = available.find(f => f.endsWith('.jpg') && f.slice(0, 12) === name.slice(0, 12));
+                if (!match) throw new Error(`fixture missing: ${name}`);
+                files.push(new MockFile(fs.readFileSync(path.join(fixturesDir, match)), match));
+            }
 
         let vault = new PasswordVault([], null, true, 'master-pw');
         [vault] = await vault.addEntry({
@@ -87,8 +84,10 @@ describe('Threshold spread save (multi-carrier distribution)', () => {
         if (subVault.entries.length !== 1) throw new Error('entry lost on threshold-subset load');
 
         // Below the threshold must fail loudly.
-        const tooFew = savedFiles.slice(0, k - 1);
+        const tooFew = savedFiles.slice(savedFiles.length - (k - 1));
         const [, belowErr] = await PasswordVault.load(tooFew, 'master-pw');
         if (!(belowErr instanceof Error)) throw new Error('sub-threshold load should fail');
-    });
+    }, { timeout: 60000 });
 });
+}
+

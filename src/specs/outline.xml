@@ -45,19 +45,21 @@
             </directory>
         </directory>
         <directory name="codec">
-            <file name="capacity-scanner.js" description="CapacityScanner: cooperative async capacity analysis across multiple JPEGs." />
-            <file name="decoder.js" description="JpegDecoder: full decode pipeline with stego extraction, fail-loud bounds checking." />
-            <file name="encoder.js" description="JpegEncoder: baseline sequential DCT encoder with F5 steganography embedding." />
+            <file name="capacity-scanner.js" description="CapacityScanner: cooperative async capacity analysis across multiple JPEGs using Format v4 bounds." />
+            <file name="decoder.js" description="JpegDecoder: full decode pipeline with Format v4 steganography extraction, fail-loud bounds checking." />
+            <file name="encoder.js" description="JpegEncoder: baseline sequential DCT encoder with Format v4 J-UNIWARD/STC steganography embedding." />
             <file name="file-scanner.js" description="FileScanner: directory scanning via File System Access API." />
-                <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
-                <file name="qr-encoder.js" description="ISO/IEC 18004 QR encoder: byte-mode data encoding, RS error correction via GF(256), matrix construction with masking." />
-                <file name="qr-decoder.js" description="ISO/IEC 18004 QR decoder: binarization, finder-pattern detection with merge-tolerant run ratios, BCH format validation, zigzag extraction and shared Reed-Solomon correction." />
+            <file name="transcoder.js" description="JpegTranscoder: lossless coefficient-level secret replacement without generation loss." />
+            <file name="qr-capacity.js" description="Shared ISO/IEC 18004 QR capacity tables, RS block structures, alignment centers, BCH format/version generators." />
+            <file name="qr-encoder.js" description="ISO/IEC 18004 QR encoder: byte-mode data encoding, RS error correction via GF(256), matrix construction with masking." />
+            <file name="qr-decoder.js" description="ISO/IEC 18004 QR decoder: binarization, finder-pattern detection with merge-tolerant run ratios, BCH format validation, zigzag extraction and shared Reed-Solomon correction." />
         </directory>
         <directory name="information-theory">
             <directory name="cryptography">
                 <file name="aes-gcm.js" description="AES-256-GCM encryption/decryption with optional AAD binding." />
                 <file name="crypto-provider.js" description="Single source of truth for Web Crypto access across browser and Node." />
                 <file name="hmac.js" description="HMAC-SHA256 signing/verification for carrier manifest authentication." />
+                <file name="kdf-chain.js" description="Unified Argon2id (t=3, m=64MB, p=1) + HKDF-Expand domain separation for AES key/IV, STC submatrix seed, and anti-SCA cost seed." />
                 <file name="pbkdf2.js" description="PBKDF2-HMAC-SHA-256 key derivation with OWASP-aligned defaults (600k iterations)." />
                 <file name="totp.js" description="RFC 6238 TOTP: hotp/totp/verifyTotp with SHA-1/SHA-256/SHA-512, drift-window verification, otpauth:// URI parse/build, codeFromOtpauthUri (Base32-correct code generation) and normalizeTotpInput (bare-secret wrapping for entry authoring)." />
             </directory>
@@ -68,18 +70,21 @@
                 <file name="rs-interleaver.js" description="ECC profiles (Low through Extreme), block splitting, interleaving, protect/recover tuple API." />
             </directory>
             <directory name="secret-sharing">
-                <file name="cauchy-ec.js" description="Cauchy MDS erasure codec: encodeErasure/decodeErasure/planErasureAllocation over GF(256)." />
+                <file name="cauchy-ec.js" description="Cauchy MDS erasure codec: encodeErasure/decodeErasure/planErasureAllocation over GF(256) with proportional parity multi-block allocation across heterogeneous carriers." />
                 <file name="css-envelope.js" description="Computationally Secure Secret Sharing envelope: AES-GCM payload + Shamir-split DEK." />
                 <file name="gf-shamir.js" description="Shamir secret sharing over GF(256): splitSecret/combineShares with injectable RNG." />
                 <file name="gf256.js" description="Shared GF(2^8) field arithmetic: exp/log tables, multiplication, inversion." />
             </directory>
             <directory name="steganography">
-                <file name="batch-embedder.js" description="BatchEmbedder: capacity-aware multi-carrier embedding with threshold mode and manifest stamping." />
-                <file name="batch-extractor.js" description="BatchExtractor: manifest verification, threshold reconstruction, chunk reassembly." />
+                <file name="batch-embedder.js" description="BatchEmbedder: capacity-aware multi-carrier embedding with proportional parity and threshold modes, multi-block bundling, and manifest stamping." />
+                <file name="batch-extractor.js" description="BatchExtractor: manifest verification, multi-block bundle unpacking, threshold reconstruction, chunk reassembly." />
                 <file name="carrier-manifest.js" description="HMAC-authenticated carrier manifests: create/verify/bind with canonical serialization." />
                 <file name="chunk-manager.js" description="ChunkManager: CRC32-checked data splitting and reassembly." />
-                <file name="coded-header.js" description="RS(255,191)-coded control header for container format v3." />
-                <file name="f5-syndrome.js" description="F5 steganography: matrix encoding, shrinkage handling, container v3 embed/extract." />
+                <file name="encrypted-container.js" description="EncryptedContainer: Format v4 seal/unseal wrapper with backward-compatible API." />
+                <file name="juniward.js" description="J-UNIWARD spatial wavelet distortion engine: 2D IDCT, 8-tap Daubechies (db8) directional wavelets, spatial sensitivity map, anti-SCA key randomization." />
+                <file name="opaque-container.js" description="Format v4 zero-length opaque framing: Deflate/Inflate, CRC-32, CSPRNG bucket padding (256B-128KB), unsealWithKeys candidate bucket fast testing." />
+                <file name="stc-matrix.js" description="Syndrome-Trellis Codes (STC): dual-trellis Viterbi encoder, submatrix generator, maxW=16 bounded trellis, linear parity extractor." />
+                <file name="stego-engine.js" description="StegoEngine: unified Format v4 orchestrator (embed, extract, calculateCapacity) with cached-key derivation." />
             </directory>
         </directory>
         <directory name="structures">
@@ -91,13 +96,24 @@
         </directory>
         <directory name="utils">
             <file name="atomic-writer.js" description="writeAllWithRollback: atomic multi-file writes with rollback on partial failure." />
+            <file name="base32.js" description="RFC 4648 Base32 encoding/decoding." />
+            <file name="compression.js" description="Native zero-dependency CompressionStream / DecompressionStream deflate/inflate helper." />
             <file name="crc32.js" description="CRC32 checksum utility (IEEE reflected, poly 0xEDB88320)." />
+            <file name="csv.js" description="RFC 4180 CSV parser with dialect switching." />
             <file name="encoding.js" description="UTF-8 and base64 encoding helpers." />
             <file name="escape-html.js" description="Canonical HTML escaping for safe interpolation." />
             <file name="logger.js" description="Leveled logger (debug/info/warn/error) with env-var override." />
             <file name="url-safety.js" description="URL scheme whitelist for safe link opening." />
-            <file name="base32.js" description="RFC 4648 Base32 encoding/decoding." />
-            <file name="csv.js" description="RFC 4180 CSV parser with CRLF/BOM handling and a KeePass backslash-escape dialect mode." />
+        </directory>
+        <directory name="vendor">
+            <directory name="argon2">
+                <file name="LICENSE" description="MIT License for OpenPGP.js Argon2id WebAssembly engine." />
+                <file name="argon2id.js" description="Argon2id core hashing logic." />
+                <file name="blake2b.js" description="Blake2b hash implementation for Argon2id." />
+                <file name="index.js" description="Clean exports: loadArgon2id and deriveArgon2id." />
+                <file name="setup.js" description="WASM memory allocator and runtime loader." />
+                <file name="wasm-binaries.js" description="Inlined base64 SIMD and non-SIMD WebAssembly binaries for zero-network, offline execution." />
+            </directory>
         </directory>
     </structure>
 </project>

@@ -7,7 +7,7 @@
  * byte mode, EC level M, versions 1-15, interleaved multi-block RS,
  * BCH format info XOR 0x5412, zigzag placement, penalty-selected masks.
  *
- * RS error correction delegates to the audited Euclidean
+ * RS error correction delegates to the Euclidean
  * decoder in information-theory/error-correction (GF(256), poly 0x11D).
  *
  * V1 scope: axis-aligned, cleanly captured codes (screenshots). Skewed or
@@ -35,8 +35,8 @@ const BLOCK = 8;          // block-stat window side
 const LOW_CONTRAST = 24;  // value range below which a block is "flat"
 
 /**
- * Converts RGBA pixel data to a binary bitmap via LOCAL ADAPTIVE
- * thresholding (block-stat and neighborhood-mean approach).
+ * Converts RGBA pixel data to a binary bitmap via local adaptive
+ * thresholding:
  *
  * 1. luma per pixel
  * 2. BLOCK x BLOCK block statistics {mean, min, max}
@@ -51,10 +51,10 @@ const LOW_CONTRAST = 24;  // value range below which a block is "flat"
  * @returns {[{bw: Uint8Array, width: number, height: number}|null, Error|null]}
  */
 export function binarize(imageData) {
-    const { data, width, height } = imageData;
-    if (!data || !width || !height) {
+    if (!imageData || typeof imageData !== 'object' || !imageData.data || !imageData.width || !imageData.height) {
         return [null, new Error('qr: imageData must contain data, width and height')];
     }
+    const { data, width, height } = imageData;
     const nPix = width * height;
     const lum = new Uint8Array(nPix);
     for (let i = 0, p2 = 0; p2 < nPix; i += 4, p2++) {
@@ -111,21 +111,24 @@ export function binarize(imageData) {
     }
 
     // PASS 2 - threshold = mean of the 5x5 black-point neighborhood
-    // (indices clamped at borders), applied PER PIXEL: lum <= threshold.
+    // (clamped at borders), applied PER PIXEL: lum <= threshold.
     const NB = 2;
-    const area = (NB * 2 + 1) * (NB * 2 + 1);
     const bw = new Uint8Array(nPix);
     for (let by = 0; by < bh; by++) {
-        const cy = Math.min(Math.max(by, NB), bh - NB - 1);
-        const y0 = cy - NB, y1 = cy + NB;
+        const y0 = Math.max(0, by - NB);
+        const y1 = Math.min(bh - 1, by + NB);
         for (let bx = 0; bx < bw_; bx++) {
-            const cx = Math.min(Math.max(bx, NB), bw_ - NB - 1);
-            const x0 = cx - NB, x1 = cx + NB;
+            const x0 = Math.max(0, bx - NB);
+            const x1 = Math.min(bw_ - 1, bx + NB);
             let nSum = 0;
+            let count = 0;
             for (let yy = y0; yy <= y1; yy++) {
-                for (let xx = x0; xx <= x1; xx++) nSum += bp[yy * bw_ + xx];
+                for (let xx = x0; xx <= x1; xx++) {
+                    nSum += bp[yy * bw_ + xx];
+                    count++;
+                }
             }
-            const cut = nSum / area;
+            const cut = count ? nSum / count : 0;
 
             const py0 = by * BLOCK, px0 = bx * BLOCK;
             const py1 = Math.min(py0 + BLOCK, height), px1 = Math.min(px0 + BLOCK, width);
@@ -141,12 +144,11 @@ export function binarize(imageData) {
 
 /* ------------------------------------------------------- finder location */
 
-/* Row scanLine via the shared pattern machinery, per-candidate cross-checks
+/* Row scanLine via the pattern matching machinery, per-candidate cross-checks
  * (vertical -> horizontal -> diagonal) with coarse totals-consistency, weighted
- * cluster merging, then generic best-right-triangle selection over confirmed
- * candidates. No domain constraints - rotation/skew safe by construction. */
+ * cluster merging, then best-right-triangle selection over confirmed candidates. */
 const RUN_VARIANCE = 2;              // straight-line tolerance divisor
-const RUN_VARIANCE_DIAGONAL = 1.333; // diagonal scans tolerance
+const RUN_VARIANCE_DIAGONAL = 1.333; // diagonal scan tolerance divisor (~75%)
 const PATTERN_MIN_CONFIRMATIONS = 2; // cluster quorum
 
 const FINDER = makePattern([true, false, true, false, true], [1, 1, 3, 1, 1]);
@@ -177,9 +179,12 @@ function patternsConfirmed(lst) {
 /**
  * Reference findFinder(): returns the three finder corners or null.
  * @param {{bw: Uint8Array, width: number, height: number}} img
- * @returns {{tl: {x:number,y:number,module:number}, tr: {x:number,y:number,module:number}, bl: {x:number,y:number,module:number}}|null}
+ * @returns {[{tl: {x:number,y:number,module:number}, tr: {x:number,y:number,module:number}, bl: {x:number,y:number,module:number}}|null, Error|null]}
  */
-function findFindersRef(img) {
+export function findFindersRef(img) {
+    if (!img || !img.bw || typeof img.width !== 'number' || typeof img.height !== 'number') {
+        return [null, new Error('qr: invalid binary image for finder search')];
+    }
     const found = [];
     const sumR = (runs) => runs.reduce((a, b) => a + b, 0);
 
@@ -233,45 +238,26 @@ function findFindersRef(img) {
 
     let skipped = false;
     let ySkip = Math.max(Math.trunc((3 * img.height) / (4 * 97)), DETECT_MIN_ROW_SKIP);
-    let done = false;
-    for (let y = ySkip - 1; y < img.height && !done; y += ySkip) {
+    for (let y = ySkip - 1; y < img.height; y += ySkip) {
         FINDER.scanLine(img, y, 0, img.width, (runs, x) => {
             if (!checkCandidate(runs, y, x)) return;
             // Found a pattern: densify rows, then early-exit heuristics
             ySkip = 2;
-            if (skipped) {
-                // Third-pattern consistency check over confirmed clusters
-                let count = 0;
-                let mtotal = 0;
-                for (const pc of found) {
-                    if (pc.count < PATTERN_MIN_CONFIRMATIONS) continue;
-                    count++;
-                    mtotal += pc.module;
-                }
-                if (count < 3) return;
-                const average = mtotal / found.length;
-                let deviation = 0.0;
-                for (const pc of found) deviation += Math.abs(pc.module - average);
-                if (deviation <= 0.05 * mtotal) {
-                    done = true;
-                    return false; // stop scan
-                }
-            } else if (found.length > 1) {
+            if (!skipped && found.length > 1) {
                 // Two top patterns: jump toward the third's expected row band
                 const q = patternsConfirmed(found);
-                if (q.length < 2) return false; // stop
+                if (q.length < 2) return;
                 skipped = true;
                 const d = Math.trunc((Math.abs(q[0].x - q[1].x) - Math.abs(q[0].y - q[1].y)) / 2);
-                if (d <= runs[2] + ySkip) return false; // stop
+                if (d <= runs[2] + ySkip) return;
                 y += d - runs[2] - ySkip;
                 return false; // restart scan from jumped position
             }
             return; // slide window
         });
-        if (done) break;
     }
     const flen = found.length;
-    if (flen < 3) return null;
+    if (flen < 3) return [null, new Error('qr: fewer than 3 finder patterns found')];
 
     found.sort((a, b) => a.module - b.module);
     const dist2 = (p, q) => (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
@@ -293,7 +279,7 @@ function findFindersRef(img) {
             }
         }
     }
-    if (!best) return null;
+    if (!best) return [null, new Error('qr: no valid finder right triangle found')];
 
     // Orientation: longest side is the hypotenuse; right-angle vertex is TL.
     const [p0, p1, p2] = best;
@@ -307,17 +293,8 @@ function findFindersRef(img) {
     if ((tr.x - tl.x) * (bl.y - tl.y) - (tr.y - tl.y) * (bl.x - tl.x) < 0.0) {
         const t = bl; bl = tr; tr = t;
     }
-    return { tl, tr, bl };
+    return [{ tl, tr, bl }, null];
 }
-
-
-
-
-
-
-
-
-
 
 function bwAt(img, x, y) {
     return img.bw[y * img.width + x] >= 0.5 ? 1 : 0;
@@ -332,30 +309,20 @@ function bwAt(img, x, y) {
  * @returns {[{bytes: Uint8Array, size: number, version: number}|null, Error|null]}
  */
 export function decodeQR(imageData) {
-    if (!imageData || typeof imageData !== 'object') {
-        return [null, new Error('qr: imageData must be an object with data, width, height')];
+    if (!imageData || typeof imageData !== 'object' || !imageData.data || !imageData.width || !imageData.height) {
+        return [null, new Error('qr: imageData must contain data, width and height')];
     }
     const [img0, binErr] = binarize(imageData);
     if (binErr) return [null, binErr];
 
-    // Finder detection across BOTH polarities with ranked hypotheses.
-    // Every finder triangle is a HYPOTHESIS verified by fully decoding:
-    // false positives lose to real finders on RS evidence, not heuristics.
-    // Inverted captures are handled by flipping the bitmap ONCE so all
-    // downstream stages (template refine, extent re-center, sampling) see
-    // standard dark-on-light geometry.
     let lastErr = null;
-    const pushErr = (e) => { if (e && !lastErr) lastErr = e instanceof Error ? e : new Error(String(e)); };
     for (const bitmap of [img0, negateBitmap(img0)]) {
-        {
-            const corners = findFindersRef(bitmap);
-            if (!corners) continue;
-            const tl = corners.tl;
-            const tr = corners.tr;
-            const bl = corners.bl;
-            const res = decodeGeometry(bitmap, { tl, tr, bl }, pushErr);
-            if (res) return [res, null];
-        }
+        const [corners, errF] = findFindersRef(bitmap);
+        if (errF && !lastErr) lastErr = errF;
+        if (!corners) continue;
+        const [res, err] = decodeGeometry(bitmap, corners);
+        if (res) return [res, null];
+        if (err && !lastErr) lastErr = err;
     }
     return [null, lastErr || new Error('qr: no decodable finder configuration found')];
 }
@@ -365,15 +332,18 @@ export function decodeQR(imageData) {
  * pipeline with externally supplied finder corners.
  */
 export function decodeWithCorners(imageData, corners) {
-    const errs = [];
-    const pushErr = (e) => { if (e && errs.length === 0) errs.push(e instanceof Error ? e : new Error(String(e))); };
+    if (!imageData || !corners || !corners.tl || !corners.tr || !corners.bl) {
+        return [null, new Error('qr: missing imageData or corners')];
+    }
     const [img0, binErr] = binarize(imageData);
     if (binErr) return [null, binErr];
+    let lastErr = null;
     for (const bitmap of [img0, negateBitmap(img0)]) {
-        const out = decodeGeometry(bitmap, corners, pushErr);
+        const [out, err] = decodeGeometry(bitmap, corners);
         if (out) return [out, null];
+        if (err && !lastErr) lastErr = err;
     }
-    return [null, errs[0] || new Error('qr: geometry failed')];
+    return [null, lastErr || new Error('qr: geometry failed')];
 }
 
     
@@ -408,9 +378,8 @@ function makePattern(p, size) {
         },
         /**
          * Walks negative then positive from center, filling runs.
-         * @returns {number} step count usable as toCenter's end coordinate
+         * @returns {number|false} step count usable as toCenter's end coordinate
          */
-        /** @returns {number|false} step count for toCenter, or false on failure */
         check(img, runs, cx, cy, incrX, incrY, maxCount) {
             let j = 0;
             let x = cx, y = cy;
@@ -439,12 +408,9 @@ function makePattern(p, size) {
             const patternBit = (x) => (img.bw[y * img.width + x] ? 1 : 0);
             let pos = 0;
             let x = xStart;
-            // Skip the first partial run when starting mid-image: its full
-            // width is unknowable from the left edge of the window.
-            if (xStart > 0 && xStart < xEnd) {
-                const want = p[0] ? 1 : 0;
-                while (x < xEnd && patternBit(x) === want) x++;
-            }
+            const want0 = p[0] ? 1 : 0;
+            while (x < xEnd && patternBit(x) !== want0) x++;
+
             for (; x < xEnd; x++) {
                 const cur = patternBit(x);
                 if (cur === (p[pos] ? 1 : 0)) {
@@ -453,10 +419,11 @@ function makePattern(p, size) {
                     while (x < xEnd && patternBit(x) === cur) x++;
                     runs[pos] += x - start;
                     x--;
+                } else if (pos === 0) {
+                    continue;
                 }
                 if (pos !== p.length - 1) {
                     pos++;
-                    runs[pos]++;
                     continue;
                 }
                 // Window complete: fn decides match(true)/stop(false)/slide
@@ -471,7 +438,6 @@ function makePattern(p, size) {
                 // the new leading context (reference shift semantics).
                 shift(runs, 2);
                 pos = p.length - 2;
-                runs[pos]++;
             }
         }
     };
@@ -486,9 +452,14 @@ const ALIGNMENT = makePattern([false, true, false], [1, 1, 1]);
  * middle-out, each candidate cross-checked vertically (arms bounded at
  * 2x inner width) with the coarse totals-consistency test.
  *
- * @returns {{x: number, y: number, moduleSize: number}|null}
+ * @param {{bw: Uint8Array, width: number, height: number}} img
+ * @param {{x: number, y: number, moduleSize: number}} est
+ * @returns {[{x: number, y: number, moduleSize: number}|null, Error|null]}
  */
-function findAlignment(img, est) {
+export function findAlignment(img, est) {
+    if (!img || !img.bw || !est || typeof est.x !== 'number' || typeof est.y !== 'number' || typeof est.moduleSize !== 'number') {
+        return [null, new Error('qr: invalid alignment estimation parameters')];
+    }
     const { moduleSize } = est;
     for (let allowanceFactor = 4; allowanceFactor <= 16; allowanceFactor *= 2) {
         const allowance = Math.trunc(allowanceFactor * moduleSize);
@@ -521,10 +492,10 @@ function findAlignment(img, est) {
                 result = { x: xx, y: yy, moduleSize: total / ALIGNMENT.totalSize };
                 return false; // stop scanning this row
             });
-            if (result) return result;
+            if (result) return [result, null];
         }
     }
-    return null;
+    return [null, new Error('qr: alignment pattern not found')];
 }
 
 /**
@@ -533,7 +504,16 @@ function findAlignment(img, est) {
  * adjugate (decode.ts transform()). from = [tl,tr,br,bl] image points,
  * to = corresponding module-center coordinates.
  */
-function makeHomography(from, to) {
+export function makeHomography(from, to) {
+    if (!Array.isArray(from) || from.length !== 4 || !Array.isArray(to) || to.length !== 4) {
+        return null;
+    }
+    for (let i = 0; i < 4; i++) {
+        if (!from[i] || typeof from[i].x !== 'number' || typeof from[i].y !== 'number' ||
+            !to[i] || typeof to[i].x !== 'number' || typeof to[i].y !== 'number') {
+            return null;
+        }
+    }
     const sq = (p) => {
         const d3x = p[0].x - p[1].x + p[2].x - p[3].x;
         const d3y = p[0].y - p[1].y + p[2].y - p[3].y;
@@ -547,6 +527,13 @@ function makeHomography(from, to) {
         const d1x = p[1].x - p[2].x, d1y = p[1].y - p[2].y;
         const d2x = p[3].x - p[2].x, d2y = p[3].y - p[2].y;
         const den = d1x * d2y - d2x * d1y;
+        if (den === 0) {
+            return [
+                [1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1]
+            ];
+        }
         const p13 = (d3x * d2y - d2x * d3y) / den;
         const p23 = (d1x * d3y - d3x * d1y) / den;
         return [
@@ -585,31 +572,29 @@ function makeHomography(from, to) {
 
 /**
  * Decodes using one finder-corner hypothesis.
-     * @returns {{bytes: Uint8Array, size: number, version: number}|null}
-     */
-    function decodeGeometry(img, corners, pushErr) {
-        const tl = corners.tl;
-        const tr = corners.tr;
-        const bl = corners.bl;
-        const brAnchor = corners.br || null;
+ * @returns {[{bytes: Uint8Array, size: number, version: number}|null, Error|null]}
+ */
+export function decodeGeometry(img, corners) {
+    if (!img || !img.bw || !corners || !corners.tl || !corners.tr || !corners.bl) {
+        return [null, new Error('qr: invalid geometry arguments')];
+    }
+    const tl = corners.tl;
+    const tr = corners.tr;
+    const bl = corners.bl;
+    const brAnchor = corners.br || null;
 
-        // Cluster-averaged module size; ray-based BWBRunLength refinement
-        // is available but produces unstable results on small-module images
-        // (see corpus data). TODO: investigate.
-        const moduleSize = (tl.module + tr.module + bl.module) / 3;
-        if (Number.isNaN(moduleSize) || moduleSize < 1.0) {
-            pushErr(new Error('qr: invalid module size'));
-            return null;
-        }
+    // Cluster-averaged module size
+    const moduleSize = (tl.module + tr.module + bl.module) / 3;
+    if (Number.isNaN(moduleSize) || moduleSize < 1.0) {
+        return [null, new Error('qr: invalid module size')];
+    }
 
     const spanX = Math.abs(tr.x - tl.x);
     const spanY = Math.abs(bl.y - tl.y);
     const nFromX = Math.round(spanX / moduleSize) + 7;
     const nFromY = Math.round(spanY / moduleSize) + 7;
 
-    // Size is a HYPOTHESIS, not a point estimate: corner imprecision makes
-    // single-axis spans disagree, so try every plausible version (nearest
-    // estimates first) through the full verify pipeline.
+    // Size is a HYPOTHESIS, not a point estimate
     const est = Math.min(Math.max(Math.round((nFromX + nFromY) / 2), 21), 17 + MAX_VERSION * 4);
     const vEst = Math.round((est - 17) / 4);
     const candidateSizes = [];
@@ -623,11 +608,6 @@ function makeHomography(from, to) {
     }
 
     // Basis-vector grid: derive per-module steps from the finder centers.
-    // Finder centers sit at module coordinate (3,3) and (size-4,size-4);
-    // separation = size-7 modules. Module (r,c) center =
-    //   tl + (c-3)*exVec + (r-3)*eyVec
-    // NOTE: offset is 3, NOT 3.5 - oracle Pattern coordinates are the
-    // center of the middle dark band (module 3's center).
     const buildGridFor = (size) => (ddx, ddy) => {
         const grid = new Uint8Array(size * size);
         const span = size - 7;
@@ -640,8 +620,6 @@ function makeHomography(from, to) {
                 // Module center in pixel space
                 const px = ox + c * exX + r * eyX;
                 const py = oy + c * exY + r * eyY;
-                // Area-majority over the inner portion of the module; window
-                // scales with module size but never bleeds past its edge.
                 const step = Math.min(Math.abs(exX), Math.abs(exY), Math.abs(eyX), Math.abs(eyY));
                 const w = Math.max(0, Math.floor(step / 4));
                 let dark = 0, tot = 0;
@@ -658,9 +636,7 @@ function makeHomography(from, to) {
         return grid;
     };
 
-    // Homography grid through a 4th BR anchor - either the LOCATED
-    // alignment pattern (v7+) or the parallelogram estimate tr-tl+bl
-    // (reference detect(): both feed the same transform()).
+    // Homography grid through a 4th BR anchor
     const buildGridHomography = (size, br, toBR) => (ddx, ddy) => {
         const grid = new Uint8Array(size * size);
         const from = [
@@ -676,6 +652,7 @@ function makeHomography(from, to) {
             { x: 3.5, y: size - 3.5 }
         ];
         const M = makeHomography(from, to);
+        if (!M) return grid;
         for (let r = 0; r < size; r++) {
             for (let c = 0; c < size; c++) {
                 const gx = c + 0.5, gy = r + 0.5;
@@ -688,26 +665,19 @@ function makeHomography(from, to) {
         return grid;
     };
 
-    let lastErr = null;
-
     /**
      * Completes decoding for one sampled grid: format parse -> mask
      * inversion -> zigzag extraction -> RS correction -> segment parse.
-     * Returns the payload or null (reason captured in lastErr). Used by the
-     * origin sweep below so an offset whose sloppy format lands within the
-     * Hamming tolerance cannot masquerade as a decode - RS verifies it.
+     *
+     * @returns {[{bytes: Uint8Array, size: number, version: number}|null, Error|null]}
      */
-    const tryFinish = (matrix, size, version, buildGrid) => {
-        void buildGrid;
+    const tryFinish = (matrix, size, version) => {
         const [fmtInfo, fmtErr] = readFormatInfo(matrix, size);
         if (!fmtInfo) {
-            if (!lastErr) lastErr = /** @type {Error} */ (fmtErr);
-            return null;
+            return [null, fmtErr || new Error('qr: invalid format information')];
         }
 
         const reserved = buildReservedMap(size, version);
-
-        // ECL-aware block structure: real vendor codes are not always EC-M.
         const vd = { ec: parityFor(fmtInfo.eclBits, version), blocks: blocksFor(fmtInfo.eclBits, version) };
         const total = totalCodewords(version);
 
@@ -734,69 +704,62 @@ function makeHomography(from, to) {
             upward = !upward;
         }
 
-        // RS correction: single-block or multi-block interleaved
+        // RS correction: single-block or multi-block interleaved (pure tuple error propagation)
         let dcw;
         const dataLens = [];
         for (const b of vd.blocks) for (let k = 0; k < b.count; k++) dataLens.push(b.data);
-        try {
-            if (dataLens.length === 1) {
-                const received = Int32Array.from(codewords);
-                QR_RS_DECODER.decode(received, vd.ec);
-                dcw = Uint8Array.from(received.subarray(0, total - vd.ec));
-            } else {
-                const nBlk = dataLens.length;
-                const maxD = Math.max(...dataLens);
-                const blocksRx = dataLens.map(() => new Int32Array(maxD + vd.ec));
-                let idx = 0;
-                for (let r2 = 0; r2 < maxD; r2++) for (let b2 = 0; b2 < nBlk; b2++) {
-                    if (r2 < dataLens[b2]) blocksRx[b2][r2] = codewords[idx++];
-                }
-                for (let j = 0; j < vd.ec; j++) for (let b2 = 0; b2 < nBlk; b2++) blocksRx[b2][maxD + j] = codewords[idx++];
-                dcw = new Uint8Array(dataLens.reduce((a, l) => a + l, 0));
-                let off = 0;
-                for (let b2 = 0; b2 < nBlk; b2++) {
-                    QR_RS_DECODER.decode(blocksRx[b2], vd.ec);
-                    for (let k = 0; k < dataLens[b2]; k++) dcw[off++] = blocksRx[b2][k];
-                }
+        if (dataLens.length === 1) {
+            const received = Int32Array.from(codewords);
+            const [, decErr] = QR_RS_DECODER.decodeTuple(received, vd.ec);
+            if (decErr) {
+                const msg = 'qr-rs: ' + String(decErr.message || decErr).replace(/ReedSolomonException\("|"\)/g, '');
+                return [null, new Error(msg)];
             }
-        } catch (e) {
-            const msg = 'qr-rs: ' + String(e.message || e).replace(/ReedSolomonException\("|"\)/g, '');
-            if (!lastErr || /locator|roots/.test(String(lastErr.message))) lastErr = new Error(msg);
-            return null;
+            dcw = Uint8Array.from(received.subarray(0, total - vd.ec));
+        } else {
+            const nBlk = dataLens.length;
+            const maxD = Math.max(...dataLens);
+            const blocksRx = dataLens.map((dLen) => new Int32Array(dLen + vd.ec));
+            let idx = 0;
+            for (let r2 = 0; r2 < maxD; r2++) for (let b2 = 0; b2 < nBlk; b2++) {
+                if (r2 < dataLens[b2]) blocksRx[b2][r2] = codewords[idx++];
+            }
+            for (let j = 0; j < vd.ec; j++) for (let b2 = 0; b2 < nBlk; b2++) {
+                blocksRx[b2][dataLens[b2] + j] = codewords[idx++];
+            }
+            dcw = new Uint8Array(dataLens.reduce((a, l) => a + l, 0));
+            let off = 0;
+            for (let b2 = 0; b2 < nBlk; b2++) {
+                const [, decErr] = QR_RS_DECODER.decodeTuple(blocksRx[b2], vd.ec);
+                if (decErr) {
+                    const msg = 'qr-rs: ' + String(decErr.message || decErr).replace(/ReedSolomonException\("|"\)/g, '');
+                    return [null, new Error(msg)];
+                }
+                for (let k = 0; k < dataLens[b2]; k++) dcw[off++] = blocksRx[b2][k];
+            }
         }
 
-        // Parse byte-mode payload from the segment bitstream:
-        // 4-bit mode indicator, then 8-bit (v1-9) or 16-bit (v10+) count.
+        // Parse byte-mode payload from the segment bitstream
         const getBit = (i) => (dcw[i >> 3] >> (7 - (i & 7))) & 1;
         let pos = 0;
         const rdBits = (n) => { let v = 0; for (let k = 0; k < n; k++) v = (v << 1) | getBit(pos++); return v; };
 
         const mode = rdBits(4);
         if (mode !== 4) {
-            if (!lastErr || !String(lastErr.message).includes('format')) {
-                lastErr = new Error('qr: unsupported encoding mode ' + mode + ' (only byte mode)');
-            }
-            return null;
+            return [null, new Error('qr: unsupported encoding mode ' + mode + ' (only byte mode)')];
         }
         const len = rdBits(version <= 9 ? 8 : 16);
         if (pos + len * 8 > dcw.length * 8) {
-            lastErr = new Error('qr: truncated payload');
-            return null;
+            return [null, new Error('qr: truncated payload')];
         }
         const outBytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) outBytes[i] = rdBits(8);
-        return { bytes: outBytes, size, version };
+        return [{ bytes: outBytes, size, version }, null];
     };
 
-    // Size hypotheses x sampler: each sampled grid is FULLY verified
-    // (format + RS + segment parse). Sampler preference mirrors reference
-    // detect(): located alignment anchor (v7+) > supplied BR anchor >
-    // parallelogram homography > affine basis grid.
+    let lastErr = null;
     for (const size of candidateSizes) {
         const version = (size - 17) / 4;
-        // Parallelogram homography FIRST (handles rotation/perspective for
-        // ALL versions); alignment refinement when available; affine basis
-        // grid as last resort.
         const builders = [];
         builders.push(buildGridHomography(size, { x: tr.x - tl.x + bl.x, y: tr.y - tl.y + bl.y }, { x: size - 3.5, y: size - 3.5 }));
         if (version >= 7 && alignmentCenters(version).length) {
@@ -805,42 +768,47 @@ function makeHomography(from, to) {
                 y: tl.y + (1 - 3 / (size - 7)) * (tr.y - tl.y + bl.y - tl.y),
                 moduleSize
             };
-            const aln = findAlignment(img, est);
+            const [aln] = findAlignment(img, est);
             if (aln) {
                 builders.push(buildGridHomography(size, aln, { x: size - 6.5, y: size - 6.5 }));
             }
         }
-        if (!builders.length && brAnchor) {
+        if (brAnchor) {
             builders.push(buildGridHomography(size, brAnchor, { x: size - 3.5, y: size - 3.5 }));
         }
-        builders.push(buildGridHomography(size, { x: tr.x - tl.x + bl.x, y: tr.y - tl.y + bl.y }, { x: size - 3.5, y: size - 3.5 }));
         builders.push(buildGridFor(size));
         for (const buildGrid of builders) {
             for (const ddy of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) {
                 for (const ddx of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) {
-                    const result = tryFinish(buildGrid(ddx, ddy), size, version, buildGrid);
-                    if (result) return result;
+                    const [result, err] = tryFinish(buildGrid(ddx, ddy), size, version);
+                    if (result) return [result, null];
+                    if (err && !lastErr) lastErr = err;
                 }
             }
         }
     }
-    pushErr(lastErr || new Error('qr: unable to sample a decodable grid'));
-    return null;
+    return [null, lastErr || new Error('qr: unable to sample a decodable grid')];
 }
 
-
-
 /** Inverts a binary bitmap (polarity flip for dark-theme captures). */
-function negateBitmap(img) {
+export function negateBitmap(img) {
+    if (!img || !img.bw || typeof img.width !== 'number' || typeof img.height !== 'number') {
+        return { bw: new Uint8Array(0), width: 0, height: 0 };
+    }
     return { bw: Uint8Array.from(img.bw, (v) => (v ? 0 : 1)), width: img.width, height: img.height };
 }
 
 /**
  * @param {Uint8Array} matrix
+ * @param {Uint8Array} reserved
  * @param {number} size
+ * @param {number} maskId
  * @returns {void}
  */
-function applyMaskInverse(matrix, reserved, size, maskId) {
+export function applyMaskInverse(matrix, reserved, size, maskId) {
+    if (!matrix || !reserved || typeof size !== 'number' || typeof maskId !== 'number' || maskId < 0 || maskId > 7) {
+        return;
+    }
     for (let row = 0; row < size; row++) {
         for (let col = 0; col < size; col++) {
             if (reserved[row * size + col]) continue;
@@ -890,12 +858,12 @@ function popcnt(x) {
  * @param {number} size
  * @returns {[{eclBits: number, maskId: number}|null, Error|null]} Tuple of [format, error]
  */
-function readFormatInfo(matrix, size) {
+export function readFormatInfo(matrix, size) {
+    if (!matrix || typeof size !== 'number' || size < 21) {
+        return [null, new Error('qr: invalid matrix for format information')];
+    }
     // Spec bit order (ISO/IEC 18004 §7.9). Copy A wraps the top-left
     // finder: (8,0)..(8,5),(8,7),(8,8),(7,8),(5,8)..(0,8), MSB first.
-    // NOTE: our ENCODER writes a transposed variant; these readers follow
-    // the spec so external captures decode. Roundtrip tests use the
-    // encoder's own convention via its writer, not this reader.
     const readCopyA = () => {
         let fmt = 0;
         const put = (row, col) => { fmt = (fmt << 1) | matrix[row * size + col]; };
@@ -941,7 +909,10 @@ function readFormatInfo(matrix, size) {
     return [null, new Error('qr: format information failed BCH validation in both copies')];
 }
 
-function buildReservedMap(size, version) {
+export function buildReservedMap(size, version) {
+    if (typeof size !== 'number' || typeof version !== 'number' || version < 1 || version > MAX_VERSION) {
+        return new Uint8Array(0);
+    }
     const res = new Uint8Array(size * size);
     const mark = (r, c) => { res[r * size + c] = 1; };
 
@@ -1003,4 +974,5 @@ function buildReservedMap(size, version) {
 
     return res;
 }
+
 

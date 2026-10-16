@@ -74,7 +74,7 @@ describe('QR capacity: all four EC levels', () => {
         for (let ecl = 0; ecl <= 3; ecl++) {
             for (let v = 1; v <= 15; v++) {
                 const blocks = blocksFor(ecl, v);
-                if (!blocks || !blocks.length) throw new Error(`ecl${ecl} v${v}: missing blocks`);
+                expect(Array.isArray(blocks) && blocks.length > 0).toBe(true);
             }
         }
     });
@@ -85,9 +85,7 @@ describe('QR capacity: all four EC levels', () => {
                 const blocks = blocksFor(ecl, v);
                 const nB = blocks.reduce((a, b) => a + b.count, 0);
                 const dCw = blocks.reduce((a, b) => a + b.count * b.data, 0);
-                if (dCw + nB * parityFor(ecl, v) !== totalCodewords(v)) {
-                    throw new Error(`ecl${ecl} v${v}: derived total mismatch`);
-                }
+                expect(dCw + nB * parityFor(ecl, v)).toBe(totalCodewords(v));
             }
         }
     });
@@ -95,14 +93,14 @@ describe('QR capacity: all four EC levels', () => {
     it('spot-checks golden non-M structures', () => {
         // ISO tables: L v10 = 2x(68+18)+2x(69+18); H v6 = 4x(15+28);
         // Q v13 = 8x(20+24)+4x(21+24)
-        expect(JSON.stringify(blocksFor(EC_LEVEL_BITS.L, 10)))
-            .toEqual(JSON.stringify([{ count: 2, data: 68 }, { count: 2, data: 69 }]));
+        expect(blocksFor(EC_LEVEL_BITS.L, 10))
+            .toEqual([{ count: 2, data: 68 }, { count: 2, data: 69 }]);
         expect(parityFor(EC_LEVEL_BITS.L, 10)).toEqual(18);
-        expect(JSON.stringify(blocksFor(EC_LEVEL_BITS.H, 6)))
-            .toEqual(JSON.stringify([{ count: 4, data: 15 }]));
+        expect(blocksFor(EC_LEVEL_BITS.H, 6))
+            .toEqual([{ count: 4, data: 15 }]);
         expect(parityFor(EC_LEVEL_BITS.H, 6)).toEqual(28);
-        expect(JSON.stringify(blocksFor(EC_LEVEL_BITS.Q, 13)))
-            .toEqual(JSON.stringify([{ count: 8, data: 20 }, { count: 4, data: 21 }]));
+        expect(blocksFor(EC_LEVEL_BITS.Q, 13))
+            .toEqual([{ count: 8, data: 20 }, { count: 4, data: 21 }]);
         expect(parityFor(EC_LEVEL_BITS.Q, 13)).toEqual(24);
     });
 });
@@ -112,7 +110,7 @@ describe('QR decode: independent golden vectors across EC levels', () => {
         it(`decodes ${vec.text.slice(15, 16)} (${vec.rows.length}x${vec.rows.length})`, () => {
             const [result, err] = decodeQR(synthRows(vec.rows));
             expect(err).toEqual(null);
-            if (!result) throw new Error('no result');
+            expect(result).not.toBe(null);
             expect(new TextDecoder().decode(result.bytes)).toBe(vec.text);
         });
     }
@@ -168,9 +166,6 @@ describe('QR decode: format information tolerance', () => {
             for (const [r, c] of cells) m.modules[r * m.size + c] = 1;
         }
         const [, err] = decodeQR(synthesize(m));
-        if (!(err instanceof Error)) throw new Error('destroyed format accepted');
-        // Destroyed strips may trip the Hamming fallback into a wrong-mask
-        // read that RS then rejects - either way decoding must FAIL.
-        void err.message;
+        expect(err).toBeInstanceOf(Error);
     });
 });

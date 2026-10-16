@@ -32,7 +32,7 @@ if (typeof document !== 'undefined') {
                     };
                     return capturedInput;
                 }
-                return originalCreate(tag);
+                return originalCreate.call(document, tag);
             };
             document.getElementById = (id) => ({ style: {}, addEventListener: () => {}, textContent: '' , innerHTML: ''});
 

@@ -27,10 +27,12 @@
         <directory name="automata">
             <directory name="bit-streams">
                 <file name="bit-core.test.js" description="Core bitwise operations and byte-stuffing handling." />
+                <file name="bit-writer.test.js" description="Bitstream packing, dynamic buffer growth, 0xFF byte stuffing, and BitReader roundtrip PBT." />
             </directory>
             <directory name="entropy-coding">
                 <file name="huffman-decoder-fsm.test.js" description="Huffman decoder FSM: DC differential and AC run-length decoding." />
                 <file name="huffman-encoder-fsm.test.js" description="Huffman encoder FSM." />
+                <file name="huffman-optimized-fsm.test.js" description="Optimized 16-bit lookup table Huffman decoder differential and PBT tests." />
             </directory>
             <directory name="parsers">
                 <file name="dht-automaton.test.js" description="DHT segment parsing." />
@@ -45,6 +47,7 @@
                 <file name="defensive.test.js" description="Defensive parsing for corrupted or malicious JPEG streams." />
                 <file name="idct-switching.test.js" description="IDCT implementation switching." />
                 <file name="rst-markers.test.js" description="Restart (RST) marker handling in the bitstream." />
+                <file name="spiff-parsing.test.js" description="SPIFF marker segment parsing." />
             </directory>
             <directory name="encoder">
                 <file name="coefficients.test.js" description="Encoding from raw DCT coefficients." />
@@ -57,33 +60,44 @@
             </directory>
             <directory name="steganography">
                 <file name="batch-process.test.js" description="Batch embedding across multiple images." />
-                <file name="format-v2.test.js" description="Container format v3 tests: version rejection, KDF parameters." />
-                <file name="result-contracts.test.js" description="Result-tuple contract enforcement." />
             </directory>
             <file name="capacity-scanner.test.js" description="CapacityScanner unit tests." />
             <file name="capacity-scanner.pbt.js" description="CapacityScanner property-based tests." />
             <file name="decoder.test.js" description="Main decoder integration tests." />
             <file name="encoder.test.js" description="JpegEncoder integration tests." />
             <file name="transcoder.test.js" description="Lossless coefficient roundtrip validation." />
-            <file name="qr-encoder.test.js" description="QR encoder structural tests: dimensions, finder patterns, timing patterns, determinism." />
-            <file name="qr-decoder.test.js" description="QR decoder: byte-exact encode/render/decode roundtrips across versions and scales, seeded PBT, luminance jitter tolerance, scattered-damage EC-M correction, format destruction fail-closed, hostile-input tuple safety." />
         </directory>
         <directory name="conformance">
-            <file name="golden-vectors.json" description="Bit-exact golden vectors for wire format layers 0-3." />
-            <file name="wire-format-conformance.test.js" description="Bit-exact conformance tests for CRC32, PRNG, permutation, ECC, F5 embedding, container layout v3." />
-            <file name="wire-format.pbt.js" description="Property-based fuzzing of wire format layers 1-3 and 5." />
+            <file name="golden-vectors.json" description="Bit-exact golden vectors for cryptographic and matrix parameters." />
+            <file name="wire-format-conformance.test.js" description="Format v4 wire format conformance: IEEE CRC-32 standard check values, Argon2id + HKDF key derivation chain, STC submatrix determinism, STC dual trellis recovery, opaque bucket framing." />
+            <file name="wire-format.pbt.js" description="Property-based fuzzing of Format v4 wire format: bit-to-byte bijection, opaque bucket packing/unpacking, and STC embedding/extraction fidelity." />
         </directory>
         <directory name="fuzz">
+            <file name="bitstreams-fuzz.mjs" description="Differential bitstream reader fuzzing harness." />
             <file name="cli-fuzz.mjs" description="CLI argument parsing and typed error tuple fuzzing." />
             <file name="cli-fuzz.test.js" description="CLI fuzz smoke test wrapper." />
             <file name="codec-mr.mjs" description="Codec metamorphic MRs: dimension preservation, encode determinism, quality monotonicity, pixel fidelity, stego survival." />
             <file name="codec-mr.test.js" description="Codec MR smoke test wrapper." />
             <file name="crypto-fuzz.mjs" description="Cryptography fuzzing: SHA-256 KATs, AES-GCM structure, PBKDF2 bounds, HMAC tamper properties." />
-            <file name="crypto-fuzz.test.js" description="Crypto fuzz smoke test wrapper." />
+            <file name="crypto-fuzz.test.js" description="Cryptography fuzz smoke test wrapper." />
+            <file name="csv-fuzz.mjs" description="Hostile CSV parser fuzzing and vendor profile mapping conservation." />
+            <file name="csv-fuzz.test.js" description="CSV fuzz smoke test wrapper." />
+            <file name="ecc-fuzz.mjs" description="Reed-Solomon and Cauchy error correction fuzzing harness." />
+            <file name="juniward-mr.mjs" description="J-UNIWARD spatial wavelet sensitivity, cost monotonicity, and anti-SCA bounds." />
+            <file name="juniward-mr.test.js" description="J-UNIWARD MR smoke test wrapper." />
+            <file name="kdf-fuzz.test.js" description="KDF and rotation boundary testing (null byte, Unicode, surrogate pairs, invalid iterations)." />
             <file name="mutation-engine.mjs" description="Structure-aware JPEG mutation engine for parser fuzzing." />
             <file name="parser-fuzz.mjs" description="Parser mutation fuzzing with worker-isolated hang/bomb detection." />
             <file name="parser-fuzz.test.js" description="Parser fuzz smoke test wrapper." />
+            <file name="qr-fuzz.mjs" description="QR encode/decode roundtrip, binarizer robustness, and format fuzzing harness." />
+            <file name="qr-fuzz.test.js" description="QR fuzz smoke test wrapper." />
+            <file name="steganography-mr.mjs" description="Steganography metamorphic relations (determinism, capacity monotonicity, key isolation, manifest tamper)." />
+            <file name="steganography-mr.test.js" description="Steganography MR smoke test wrapper." />
+            <file name="stego-fuzz.mjs" description="Syndrome-Trellis Codes (STC) roundtrip and opaque container framing fuzz harness." />
+            <file name="stego-fuzz.test.js" description="Stego fuzz smoke test wrapper." />
             <file name="suites.mjs" description="Central registry for long-run fuzz driver (scripts/fuzz.mjs)." />
+            <file name="utils-fuzz.mjs" description="Utilities fuzz harness: Base32, Base64/UTF-8, URL safety, escapeHtml, and CRC32." />
+            <file name="utils-fuzz.test.js" description="Utilities fuzz smoke test wrapper." />
             <file name="vault-batch-fuzz.mjs" description="Vault model-based op-sequence fuzzing, DEK zeroization checks, EC carrier-subset MRs." />
             <file name="vault-batch.test.js" description="Vault/batch fuzz smoke test wrapper." />
             <file name="worker-parse.mjs" description="Worker thread entry point for parser fuzz isolation." />
@@ -92,9 +106,9 @@
             <directory name="cryptography">
                 <file name="aes-gcm.test.js" description="AES-GCM encryption/decryption tests." />
                 <file name="hmac.test.js" description="HMAC-SHA256 signing/verification tests." />
+                <file name="kdf-chain.test.js" description="Unified Argon2id + HKDF-Expand key derivation chain tests." />
                 <file name="pbkdf2.test.js" description="PBKDF2 key derivation tests including deriveRawBits." />
-                <file name="totp-gate.test.js" description="PasswordVault Tier B TOTP gate: enable/verify/disable, drift window, export/import persistence, locked-vault refusal." />
-                <file name="totp.test.js" description="RFC 6238 TOTP: Annex B vectors, drift-window verification, otpauth URI roundtrip, codeFromOtpauthUri URI-routed exact vectors, normalizeTotpInput authoring helper." />
+                <file name="pbkdf2-benchmark.test.js" description="Hardware benchmark calibration, strict >= 600,000 iteration floor, and metamorphic MR1/MR2 scaling tests." />
             </directory>
             <directory name="error-correction">
                 <file name="galois-field.test.js" description="GF(256) field arithmetic tests." />
@@ -103,7 +117,10 @@
             </directory>
             <directory name="steganography">
                 <file name="chunk-manager.test.js" description="Data chunking and reassembly tests." />
-                <file name="f5-syndrome.test.js" description="F5 algorithm: matrix encoding, shrinkage handling, container format." />
+                <file name="juniward.test.js" description="J-UNIWARD spatial Daubechies db8 wavelet distortion model and anti-SCA randomization unit tests." />
+                <file name="opaque-container.test.js" description="Format v4 zero-length opaque framing, CSPRNG bucket padding, and unsealWithKeys candidate testing." />
+                <file name="stc-matrix.test.js" description="Syndrome-Trellis Codes (STC) dual-trellis Viterbi encoder and linear extractor unit tests." />
+                <file name="stego-engine.test.js" description="StegoEngine unified Format v4 embedding, extraction, and capacity calculation unit tests." />
             </directory>
         </directory>
         <directory name="integration">
@@ -127,9 +144,22 @@
                 <file name="vault-tierb-flow.test.js" description="Create-vault gate enrollment with explicit weak-access-control disclaimer, QR show-once overlay, unlock enforcement prompts." />
                 <file name="vault-totp-form.test.js" description="Add-entry form carries TOTP field; bare secrets stored normalized; garbage rejected before encryption." />
                 <file name="vault-totp-display.test.js" description="TOTP live display: Base32-correct codes in .totp-slot, countdown ticks with boundary recompute, warn-not-throw on malformed values, single-interval lifecycle." />
+                <file name="vault-ui-redesign.test.js" description="Vault UI redesign integration tests (clean card layout, toasts, password generator/reveal, onboarding wizard, 2FA settings modal)." />
             </directory>
             <file name="roundtrip.test.js" description="Full JPEG encode-decode roundtrip." />
             <file name="steganography-roundtrip.test.js" description="End-to-end steganographic embed-extract roundtrip." />
+        </directory>
+        <directory name="pbt">
+            <file name="algebraic.pbt.js" description="Dedicated algebraic PBT suite: colorspace, DCT, zigzag, and quantization error bounds." />
+            <file name="automata.pbt.js" description="Dedicated automata PBT suite: BitWriter/BitReader roundtrip bijection and Huffman LUT decoding." />
+            <file name="codec.pbt.js" description="Dedicated codec PBT suite: dimension conservation, quality monotonicity, and JPEG marker bounds." />
+            <file name="crypto.pbt.js" description="Dedicated crypto PBT suite: AES-GCM roundtrip, HMAC single-bit tampering, KDF domain separation, TOTP time window invariance." />
+            <file name="ecc.pbt.js" description="Dedicated ECC PBT suite: GF(256) group axioms and Reed-Solomon error correction bounds." />
+            <file name="qr.pbt.js" description="Dedicated QR PBT suite: encodeQR dimension invariants, synthesize/decode roundtrip, and binarizer robustness." />
+            <file name="secret-sharing.pbt.js" description="Dedicated secret sharing PBT suite: Cauchy MDS erasure recovery and threshold fail-closed enforcement." />
+            <file name="steganography.pbt.js" description="Dedicated steganography PBT suite: STC trellis coding, opaque framing, and capacity monotonicity." />
+            <file name="utils.pbt.js" description="Dedicated utils PBT suite: Base32, Deflate/Inflate, Base64, CRC32 bit-flip sensitivity, and URL safety." />
+            <file name="vault.pbt.js" description="Dedicated vault PBT suite: serialization roundtrip, monotonic revision bumps, and deterministic locking." />
         </directory>
         <directory name="scripts">
             <file name="auto_detection_roundtrip.test.js" description="Automatic format detection and roundtrip." />
@@ -138,50 +168,68 @@
         </directory>
         <directory name="security">
             <file name="bitreader-differential.test.js" description="BitReader differential properties across read strategies." />
-            <file name="capacity-consistency.test.js" description="Scanner-vs-embedder capacity parity assertions." />
+            <file name="capacity-consistency.test.js" description="Scanner-vs-embedder capacity parity assertions for Format v4." />
             <file name="carrier-manifest.test.js" description="Carrier manifest structure, canonical serialization, verification, chunk binding." />
             <file name="cauchy-ec.test.js" description="Cauchy erasure codec: MDS roundtrip, fail-closed, allocation planning." />
+            <file name="proportional-cauchy-ec.test.js" description="Proportional Cauchy parity erasure coding: granular multi-block proportional allocation, k-subset roundtrips, PBT over heterogeneous capacities, metamorphic subset invariance, sub-threshold fail-closed." />
             <file name="chunk-integrity.test.js" description="Chunk integrity checksum enforcement." />
-            <file name="coded-header.test.js" description="RS(255,191) coded control header packing, RS roundtrip, tolerance edges." />
             <file name="css-envelope.test.js" description="CSS envelope sealing/opening, DEK zeroization, foreign-share rejection." />
             <file name="decoder-hardening.test.js" description="Decoder fail-loud hardening against malformed streams." />
             <file name="drop-zone-pagination.test.js" description="DropZone >100-entry directory pagination." />
             <file name="drop-zone-folders.test.js" description="DropZone folder traversal: synchronous multi-item snapshot, deterministic ordering, zero-match feedback, unreadable-subtree resilience, depth cap." />
             <file name="ecc-edges.test.js" description="RS tolerance-edge corruption distribution properties." />
-            <file name="forged-metadata.test.js" description="Forged metadata rejection at extraction boundaries." />
+            <file name="encrypted-container.test.js" description="Format v4 encrypted opaque container envelope security and unseal tests." />
             <file name="gf-shamir.test.js" description="Shamir secret sharing over GF(256): splitting, combination, bijection." />
+            <file name="gf256.test.js" description="GF(256) field arithmetic verification." />
             <file name="manifest-enforcement.test.js" description="Manifest enforcement across batch pipeline: stamping, legacy rejection, swap detection." />
-            <file name="probe-regressions.test.js" description="Regressions promoted from root evidence scripts." />
+            <file name="probe-regressions.test.js" description="Regressions promoted from root evidence scripts (rejects extraction without password)." />
+            <file name="qr-binarizer.test.js" description="QR image binarizer tests." />
+            <file name="qr-capacity.test.js" description="QR capacity and version selection tests." />
+            <file name="qr-decoder.test.js" description="QR decoder: byte-exact encode/render/decode roundtrips across versions and scales, seeded PBT, luminance jitter tolerance, scattered-damage EC-M correction, format destruction fail-closed, hostile-input tuple safety." />
+            <file name="qr-encoder.test.js" description="QR encoder structural tests: dimensions, finder patterns, timing patterns, determinism." />
+            <file name="qr-fixtures.test.js" description="QR fixture validation." />
+            <file name="qr-format-tolerance.test.js" description="QR format and version error tolerance." />
             <file name="secure-id-generation.test.js" description="Secure UUID generation." />
             <file name="threshold-vault.test.js" description="Threshold vault recovery: distinct coded stripes, subset recovery, unique-share counting." />
+            <file name="totp-gate.test.js" description="PasswordVault Tier B TOTP gate: enable/verify/disable, drift window, export/import persistence, locked-vault refusal." />
+            <file name="totp.test.js" description="RFC 6238 TOTP: Annex B vectors, drift-window verification, otpauth URI roundtrip, codeFromOtpauthUri URI-routed exact vectors, normalizeTotpInput authoring helper." />
             <file name="ui-legacy-xss.test.js" description="escapeHtml XSS prevention." />
+            <file name="ui-xss.test.js" description="Cross-site scripting protection in vault UI rendering." />
             <file name="url-safety.test.js" description="URL scheme whitelist enforcement." />
-            <file name="base32.test.js" description="RFC 4648 Base32 encode/decode tests." />
             <file name="vault-hardening.test.js" description="Vault hardening: import ID validation, lock guard, session-key wrapping." />
             <file name="xss.test.js" description="XSS prevention in prompts and views." />
         </directory>
         <directory name="structures">
             <directory name="vault">
-                <file name="immutable-vault.test.js" description="Immutable vault structure, revision tracking, encrypted export." />
-                <file name="revision-tracking.test.js" description="Revision counter strict monotonicity." />
-                <file name="encrypted-export.test.js" description="Encrypted export/import envelope format." />
-                <file name="secure-record.test.js" description="SecureEntry encryption and structural immutability." />
                 <file name="csv-import.test.js" description="Vendor CSV import: profile detection, title derivation chain, timestamp normalization, provenance customFields, TOTP wrapping, hostile-cell storage, ragged-row policy." />
+                <file name="encrypted-export.test.js" description="Encrypted export/import envelope format." />
+                <file name="immutable-vault.test.js" description="Immutable vault structure, revision tracking, encrypted export." />
+                <file name="key-wrapping.test.js" description="Vault session key wrapping and derivation." />
+                <file name="password-rotation.test.js" description="Master password rotation, salt renewal, session key preservation, getPasswordAgeDays, and MR3 metamorphic tests." />
+                <file name="revision-tracking.test.js" description="Revision counter strict monotonicity." />
+                <file name="secure-record.test.js" description="SecureEntry encryption and structural immutability." />
             </directory>
         </directory>
         <directory name="utils">
             <file name="atomic-writer.test.js" description="Atomic multi-file write rollback on partial failure." />
-            <file name="csv.test.js" description="RFC 4180 CSV parser: quoting, embedded newlines, CRLF/BOM, ragged rows, KeePass escape dialect." />
+            <file name="base32.test.js" description="RFC 4648 Base32 encode/decode tests." />
             <file name="bit-reader.test.js" description="BitReader wrapper unit tests." />
+            <file name="compare-bitreaders.js" description="Differential testing helper comparing BitReader implementations." />
+            <file name="compare-skipbits.js" description="Differential testing helper comparing skipBits performance and correctness." />
+            <file name="compression.test.js" description="Deflate/Inflate stream compression and decompression roundtrip and PBT tests." />
+            <file name="coverage.js" description="Test coverage tracking helper." />
+            <file name="crc32.test.js" description="IEEE 802.3 CRC32 checksum standard check vectors, bit-flip sensitivity, and PBT tests." />
+            <file name="csv.test.js" description="RFC 4180 CSV parser: quoting, embedded newlines, CRLF/BOM, ragged rows, KeePass escape dialect." />
+            <file name="encoding.test.js" description="Shared Base64 and UTF-8 codecs and error handling tests." />
+            <file name="jpeg-fixtures.js" description="JPEG test fixture generator and loader utility." />
             <file name="marker-parser.test.js" description="MarkerParser utility unit tests." />
             <file name="pbt.js" description="Property-based testing harness with seeded PRNG and shrinking." />
             <file name="test-runner.js" description="Bespoke test runner with structured reporting." />
+            <file name="test-runner.pbt.js" description="Property-based testing of test runner assertions." />
+            <file name="test-runner.test.js" description="Test runner unit tests." />
         </directory>
-        <directory name="conformance-wire-format">
-            <file name="wire-format-conformance.test.js" description="Bit-exact golden vector conformance for CRC32, PRNG, permutation, seed derivation, ECC, F5, container layout v3." />
-        </directory>
-        <directory name="security-ui">
-            <file name="xss.test.js" description="XSS prevention in prompts and views." />
+        <directory name="vendor">
+            <file name="argon2id.test.js" description="RFC 9106 test vectors and unit tests for vendored OpenPGP.js Argon2id WebAssembly engine." />
         </directory>
         <file name="runner.js" description="Node.js test runner with PBT seeding and suite registration." />
     </structure>

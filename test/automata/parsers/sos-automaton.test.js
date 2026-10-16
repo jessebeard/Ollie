@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { parseScanHeader } from '../../../src/automata/parsers/sos-automaton.js';
 
 describe('ScanHeaderParser', () => {
@@ -166,5 +167,30 @@ describe('ScanHeaderParser', () => {
         expect(scan.components[1].acTableId).toBe(1);
         expect(scan.components[2].dcTableId).toBe(1);
         expect(scan.components[2].acTableId).toBe(1);
+    });
+
+    describe('PBT & Table ID Fidelity', () => {
+        it('Property: parseScanHeader preserves arbitrary valid component and table selectors', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 4), Arbitrary.integer(0, 3), Arbitrary.integer(0, 3)],
+                (cs, td, ta) => {
+                    const data = new Uint8Array([
+                        1,
+                        cs, (td << 4) | ta,
+                        0, 63, 0
+                    ]);
+
+                    const [scan, err] = parseScanHeader(data);
+                    expect(err).toBe(null);
+                    expect(scan.numComponents).toBe(1);
+                    expect(scan.components[0].selector).toBe(cs);
+                    expect(scan.components[0].dcTableId).toBe(td);
+                    expect(scan.components[0].acTableId).toBe(ta);
+                    expect(scan.Ss).toBe(0);
+                    expect(scan.Se).toBe(63);
+                },
+                50
+            );
+        });
     });
 });

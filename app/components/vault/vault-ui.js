@@ -1,4 +1,3 @@
-
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { DropZone } from './components/drop-zone.js';
 import { ModalManager } from './components/modal-manager.js';
@@ -7,8 +6,13 @@ import { FileScanner } from '../../../src/codec/file-scanner.js';
 import { CapacityScanner } from '../../../src/codec/capacity-scanner.js';
 import { logger } from '../../../src/utils/logger.js';
 import { writeAllWithRollback } from '../../../src/utils/atomic-writer.js';
-import { codeFromOtpauthUri, normalizeTotpInput } from '../../../src/information-theory/cryptography/totp.js';
+import { codeFromOtpauthUri, normalizeTotpInput, buildOtpauthUri } from '../../../src/information-theory/cryptography/totp.js';
 import { decodeQR } from '../../../src/codec/qr-decoder.js';
+import { KeyDerivation } from '../../../src/information-theory/cryptography/pbkdf2.js';
+import { encodeBase32 } from '../../../src/utils/base32.js';
+import { getCrypto } from '../../../src/information-theory/cryptography/crypto-provider.js';
+import { importFromCsv } from '../../../src/structures/vault/csv-import.js';
+import { escapeHtml } from '../../../src/utils/escape-html.js';
 
 class EventBus {
     constructor() { this.listeners = {}; }
@@ -35,11 +39,15 @@ export class VaultUI {
     initialize() {
         // Drop Zone
         const dropEl = document.getElementById('dropZone');
-        new DropZone(dropEl, (files) => this.handleFilesDropped(files));
+        if (dropEl) {
+            new DropZone(dropEl, (files) => this.handleFilesDropped(files));
+        }
 
         // View
         const viewEl = document.getElementById('vaultList');
-        this.view = new VaultView(viewEl, this.events);
+        if (viewEl) {
+            this.view = new VaultView(viewEl, this.events);
+        }
 
         // Bind Events
         this.events.on('edit-entry', (e) => this.editEntry(e));
@@ -50,32 +58,76 @@ export class VaultUI {
         });
 
         // Buttons
-        document.getElementById('createBtn').addEventListener('click', () => this.createVault());
-        document.getElementById('saveBtn').addEventListener('click', () => this.saveVault());
-        document.getElementById('addBtn').addEventListener('click', () => this.addEntry());
-        document.getElementById('importBtn').addEventListener('click', () => this.importData());
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+        const createBtn = document.getElementById('createBtn');
+        if (createBtn) createBtn.addEventListener('click', () => this.createVault());
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.addEventListener('click', () => this.saveVault());
+        const lockBtn = document.getElementById('lockBtn');
+        if (lockBtn) lockBtn.addEventListener('click', () => this.lockVault());
+        const changePwBtn = document.getElementById('changePwBtn');
+        if (changePwBtn) changePwBtn.addEventListener('click', () => this.changeMasterPasswordFlow());
+        const totpSettingsBtn = document.getElementById('totpSettingsBtn');
+        if (totpSettingsBtn) totpSettingsBtn.addEventListener('click', () => this.manage2FaGateFlow());
+        const addBtn = document.getElementById('addBtn');
+        if (addBtn) addBtn.addEventListener('click', () => this.addEntry());
+        const importBtn = document.getElementById('importBtn');
+        if (importBtn) importBtn.addEventListener('click', () => this.importData());
+        const exportEncryptedBtn = document.getElementById('exportEncryptedBtn');
+        if (exportEncryptedBtn) exportEncryptedBtn.addEventListener('click', () => this.exportEncryptedData());
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) exportBtn.addEventListener('click', () => this.exportData());
 
-        // ÃƒÅ½Ã¢â‚¬Å“ÃƒÆ’Ã…â€œÃƒÆ’Ã‚Â­ Bolt Optimization: Debounce search input to prevent main thread blocking
-        // This limits full DOM re-renders and expensive capacity calculations while the user types
+        // Debounce search input
         const searchInput = document.getElementById('searchInput');
         let searchTimeout;
-        searchInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.currentQuery = e.target.value.trim();
-                this.updateUI();
-            }, 150);
-        });
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.currentQuery = e.target.value.trim();
+                    this.updateUI();
+                }, 150);
+            });
+        }
 
         const sortSelect = document.getElementById('sortSelect');
-        sortSelect.addEventListener('change', (e) => {
-            this.currentSort = e.target.value;
-            this.updateUI();
-        });
+        if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+                this.currentSort = e.target.value;
+                this.updateUI();
+            });
+        }
+
+        const tagSearchInput = document.getElementById('tagSearchInput');
+        if (tagSearchInput) {
+            tagSearchInput.addEventListener('input', (e) => {
+                this.tagSearchQuery = e.target.value.trim().toLowerCase();
+                this.renderTags();
+            });
+        }
+
+        const clearTagsBtn = document.getElementById('clearTagsBtn');
+        if (clearTagsBtn) {
+            clearTagsBtn.addEventListener('click', () => {
+                this.activeTags.clear();
+                this.updateUI();
+            });
+        }
 
         // Initial State
         this.updateState();
+    }
+
+    _notify(message, type = 'info') {
+        if (this.modals && typeof this.modals.showToast === 'function') {
+            try {
+                this.modals.showToast(message, type);
+                return;
+            } catch (_) {}
+        }
+        if (this.modals && typeof this.modals.showAlert === 'function') {
+            this.modals.showAlert(type === 'error' ? 'Error' : 'Notification', message, type);
+        }
     }
 
     async handleFilesDropped(items, errors) {
@@ -89,13 +141,11 @@ export class VaultUI {
             return;
         }
 
-        // Separate Handles and Files
         const filesToLoad = [];
-        this.droppedHandles = new Map(); // Store handlers for saving
+        this.droppedHandles = new Map();
 
         for (const item of items) {
             if (item.kind === 'file' && item.getFile) {
-                // It's a Handle
                 try {
                     const file = await item.getFile();
                     if (FileScanner.matchesPattern(file.name, '*.jpg') || FileScanner.matchesPattern(file.name, '*.jpeg')) {
@@ -106,7 +156,6 @@ export class VaultUI {
                     console.warn('Failed to get file from handle:', e);
                 }
             } else {
-                // It's a standard File object
                 if (item.name && (FileScanner.matchesPattern(item.name, '*.jpg') || FileScanner.matchesPattern(item.name, '*.jpeg'))) {
                     filesToLoad.push(item);
                 } else if (!item.name && (item.type === 'image/jpeg' || item.type === 'image/jpg')) {
@@ -141,9 +190,8 @@ export class VaultUI {
                 this.updateUI();
                 return;
             }
-            this.modals.showAlert('Success', `Loaded ${this.vault.entries.length} entries.`);
+            this._notify(`Loaded ${this.vault.entries.length} entries.`, 'success');
 
-            // Scan for capacity
             const [scanResult, scanErr] = await CapacityScanner.scan(filesToLoad, {
                 f5Options: {
                     format: 'container',
@@ -165,31 +213,141 @@ export class VaultUI {
         }
     }
 
-    async createVault() {
-        const pass1 = await this.modals.prompt('New Vault', 'Create Master Password:', 'password');
-        if (!pass1) return;
+    async generateTempTotp() {
+        const [cryptoObj] = getCrypto();
+        const secretBytes = new Uint8Array(20);
+        cryptoObj.getRandomValues(secretBytes);
+        const secret = encodeBase32(secretBytes);
+        const [uri, uriErr] = buildOtpauthUri({ label: 'Ollie Vault', secret });
+        if (uriErr) return [null, uriErr];
+        return [{ secret, uri }, null];
+    }
 
-        const pass2 = await this.modals.prompt('New Vault', 'Confirm Master Password:', 'password');
-        if (pass1 !== pass2) {
-            this.modals.showAlert('Error', 'Passwords do not match', 'error');
+    async createVault() {
+        if (this.modals && typeof this.modals.showOnboardingWizard === 'function') {
+            const result = await this.modals.showOnboardingWizard({
+                onBenchmark: () => KeyDerivation.benchmark(),
+                generateQr: () => this.generateTempTotp()
+            });
+
+            if (!result) return;
+
+            let metadata = null;
+            if (result.enableTotp && result.totpSecret) {
+                metadata = {
+                    version: '3.0',
+                    revision: 0,
+                    created: new Date().toISOString(),
+                    modified: new Date().toISOString(),
+                    totpGate: {
+                        secret: result.totpSecret,
+                        enrolled: new Date().toISOString()
+                    }
+                };
+            }
+
+            this.vault = new PasswordVault([], metadata, true, result.password);
+            this._sessionPassword = result.password;
+
+            this.updateUI();
+            this._notify('New vault initialized!', 'success');
+
+            if (result.quickAction === 'add-entry') {
+                setTimeout(() => this.addEntry(), 100);
+            } else if (result.quickAction === 'import-csv') {
+                setTimeout(() => this.importData(), 100);
+            }
+        } else {
+            // Legacy / test mock fallback
+            const pass1 = await this.modals.prompt('New Vault', 'Create Master Password:', 'password');
+            if (!pass1) return;
+
+            const pass2 = await this.modals.prompt('New Vault', 'Confirm Master Password:', 'password');
+            if (pass1 !== pass2) {
+                this.modals.showAlert('Error', 'Passwords do not match', 'error');
+                return;
+            }
+
+            this.vault = new PasswordVault([], null, true, pass1);
+            this._sessionPassword = pass1;
+
+            await this.enrollTotpGateFlow();
+
+            this.updateUI();
+            this.modals.showAlert('Created', 'New vault created. Add entries and save.');
+        }
+    }
+
+    async changeMasterPasswordFlow() {
+        if (!this.vault || !this.vault.isUnlocked) return;
+
+        const result = await this.modals.showChangePasswordModal({
+            currentIterations: this.vault.metadata.kdf?.iterations || 600000,
+            onBenchmark: () => KeyDerivation.benchmark()
+        });
+
+        if (!result) return;
+
+        if (result.currentPassword !== this._sessionPassword) {
+            this._notify('Current master password incorrect', 'error');
             return;
         }
 
-        this.vault = new PasswordVault([], null, true, pass1);
-        this._sessionPassword = pass1;
+        this.showLoading(true, 'Rotating master password & salt...');
+        const [newVault, rotErr] = await this.vault.changeMasterPassword(result.newPassword, {
+            iterations: result.iterations
+        });
+        this.showLoading(false);
 
-        await this.enrollTotpGateFlow();
+        if (rotErr) {
+            this.modals.showAlert('Error', 'Failed to change password: ' + rotErr.message, 'error');
+            return;
+        }
 
+        this.vault = newVault;
+        this._sessionPassword = result.newPassword;
         this.updateUI();
-        this.modals.showAlert('Created', 'New vault created. Add entries and save.');
+        this._notify('Master password and salt rotated successfully!', 'success');
     }
 
-    /**
-     * Tier B gate enrollment: optional, explicitly disclosed as weak
-     * access control (deters shoulder-surfing only). Shows the otpauth
-     * URI and its QR exactly once for authenticator enrollment.
-     * @returns {Promise<boolean>} true when the gate was enabled
-     */
+    async manage2FaGateFlow() {
+        if (!this.vault || !this.vault.isUnlocked) return;
+
+        const isEnrolled = !!(this.vault.metadata && this.vault.metadata.totpGate);
+        const enrolledUri = isEnrolled ? `otpauth://totp/Ollie%20Vault?secret=${this.vault.metadata.totpGate.secret}` : null;
+
+        const result = await this.modals.show2FaSettingsModal({
+            isEnrolled,
+            enrolledUri
+        });
+
+        if (!result) return;
+
+        if (result.action === 'disable') {
+            const confirmed = await this.modals.confirm('Are you sure you want to remove 2FA second-factor gate from this vault?');
+            if (!confirmed) return;
+
+            const [newVault, err] = await this.vault.disableTotpGate();
+            if (err) {
+                this.modals.showAlert('Error', 'Failed to disable 2FA: ' + err.message, 'error');
+                return;
+            }
+            this.vault = newVault;
+            this.updateUI();
+            this._notify('2FA Gate disabled', 'info');
+        } else if (result.action === 'enable') {
+            await this.enrollTotpGateFlow();
+        }
+    }
+
+    lockVault() {
+        if (!this.vault) return;
+        this.vault = this.vault.lock();
+        this._sessionPassword = null;
+        this.updateUI();
+        this._notify('Vault locked', 'info');
+    }
+
     async enrollTotpGateFlow() {
         const disclaimer =
             'Enable a TOTP code gate on this vault?\n\n' +
@@ -214,7 +372,6 @@ export class VaultUI {
         return true;
     }
 
-    /** Renders an otpauth:// URI as an on-screen QR overlay (show-side of enrollment). */
     showQrOverlay(uri) {
         if (typeof document === 'undefined') return;
         const overlay = document.createElement('div');
@@ -224,42 +381,24 @@ export class VaultUI {
         note.textContent = uri;
         overlay.appendChild(note);
         const close = document.createElement('button');
+        close.className = 'btn btn-secondary';
         close.textContent = 'Close';
         close.addEventListener('click', () => overlay.remove());
         overlay.appendChild(close);
 
         try {
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext && canvas.getContext('2d');
-            if (ctx) {
-                import('../../../src/codec/qr-encoder.js').then(({ encodeQR }) => {
-                    const matrix = encodeQR(new TextEncoder().encode(uri));
-                    const scale = 6;
-                    canvas.width = (matrix.size + 8) * scale;
-                    canvas.height = (matrix.size + 8) * scale;
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = '#000';
-                    for (let r = 0; r < matrix.size; r++) {
-                        for (let c = 0; c < matrix.size; c++) {
-                            if (matrix.modules[r * matrix.size + c]) {
-                                ctx.fillRect((c + 4) * scale, (r + 4) * scale, scale, scale);
-                            }
-                        }
-                    }
-                    overlay.insertBefore(canvas, note);
-                }).catch(() => {});
-            }
-        } catch { /* canvas unavailable: URI text remains */ }
+            canvas.width = 180;
+            canvas.height = 180;
+            this.modals.renderQrOnCanvas(canvas, uri);
+            overlay.insertBefore(canvas, note);
+        } catch { /* fallback */ }
 
-        document.body.appendChild(overlay);
+        if (document.body && typeof document.body.appendChild === 'function') {
+            document.body.appendChild(overlay);
+        }
     }
 
-    /**
-     * Gate enforcement on unlock: prompts until a valid code is entered or
-     * the user cancels (cancel keeps the vault hidden).
-     * @returns {Promise<boolean>}
-     */
     async enforceTotpGate() {
         while (this.vault && this.vault.metadata.totpGate) {
             const code = await this.modals.prompt(
@@ -301,7 +440,7 @@ export class VaultUI {
 
         this.vault = newVault;
         this.updateUI();
-        this.modals.showAlert('Success', 'Entry added.');
+        this._notify('Entry added successfully', 'success');
     }
 
     async editEntry(id) {
@@ -335,14 +474,29 @@ export class VaultUI {
             { name: 'notes', label: 'Notes', type: 'textarea' }
         ];
 
-        // Prepare initial values (join tags back to string)
         const initial = { ...decrypted };
         if (Array.isArray(initial.tags)) {
             initial.tags = initial.tags.join(', ');
         }
 
-        const data = await this.modals.showForm('Edit Entry', fields, initial);
+        const data = await this.modals.showForm('Edit Entry', fields, initial, { showDelete: true });
         if (!data) return;
+
+        if (data._action === 'delete') {
+            const confirmed = await this.modals.confirm('Are you sure you want to permanently delete this entry?');
+            if (!confirmed) return;
+
+            const [newVault, delErr] = this.vault.deleteEntry(id);
+            if (delErr) {
+                this.modals.showAlert('Error', 'Failed to delete entry: ' + delErr.message, 'error');
+                return;
+            }
+
+            this.vault = newVault;
+            this.updateUI();
+            this._notify('Entry deleted', 'info');
+            return;
+        }
 
         this.showLoading(true, 'Encrypting...');
         const [newVault, err] = await this.vault.updateEntry(id, data);
@@ -355,15 +509,13 @@ export class VaultUI {
 
         this.vault = newVault;
         this.updateUI();
+        this._notify('Entry updated', 'success');
     }
-
-
 
     async saveVault() {
         if (!this.vault.isUnlocked || !this._sessionPassword) return;
 
         try {
-            // 1. Confirm intention
             const confirmed = await this.modals.confirm(
                 'Select a folder with JPEG images.\n\n' +
                 'The vault data will be hidden inside these images.\n' +
@@ -371,129 +523,79 @@ export class VaultUI {
             );
             if (!confirmed) return;
 
-            // 2. Select Directory or Use Dropped Handles
             let handles = [];
-            let reusedHandles = false;
 
             if (this.droppedHandles && this.droppedHandles.size > 0) {
-                // Check if we want to reuse dropped handles?
-                // Yes, if the user doesn't want to pick a new folder.
-                // Let's ask or just infer?
-                // Ideally we verify if the handles are writable.
-                // Assuming they are the same file set.
                 console.log('Using dropped handles for saving...');
                 handles = Array.from(this.droppedHandles.values());
-                reusedHandles = true;
             } else {
                 try {
-                    handles = await FileScanner.scanDirectory('*.jpg');
-                } catch (e) {
-                    if (e.name === 'AbortError') return;
-                    throw e;
+                    const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    handles = await FileScanner.getJpegHandles(dirHandle);
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    throw err;
                 }
             }
 
             if (handles.length === 0) {
-                this.modals.showAlert('Error', 'No JPEG images found.', 'error');
+                this.modals.showAlert('Error', 'No JPEG (.jpg / .jpeg) carrier images were found in the selected folder.', 'error');
                 return;
             }
 
-            // 3. Secure write permissions NOW, while the confirm-click user
-            // activation is still valid. FileSystemHandle.requestPermission()
-            // requires transient activation; asking after the slow encrypt +
-            // embed phase throws "User activation is required".
-            this.showLoading(true, 'Requesting write access...');
+            // Check write permissions eagerly while we have fresh user activation
             for (const h of handles) {
-                const options = { mode: 'readwrite' };
-                try {
-                    const current = typeof h.queryPermission === 'function'
-                        ? await h.queryPermission(options)
-                        : 'prompt';
-                    if (current === 'granted') continue;
-                    const requested = await h.requestPermission(options);
-                    if (requested !== 'granted') {
-                        throw new Error(`Write permission denied for ${h.name}. No images were modified.`);
+                if (typeof h.queryPermission === 'function') {
+                    let perm = await h.queryPermission({ mode: 'readwrite' });
+                    if (perm !== 'granted' && typeof h.requestPermission === 'function') {
+                        perm = await h.requestPermission({ mode: 'readwrite' });
                     }
-                } catch (permError) {
-                    this.showLoading(false);
-                    this.modals.showAlert('Error', 'Save aborted: ' + permError.message, 'error');
-                    return;
+                    if (perm !== 'granted') {
+                        this.modals.showAlert('Error', `Write permission denied for ${h.name || 'carrier image'}`, 'error');
+                        return;
+                    }
                 }
             }
 
-            // 4. Prepare Files (buffering originals so a failed write can be rolled back)
-            this.showLoading(true, 'Reading images...');
+            this.showLoading(true, 'Embedding vault in images...');
+
             const fileObjs = [];
-            const handleList = [];   // parallel to fileObjs; results reference carriers by sourceIndex
-            const originalBytes = new Map(); // name -> ArrayBuffer
-
             for (const h of handles) {
-                const file = await h.getFile();
-                originalBytes.set(file.name, await file.arrayBuffer());
-                fileObjs.push(file);
-                handleList.push(h);
+                fileObjs.push(await h.getFile());
             }
 
-            // 4. Embed Data
-            this.showLoading(true, 'Encrypting & Saving...');
-
-            // vault.save returns [results, error]
-            const [results, saveErr] = await this.vault.save(fileObjs, this._sessionPassword,
-                (curr, total, status) => {
-                    this.showLoading(true, `${status} (${curr}/${total})`);
-                }
-            );
-            if (saveErr) throw saveErr;
-
-            // 5. Write back to disk - permissions were pre-flighted in step 3,
-            // so no carrier can be left half-written by a mid-batch prompt.
-            this.showLoading(true, 'Writing files to disk...');
-            const writeTargets = [];
-
-            for (const result of results) {
-                let handle = null;
-                if (Number.isInteger(result.sourceIndex) && handleList[result.sourceIndex]) {
-                    handle = handleList[result.sourceIndex];
-                } else {
-                    // Legacy result shape: fall back to filename matching.
-                    let originalName = result.name;
-                    const prefixMatch = result.name.match(/^steg_\d+_(.+)$/);
-                    if (prefixMatch) {
-                        originalName = prefixMatch[1];
-                    }
-                    handle = handles.find(h => h.name === originalName) ||
-                             handles.find(h => h.name === result.name);
-                }
-                if (!handle) {
-                    logger.warn(`Could not find handle for ${result.name}`);
-                    continue;
-                }
-
-                writeTargets.push({ handle, result });
+            const [results, saveErr] = await this.vault.save(fileObjs, this._sessionPassword);
+            if (saveErr) {
+                this.showLoading(false);
+                this.modals.showAlert('Error', 'Failed to embed vault: ' + saveErr.message, 'error');
+                return;
             }
 
-            const atomicTargets = writeTargets.map(({ handle, result }) => ({ handle, data: result.data }));
-            const [, writeErr] = await writeAllWithRollback(atomicTargets, originalBytes);
+            const resultsMap = new Map();
+            for (const r of results) resultsMap.set(r.name, r.data);
+
+            const writeTasks = [];
+            for (const h of handles) {
+                if (resultsMap.has(h.name)) {
+                    writeTasks.push({ handle: h, data: resultsMap.get(h.name) });
+                }
+            }
+
+            const [, writeErr] = await writeAllWithRollback(writeTasks);
             if (writeErr) {
-                logger.error('Atomic save failed:', writeErr);
-                throw writeErr;
+                this.showLoading(false);
+                this.modals.showAlert('Error', 'Failed to save modified images: ' + writeErr.message, 'error');
+                return;
             }
 
             this.showLoading(false);
-            this.modals.showAlert('Saved', `Vault successfully saved to ${results.length} images.`);
+            this._notify(`Vault embedded across ${results.length} carrier images!`, 'success');
 
-            // Update handles and capacity if we saved to a new set
-            if (!reusedHandles) {
-                this.droppedHandles = new Map();
-            }
-
-            // Refresh fileObjs with new File objects since they were modified on disk
             const refreshedFileObjs = [];
             for (const h of handles) {
                 refreshedFileObjs.push(await h.getFile());
             }
 
-            // Re-scan for capacity after save (since carrier images might have changed)
             const [scanResult, scanErr] = await CapacityScanner.scan(refreshedFileObjs, {
                 f5Options: {
                     format: 'container',
@@ -515,11 +617,6 @@ export class VaultUI {
         }
     }
 
-    /**
-     * Rasterizes a dropped/selected image file into canvas ImageData.
-     * Browser path uses createImageBitmap + 2D canvas; the Node/test seam
-     * accepts files that already expose an `imageData` property.
-     */
     async rasterizeToImageData(file) {
         if (file && file.imageData) return file.imageData;
         if (typeof createImageBitmap !== 'function') {
@@ -566,29 +663,44 @@ export class VaultUI {
 
         const [newVault, updateErr] = await this.vault.updateEntry(entryId, { totp: normalized });
         if (updateErr) {
-            this.modals.showAlert('Error', 'Failed to store scanned TOTP: ' + updateErr.message, 'error');
+            this.modals.showAlert('Error', 'Failed to update entry with TOTP: ' + updateErr.message, 'error');
             return;
         }
 
         this.vault = newVault;
         this.updateUI();
-        this.modals.showAlert('TOTP Added', 'One-time password secret imported from QR.');
+        this._notify('TOTP secret added to entry', 'success');
     }
 
     async copyPassword(id) {
         if (!this.vault.isUnlocked) return;
 
-        const currentSecure = this.vault.entries.find(e => e.id === id);
-        if (!currentSecure) return;
+        const entry = this.vault.entries.find(e => e.id === id);
+        if (!entry) return;
 
         const [sessionKey, kErr] = await this.vault._getSessionKey();
-        if (kErr) return;
+        if (kErr || !sessionKey) {
+            this.modals.showAlert('Error', 'Cannot copy: vault key error', 'error');
+            return;
+        }
 
-        const [decrypted, decErr] = await currentSecure.decrypt(sessionKey);
-        if (decErr) return;
+        const [decrypted, decErr] = await entry.decrypt(sessionKey);
+        if (decErr || !decrypted) {
+            this.modals.showAlert('Error', 'Cannot copy: failed to decrypt entry', 'error');
+            return;
+        }
 
-        navigator.clipboard.writeText(decrypted.password);
-        this.modals.showAlert('Copied', 'Password copied to clipboard!');
+        if (!decrypted.password) {
+            this._notify('No password set for this entry', 'warn');
+            return;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(decrypted.password);
+            this._notify('Password copied to clipboard', 'success');
+        } else {
+            this.modals.showAlert('Password', decrypted.password);
+        }
     }
 
     async importData() {
@@ -596,80 +708,127 @@ export class VaultUI {
 
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv,.json,text/csv,application/json';
+        input.accept = '.json,.csv,.txt,.ollie';
 
         input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
             try {
+                this.showLoading(true, 'Reading file...');
                 const text = await file.text();
-                let entries;
-                let skippedCount = 0;
 
-                if (text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {
-                    const data = JSON.parse(text);
-
-                    if (!data.entries || !Array.isArray(data.entries)) {
-                        this.modals.showAlert('Error', 'Invalid import format. Expected an array of entries.', 'error');
+                // Check for encrypted backup
+                try {
+                    const parsed = JSON.parse(text);
+                    if (parsed.format === 'ollie-export') {
+                        const pass = await this.modals.prompt('Encrypted Backup', 'Enter backup envelope password:', 'password');
+                        if (!pass) {
+                            this.showLoading(false);
+                            return;
+                        }
+                        const [importedVault, impErr] = await PasswordVault.importEncrypted(text, pass);
+                        this.showLoading(false);
+                        if (impErr) {
+                            this.modals.showAlert('Import Failed', impErr.message, 'error');
+                            return;
+                        }
+                        this.vault = importedVault;
+                        this._sessionPassword = pass;
+                        this.updateUI();
+                        this.modals.showAlert('Import Complete', `Restored ${importedVault.entries.length} entries from backup!`);
+                        return;
+                    } else if (Array.isArray(parsed.entries)) {
+                        // Plain JSON export
+                        let currentVault = this.vault;
+                        let addedCount = 0;
+                        for (const rawEntry of parsed.entries) {
+                            const [updatedVault, addErr] = await currentVault.addEntry(rawEntry);
+                            if (!addErr) {
+                                currentVault = updatedVault;
+                                addedCount++;
+                            }
+                        }
+                        this.vault = currentVault;
+                        this.showLoading(false);
+                        this.updateUI();
+                        this.modals.showAlert('Import Complete', `Imported ${addedCount} of ${parsed.entries.length} items.`);
                         return;
                     }
-                    entries = data.entries;
-                } else {
-                    const { importFromCsv } = await import('../../../src/structures/vault/csv-import.js');
-                    const [result, csvErr] = await importFromCsv(text);
-                    if (csvErr) {
-                        this.modals.showAlert('Error', 'Failed to parse CSV import: ' + csvErr.message, 'error');
-                        return;
-                    }
-                    entries = result.entries;
-                    skippedCount = result.skipped.length;
+                } catch { /* not JSON */ }
+
+                // CSV / vendor import
+                const [csvResult, parseErr] = await importFromCsv(text);
+                if (parseErr) {
+                    this.showLoading(false);
+                    this.modals.showAlert('Error', 'Failed to parse CSV data: ' + parseErr.message, 'error');
+                    return;
                 }
 
-                this.showLoading(true, 'Importing ' + entries.length + ' entries...');
+                const entries = csvResult ? csvResult.entries : [];
+                if (!entries || entries.length === 0) {
+                    this.showLoading(false);
+                    this.modals.showAlert('Import', 'No valid entries found in the file.');
+                    return;
+                }
+
+                this.showLoading(true, `Importing ${entries.length} items...`);
 
                 let currentVault = this.vault;
                 let addedCount = 0;
-                let errorCount = 0;
-
-                for (const entry of entries) {
-                    const [newVault, err] = await currentVault.addEntry(entry, entry.id);
-                    if (err) {
-                        logger.warn(`Import rejected entry "${entry.title || entry.id}": ${err.message}`);
-                        errorCount++;
-                    } else {
-                        currentVault = newVault;
-                        addedCount++;
+                for (const rawEntry of entries) {
+                    const [updatedVault, addErr] = await currentVault.addEntry(rawEntry);
+                    if (addErr) {
+                        console.warn('Skipping entry import due to error:', addErr, rawEntry);
+                        continue;
                     }
+                    currentVault = updatedVault;
+                    addedCount++;
                 }
 
                 this.vault = currentVault;
-                this.updateUI();
                 this.showLoading(false);
-
-                let summary = `Successfully imported ${addedCount} entries.` +
-                    (errorCount > 0 ? ` Failed to import ${errorCount} entries.` : '');
-                if (skippedCount > 0) {
-                    summary += ` Skipped ${skippedCount} rows (unsupported item types or malformed rows).`;
-                }
-                this.modals.showAlert('Import Complete', summary);
+                this.updateUI();
+                this.modals.showAlert('Import Complete', `Imported ${addedCount} of ${entries.length} items.`);
 
             } catch (err) {
                 this.showLoading(false);
-                this.modals.showAlert('Error', 'Failed to read or parse import file: ' + err.message, 'error');
+                this.modals.showAlert('Error', 'Failed to read import file: ' + err.message, 'error');
             }
         };
 
         input.click();
     }
 
+    async exportEncryptedData() {
+        if (!this.vault.isUnlocked) return;
+
+        this.showLoading(true, 'Packaging encrypted backup...');
+        const [envelopeJson, err] = await this.vault.exportEncrypted(this._sessionPassword);
+        this.showLoading(false);
+
+        if (err) {
+            this.modals.showAlert('Error', 'Export failed: ' + err.message, 'error');
+            return;
+        }
+
+        const blob = new Blob([envelopeJson], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ollie-backup-${new Date().toISOString().split('T')[0]}.ollie.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this._notify('Encrypted backup downloaded', 'success');
+    }
+
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
-        const warningMsg = 'ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â¡Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¶ÃƒÂ¢Ã¢â‚¬ÂÃ‚Â¤ SECURITY WARNING: Red Flag Operation\n\n' +
-            'You are about to export your entire vault in PLAINTEXT. This means all passwords and secrets will be saved in an unencrypted JSON file on your computer.\n\n' +
-            'Anyone who gains access to this file will have immediate access to all your passwords.\n\n' +
-            'Are you absolutely sure you want to proceed?';
+        const warningMsg = '⚠️ SECURITY WARNING: Plaintext Export\n\n' +
+            'You are about to export your entire vault in PLAINTEXT. All passwords will be saved in an unencrypted JSON file on your computer.\n\n' +
+            'Anyone with access to this file can view all your passwords.\n\n' +
+            'Are you sure you want to proceed?';
 
         const confirmed = await this.modals.confirm(warningMsg);
         if (!confirmed) return;
@@ -695,53 +854,94 @@ export class VaultUI {
     getVaultSize() {
         if (!this.vault) return 0;
 
-        // Use composite key based on modified timestamp and entry count to safely verify state changes
-        const currentKey = `${this.vault.metadata?.modified}-${this.vault.entries?.length}`;
-        if (this._vaultSizeCacheKey === currentKey && this._vaultSizeCacheKey !== 'undefined-undefined') {
+        const stateKey = `${this.vault.metadata?.modified || ''}-${this.vault.entries.length}-${this.vault.metadata?.revision || 0}`;
+        if (this._vaultSizeCacheKey === stateKey) {
             return this._vaultSizeCache;
         }
 
-        const json = JSON.stringify(this.vault.toJSON());
-        this._vaultSizeCache = new TextEncoder().encode(json).length;
-        this._vaultSizeCacheKey = currentKey;
+        try {
+            const vaultData = JSON.stringify({
+                metadata: this.vault.metadata,
+                entries: this.vault.entries.map(e => e.toJSON())
+            });
+            const size = new TextEncoder().encode(vaultData).length;
+            this._vaultSizeCache = size;
+            this._vaultSizeCacheKey = stateKey;
+            return size;
+        } catch {
+            return 0;
+        }
+    }
 
-        return this._vaultSizeCache;
+    formatSize(bytes) {
+        if (bytes === 0) return '0 bytes';
+        const k = 1024;
+        const sizes = ['bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        const val = (bytes / Math.pow(k, i));
+        const valStr = Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        return valStr + ' ' + (i === 0 ? 'bytes' : sizes[i]);
     }
 
     updateUI() {
-                const itemCount = document.getElementById('itemCount');
-        const statusText = document.getElementById('statusText');
-        const capacityText = document.getElementById('capacityText');
+        this.updateState();
+        this.renderTags();
 
-        if (!this.vault) {
-            statusText.textContent = 'Locked';
-            return;
+        if (this.view) {
+            const entries = this.vault.search(this.currentQuery, Array.from(this.activeTags));
+
+            if (this.currentSort === 'newest') {
+                entries.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+            } else if (this.currentSort === 'oldest') {
+                entries.sort((a, b) => new Date(a.modified) - new Date(b.modified));
+            } else if (this.currentSort === 'az') {
+                entries.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            } else if (this.currentSort === 'za') {
+                entries.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+            }
+
+            this.view.render(entries);
         }
+    }
 
-        const unlocked = this.vault.isUnlocked;
-        document.body.classList.toggle('vault-unlocked', unlocked);
-
+    updateState() {
         const importBtn = document.getElementById('importBtn');
         const exportBtn = document.getElementById('exportBtn');
+        const lockBtn = document.getElementById('lockBtn');
+        const changePwBtn = document.getElementById('changePwBtn');
+        const totpSettingsBtn = document.getElementById('totpSettingsBtn');
+        const exportEncryptedBtn = document.getElementById('exportEncryptedBtn');
+        const addBtn = document.getElementById('addBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusText = document.getElementById('statusText');
+        const itemCount = document.getElementById('itemCount');
+        const capacityText = document.getElementById('capacityText');
 
-        if (unlocked) {
-            importBtn.style.display = 'block';
-            exportBtn.style.display = 'block';
-            this.renderSidebarTags();
+        if (typeof document !== 'undefined' && document.body && document.body.classList) {
+            document.body.classList.toggle('vault-unlocked', !!(this.vault && this.vault.isUnlocked));
+        }
 
-            let filteredResults = this.vault.search(this.currentQuery, Array.from(this.activeTags));
-            filteredResults = this.sortEntries(filteredResults, this.currentSort);
+        const isUnlocked = this.vault && this.vault.isUnlocked;
 
-            this.view.render(filteredResults);
-            itemCount.textContent = `${filteredResults.length} Items`;
+        if (importBtn) importBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (exportBtn) exportBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (lockBtn) lockBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (changePwBtn) changePwBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (totpSettingsBtn) totpSettingsBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (exportEncryptedBtn) exportEncryptedBtn.style.display = isUnlocked ? 'block' : 'none';
+        if (addBtn) addBtn.disabled = !isUnlocked;
+        if (saveBtn) saveBtn.disabled = !isUnlocked;
 
-            // Update capacity display
+        if (isUnlocked) {
+            const filteredResults = this.vault.search(this.currentQuery, Array.from(this.activeTags));
+            if (itemCount) itemCount.textContent = `${filteredResults.length} Items`;
+
             if (capacityText) {
                 const usedSize = this.getVaultSize();
                 const usedStr = this.formatSize(usedSize);
                 const totalStr = this.formatSize(this.totalCapacity || 0);
                 capacityText.textContent = `Used: ${usedStr} / Total: ${totalStr}`;
-                capacityText.title = `Vault currently uses ${usedStr} of ${totalStr} available steganographic space (Extreme ECC enabled).`;
+                capacityText.title = `Vault currently uses ${usedStr} of ${totalStr} available space.`;
 
                 const progressEl = document.getElementById('capacityProgress');
                 if (progressEl) {
@@ -754,14 +954,16 @@ export class VaultUI {
                 }
             }
 
-            const savedDate = this.vault.metadata.modified
-                ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
-                : 'unknown';
-            statusText.textContent = `Unlocked Ãƒâ€šÃ‚Â· Rev ${this.vault.metadata.revision} Ãƒâ€šÃ‚Â· ${savedDate} UTC`;
+            if (statusText) {
+                const savedDate = this.vault.metadata.modified
+                    ? new Date(this.vault.metadata.modified).toISOString().slice(0, 16).replace('T', ' ')
+                    : 'unknown';
+                statusText.textContent = `Unlocked · Rev ${this.vault.metadata.revision} · ${savedDate} UTC`;
+            }
 
             this.populateTotpCodes(filteredResults);
         } else {
-            statusText.textContent = 'Locked';
+            if (statusText) statusText.textContent = 'Locked';
             this.stopTotpRefresh();
         }
     }
@@ -846,80 +1048,96 @@ export class VaultUI {
 
             const countdown = slot.querySelector('.totp-countdown');
             if (countdown) {
-                const period = 30;
-                const remaining = period - (Math.floor(nowSeconds) % period);
+                const remaining = 30 - (Math.floor(nowSeconds) % 30);
                 countdown.textContent = `${remaining}s`;
             }
         }
     }
 
-    sortEntries(entries, sortMethod) {
-        return entries.slice().sort((a, b) => { // Shallow copy to avoid mutating cache
-            const titleA = (a.title || '').toLowerCase();
-            const titleB = (b.title || '').toLowerCase();
-            switch (sortMethod) {
-                case 'az': return titleA.localeCompare(titleB);
-                case 'za': return titleB.localeCompare(titleA);
-                case 'oldest': return a.id.localeCompare(b.id); // Hack: IDs are usually time-based or serial UUIDs, but ideally we'd use a real created_at date.
-                case 'newest':
-                default:
-                    return b.id.localeCompare(a.id);
+    renderTags() {
+        const tagList = document.getElementById('tagList');
+        if (!tagList) return;
+
+        const tagCounts = new Map();
+        if (this.vault && this.vault.entries) {
+            this.vault.entries.forEach(e => {
+                if (e.tags && Array.isArray(e.tags)) {
+                    e.tags.forEach(t => {
+                        const trimmed = String(t).trim();
+                        if (trimmed) {
+                            tagCounts.set(trimmed, (tagCounts.get(trimmed) || 0) + 1);
+                        }
+                    });
+                }
+            });
+        }
+
+        const tagCountBadge = document.getElementById('tagCountBadge');
+        if (tagCountBadge) {
+            tagCountBadge.textContent = String(tagCounts.size);
+        }
+
+        const clearTagsBtn = document.getElementById('clearTagsBtn');
+        if (clearTagsBtn) {
+            if (this.activeTags.size > 0) {
+                clearTagsBtn.style.display = 'inline-block';
+                clearTagsBtn.textContent = `✕ Clear (${this.activeTags.size})`;
+            } else {
+                clearTagsBtn.style.display = 'none';
             }
-        });
-    }
+        }
 
-    renderSidebarTags() {
-        const tagListEl = document.getElementById('tagList');
-        tagListEl.innerHTML = '';
-
-        // Extract all unique tags
-        const allTags = new Set();
-        this.vault.entries.forEach(e => {
-            if (e.tags) e.tags.forEach(t => allTags.add(t));
-        });
-
-        if (allTags.size === 0) {
-            tagListEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem;">No tags</div>';
+        if (tagCounts.size === 0) {
+            tagList.innerHTML = '';
             return;
         }
 
-        Array.from(allTags).sort().forEach(tag => {
-            const span = document.createElement('span');
-            span.className = `tag tag-interactive ${this.activeTags.has(tag) ? 'tag-active' : ''}`;
-            span.textContent = tag;
-            span.addEventListener('click', () => {
-                if (this.activeTags.has(tag)) this.activeTags.delete(tag);
-                else this.activeTags.add(tag);
+        tagList.innerHTML = '';
+        const sortedTags = [...tagCounts.keys()].sort((a, b) => a.localeCompare(b));
+        const filterQuery = (this.tagSearchQuery || '').toLowerCase();
+
+        let visibleCount = 0;
+        sortedTags.forEach(tag => {
+            if (filterQuery && !tag.toLowerCase().includes(filterQuery)) {
+                return;
+            }
+            visibleCount++;
+            const count = tagCounts.get(tag);
+            const isActive = this.activeTags.has(tag);
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = `tag-pill ${isActive ? 'active' : ''}`;
+            pill.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            pill.setAttribute('aria-label', `Tag ${tag}, ${count} entries`);
+            pill.innerHTML = `<span>#${escapeHtml(tag)}</span> <span class="pill-count">${count}</span>`;
+            pill.onclick = () => {
+                if (this.activeTags.has(tag)) {
+                    this.activeTags.delete(tag);
+                } else {
+                    this.activeTags.add(tag);
+                }
                 this.updateUI();
-            });
-            tagListEl.appendChild(span);
+            };
+            tagList.appendChild(pill);
         });
-    }
 
-    updateState() {
-        this.updateUI();
-    }
-
-    showLoading(show, text) {
-        // Simple loading overlay logic
-        const el = document.getElementById('loadingOverlay');
-        if (el) {
-            el.style.display = show ? 'flex' : 'none';
-            if (text) el.querySelector('p').textContent = text;
+        if (visibleCount === 0 && filterQuery) {
+            tagList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">No matching tags</span>';
         }
     }
 
-    formatSize(bytes) {
-        if (bytes === 0) return '0 bytes';
-        const k = 1024;
-        const sizes = ['bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    showLoading(show, message = 'Processing...') {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = show ? 'flex' : 'none';
+            const text = overlay.querySelector('p');
+            if (text) text.textContent = message;
+        }
     }
 }
 
-// Init
-// Init only if we are in a browser and not in a test runner that handles it manually.
-if (typeof window !== 'undefined' && !window.__TEST_RUNNER__) {
-    new VaultUI();
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        new VaultUI();
+    });
 }

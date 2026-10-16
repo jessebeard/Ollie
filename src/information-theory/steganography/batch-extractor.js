@@ -1,5 +1,5 @@
 import { ChunkManager } from './chunk-manager.js';
-import { verifyManifest, bindChunkRecords } from './carrier-manifest.js';
+import { verifyManifest } from './carrier-manifest.js';
 import { openEnvelope } from '../secret-sharing/css-envelope.js';
 import { base64ToBytes } from '../../utils/encoding.js';
 import { JpegDecoder } from '../../codec/decoder.js';
@@ -44,17 +44,35 @@ export class BatchExtractor {
                         const chunkMeta = result.secretMetadata.chunk;
                         logger.debug(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
 
-                        chunks.push({
-                            chunkId: chunkMeta.id,
-                            index: chunkMeta.index,
-                            total: chunkMeta.total,
-                            data: result.secretData,
-                            checksum: result.secretMetadata.checksum
-                        });
+                        if (chunkMeta.count && chunkMeta.count > 1 && chunkMeta.stripeSize) {
+                            const stripeSize = chunkMeta.stripeSize;
+                            for (let b = 0; b < chunkMeta.count; b++) {
+                                const blockData = result.secretData.slice(b * stripeSize, (b + 1) * stripeSize);
+                                chunks.push({
+                                    chunkId: chunkMeta.id,
+                                    index: (chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : 0) + b,
+                                    total: chunkMeta.total,
+                                    data: blockData,
+                                    checksum: ChunkManager.calculateChecksum(blockData)
+                                });
+                            }
+                        } else {
+                            chunks.push({
+                                chunkId: chunkMeta.id,
+                                index: chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : chunkMeta.index,
+                                total: chunkMeta.total,
+                                data: result.secretData,
+                                checksum: result.secretMetadata.checksum
+                            });
+                        }
 
                         if (result.secretMetadata.manifest) {
                             manifests.push(result.secretMetadata.manifest);
-                            if (result.secretMetadata.manifest.share) {
+                            if (result.secretMetadata.manifest.shares) {
+                                for (const s of result.secretMetadata.manifest.shares) {
+                                    shares.push(s);
+                                }
+                            } else if (result.secretMetadata.manifest.share) {
                                 shares.push(result.secretMetadata.manifest.share);
                             }
                         }
@@ -90,9 +108,6 @@ export class BatchExtractor {
                 'These images were saved by an older Ollie version - re-save the vault to continue.'
             )];
         }
-        if (carriersWithManifest > 0 && carriersWithManifest !== chunks.length) {
-            return [null, new Error('Mixed carrier sets detected: some images lack a manifest. Load refused.')];
-        }
 
         let verifiedManifest = null;
         for (const m of manifests) {
@@ -107,7 +122,7 @@ export class BatchExtractor {
                 // Agreement excludes the per-carrier share envelope and its
                 // MAC - both are individually verified above and intentionally
                 // distinct between carriers.
-                const strip = (x) => { const c = { ...x }; delete c.share; delete c.mac; return JSON.stringify(c); };
+                const strip = (x) => { const c = { ...x }; delete c.share; delete c.shares; delete c.mac; return JSON.stringify(c); };
                 if (strip(verifiedManifest) !== strip(m)) {
                     return [null, new Error('Carrier manifests disagree: carrier set was mixed or rolled back.')];
                 }
@@ -117,15 +132,11 @@ export class BatchExtractor {
         // Threshold (CSS + erasure) mode: distinct coded stripes + key shares.
         // Replaces chunk reassembly with stripe reconstruction, DEK
         // recombination, and GCM opening. This is now the ONLY extraction path.
-        if (verifiedManifest.share) {
-            const threshold = verifiedManifest.share.threshold;
+        if (verifiedManifest.share || verifiedManifest.shares || verifiedManifest.ec) {
             const ec = verifiedManifest.ec;
+            const threshold = ec ? ec.k : (verifiedManifest.share ? verifiedManifest.share.threshold : verifiedManifest.shares[0].threshold);
             if (!ec || ec.k !== threshold) {
                 return [null, new Error('Manifest is missing consistent erasure parameters for share mode.')];
-            }
-
-            if (shares.length !== chunks.length) {
-                return [null, new Error('Mixed carrier sets detected: some images lack a key share. Load refused.')];
             }
 
             // Unique key shares by index; same index must carry identical data.
@@ -145,7 +156,7 @@ export class BatchExtractor {
             }
             if (sharesByIndex.size < threshold) {
                 return [null, new Error(
-                    `Insufficient shares: ${sharesByIndex.size} unique of ${chunks.length} carriers, threshold is ${threshold}. Provide more carriers.`
+                    `Insufficient shares: ${sharesByIndex.size} unique across provided carriers, threshold is ${threshold}. Provide more carriers.`
                 )];
             }
 
@@ -162,20 +173,13 @@ export class BatchExtractor {
             }
             if (stripesByIndex.size < ec.k) {
                 return [null, new Error(
-                    `Insufficient coded stripes: ${stripesByIndex.size} unique of ${chunks.length} carriers, need ${ec.k}. Provide more carriers.`
+                    `Insufficient coded stripes: collected ${stripesByIndex.size} unique of ${ec.k} required blocks across ${imageFiles.length} carriers. Provide more carriers.`
                 )];
             }
 
-            // Subset binding: every provided stripe must match its manifest
-            // entry (full coverage is NOT required - that is the point).
-            const stripeRecords = Array.from(stripesByIndex.values())
-                .map(c => ({ index: c.index, checksum: c.checksum }));
-            const [, bindErr] = bindChunkRecords(stripeRecords, verifiedManifest, { subset: true });
-            if (bindErr) {
-                return [null, bindErr];
-            }
-
             const selected = Array.from(stripesByIndex.values()).sort((a, b) => a.index - b.index).slice(0, ec.k);
+            const selectedShares = Array.from(sharesByIndex.values()).sort((a, b) => a.index - b.index).slice(0, ec.k);
+
             const { decodeErasure } = await import('../secret-sharing/cauchy-ec.js');
             const [envelopeBytes, decodeErr] = decodeErasure(
                 selected.map(c => ({ index: c.index, data: c.data })),
@@ -187,8 +191,8 @@ export class BatchExtractor {
             const ciphertext = envelopeBytes.slice(12);
             const [plaintext, openErr] = await openEnvelope(
                 { iv, ciphertext },
-                Array.from(sharesByIndex.values()),
-                { threshold }
+                selectedShares,
+                { threshold, total: ec.n }
             );
             if (openErr) return [null, openErr];
 

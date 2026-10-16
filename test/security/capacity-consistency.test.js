@@ -3,7 +3,7 @@ import { CapacityScanner } from '../../src/codec/capacity-scanner.js';
 import { BatchEmbedder } from '../../src/information-theory/steganography/batch-embedder.js';
 import { JpegEncoder } from '../../src/codec/encoder.js';
 import { JpegDecoder } from '../../src/codec/decoder.js';
-import { F5 } from '../../src/information-theory/steganography/f5-syndrome.js';
+import { StegoEngine } from '../../src/information-theory/steganography/stego-engine.js';
 
 function makeMockFile(bytes, name) {
     return {
@@ -37,50 +37,20 @@ async function buildSyntheticCarrier() {
     return { mockFile: makeMockFile(jpegBytes, 'carrier.jpg'), allBlocks };
 }
 
-function realisticCapacityOptions() {
-    return {
-        format: 'container',
-        ecc: true,
-        eccProfile: 'Extreme',
-        encrypted: true,
-        metadata: {
-            filename: 'vault.json',
-            chunk: { id: '0123456789abcdef0123456789abcdef0123', index: 0, total: 1 },
-            checksum: 1234567890,
-            originalLength: 29310,
-            blockCount: 345
-        }
-    };
-}
-
-describe('Capacity model consistency', () => {
+describe('Format v4 Capacity Model Consistency', () => {
 
     it('scanner reports exactly what the embedder pipeline will accept', async () => {
         const { mockFile, allBlocks } = await buildSyntheticCarrier();
 
-        const [scanResult, scanErr] = await CapacityScanner.scan([mockFile], {
-            f5Options: realisticCapacityOptions()
-        });
+        const [scanResult, scanErr] = await CapacityScanner.scan([mockFile]);
         expect(scanErr).toEqual(null);
 
-        const expected = F5.calculateCapacity(allBlocks, realisticCapacityOptions());
-
+        const expected = StegoEngine.calculateCapacity(allBlocks);
         expect(scanResult.totalCapacity).toBe(expected);
+        expect(scanResult.totalCapacity).toBeGreaterThan(0);
     });
 
-    it('scanner estimate is strictly below the naive legacy estimate', async () => {
-        const { mockFile, allBlocks } = await buildSyntheticCarrier();
-
-        const [scanResult] = await CapacityScanner.scan([mockFile], {
-            f5Options: realisticCapacityOptions()
-        });
-
-        const legacyEstimate = F5.calculateCapacity(allBlocks, {});
-
-        expect(scanResult.totalCapacity).toBeLessThan(legacyEstimate);
-    });
-
-    it('embedder capacity template is never smaller than real chunk metadata', () => {
+    it('embedder capacity template is well-formed', () => {
         const template = BatchEmbedder.CAPACITY_METADATA_TEMPLATE();
         const realShape = {
             filename: 'vault.json',
@@ -93,16 +63,12 @@ describe('Capacity model consistency', () => {
         expect(JSON.stringify(template).length).toBeGreaterThanOrEqual(JSON.stringify(realShape).length);
     });
 
-    it('calculateCarrierCapacity matches F5 container-mode math for the same inputs', () => {
-        return Promise.resolve().then(async () => {
-            const { allBlocks } = await buildSyntheticCarrier();
+    it('calculateCarrierCapacity matches StegoEngine capacity math', async () => {
+        const { allBlocks } = await buildSyntheticCarrier();
 
-            const viaHelper = BatchEmbedder.calculateCarrierCapacity(
-                allBlocks, { eccProfile: 'Extreme', encrypted: true }, realisticCapacityOptions().metadata
-            );
-            const direct = F5.calculateCapacity(allBlocks, realisticCapacityOptions());
+        const viaHelper = BatchEmbedder.calculateCarrierCapacity(allBlocks);
+        const direct = StegoEngine.calculateCapacity(allBlocks);
 
-            expect(viaHelper).toBe(direct);
-        });
+        expect(viaHelper).toBe(direct);
     });
 });

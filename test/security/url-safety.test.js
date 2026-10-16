@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../utils/pbt.js';
 import { isSafeHttpUrl } from '../../src/utils/url-safety.js';
 
 describe('URL safety whitelist', () => {
@@ -29,5 +30,49 @@ describe('URL safety whitelist', () => {
         expect(isSafeHttpUrl(null)).toBe(false);
         expect(isSafeHttpUrl(undefined)).toBe(false);
         expect(isSafeHttpUrl(42)).toBe(false);
+    });
+
+    it('Property: javascript schemes are unconditionally rejected regardless of payload', async () => {
+        await assertProperty(
+            [Arbitrary.string(0, 100)],
+            (payload) => {
+                const res = isSafeHttpUrl(`javascript:${payload}`);
+                expect(res).toBe(false);
+            },
+            100
+        );
+    });
+
+    it('Property: data schemes are unconditionally rejected regardless of payload', async () => {
+        await assertProperty(
+            [Arbitrary.string(0, 100)],
+            (payload) => {
+                const res = isSafeHttpUrl(`data:${payload}`);
+                expect(res).toBe(false);
+            },
+            100
+        );
+    });
+
+    it('Property: arbitrary strings never throw and return a boolean', async () => {
+        await assertProperty(
+            [Arbitrary.string(0, 200)],
+            (input) => {
+                const res = isSafeHttpUrl(input);
+                expect(typeof res).toBe('boolean');
+            },
+            100
+        );
+    });
+
+    it('Property: valid https URLs with clean hostnames are accepted', async () => {
+        await assertProperty(
+            [Arbitrary.integer(1, 1000)],
+            (id) => {
+                const url = `https://safe-domain-${id}.example.org/path/${id}`;
+                expect(isSafeHttpUrl(url)).toBe(true);
+            },
+            50
+        );
     });
 });

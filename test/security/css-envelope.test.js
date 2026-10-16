@@ -30,14 +30,11 @@ describe('css-envelope sealing', () => {
         const payload = bytes('vault document bytes');
         const { envelope, shares } = await sealed(payload, 3, 5);
 
-        if (!(envelope.iv instanceof Uint8Array) || envelope.iv.length !== 12) {
-            throw new Error('expected 12-byte GCM iv');
-        }
-        if (!(envelope.ciphertext instanceof Uint8Array)) throw new Error('ciphertext missing');
-        if (envelope.ciphertext.length !== payload.length + 16) {
-            throw new Error('ciphertext must be payload + 16-byte tag');
-        }
-        if (shares.length !== 5) throw new Error('share count mismatch');
+        expect(envelope.iv).toBeInstanceOf(Uint8Array);
+        expect(envelope.iv).toHaveLength(12);
+        expect(envelope.ciphertext).toBeInstanceOf(Uint8Array);
+        expect(envelope.ciphertext).toHaveLength(payload.length + 16);
+        expect(shares).toHaveLength(5);
     });
 
     it('never exposes the data-encryption key in shares or envelope', async () => {
@@ -50,7 +47,7 @@ describe('css-envelope sealing', () => {
         const [result] = await sealPayload(payload, { threshold: 2, total: 3, random: wrapped });
 
         const dek = drawn.find(b => b.length === 32);
-        if (!dek) throw new Error('test setup: expected one 32-byte draw for the DEK');
+        expect(dek).toBeDefined();
 
         const blobs = [
             ...result.shares.map(s => Array.from(s.data).join()),
@@ -58,17 +55,15 @@ describe('css-envelope sealing', () => {
             Array.from(result.envelope.iv).join()
         ].join('|');
 
-        if (blobs.includes(Array.from(dek).join())) {
-            throw new Error('raw DEK leaked into shares or envelope');
-        }
+        expect(blobs.includes(Array.from(dek).join())).toBe(false);
     });
 
     it('rejects bad parameters via tuples', async () => {
         const [, emptyErr] = await sealPayload(new Uint8Array(0), { threshold: 1, total: 1 });
-        if (!(emptyErr instanceof Error)) throw new Error('empty payload accepted');
+        expect(emptyErr).toBeInstanceOf(Error);
 
         const [, optsErr] = await sealPayload(bytes('x'), { threshold: 5, total: 3 });
-        if (!(optsErr instanceof Error)) throw new Error('threshold > total accepted');
+        expect(optsErr).toBeInstanceOf(Error);
     });
 });
 
@@ -94,7 +89,7 @@ describe('css-envelope opening', () => {
     it('fails closed below the threshold even with valid shares', async () => {
         const { envelope, shares } = await sealed(bytes('two of five'), 3, 5);
         const [, err] = await openEnvelope(envelope, shares.slice(0, 2), { threshold: 3 });
-        if (!(err instanceof Error)) throw new Error('sub-threshold open accepted');
+        expect(err).toBeInstanceOf(Error);
     });
 
     it('rejects tampered ciphertext even with every share present', async () => {
@@ -105,7 +100,7 @@ describe('css-envelope opening', () => {
         tampered.ciphertext[0] ^= 0x01;
 
         const [, err] = await openEnvelope(tampered, shares, { threshold: 2 });
-        if (!(err instanceof Error)) throw new Error('tampered ciphertext decrypted');
+        expect(err).toBeInstanceOf(Error);
     });
 
     it('refuses shares from a different sealing operation', async () => {
@@ -114,7 +109,7 @@ describe('css-envelope opening', () => {
 
         const mixedShares = [second.shares[0], second.shares[1]];
         const [, err] = await openEnvelope(first.envelope, mixedShares, { threshold: 2 });
-        if (!(err instanceof Error)) throw new Error('foreign shares reconstructed a payload');
+        expect(err).toBeInstanceOf(Error);
     });
 
     it('roundtrips arbitrary payloads up to vault scale (property)', async () => {
@@ -122,10 +117,10 @@ describe('css-envelope opening', () => {
             [Arbitrary.byteArray(16, 512)],
             async (payload) => {
                 const [result, err] = await sealPayload(payload, { threshold: 2, total: 3, random: seededRandom(payload.length) });
-                if (err) throw err;
+                expect(err).toBe(null);
                 const [out, outErr] = await openEnvelope(result.envelope, result.shares.slice(1), { threshold: 2 });
-                if (outErr) throw outErr;
-                if (Array.from(out).join() !== Array.from(payload).join()) throw new Error('mismatch');
+                expect(outErr).toBe(null);
+                expect(out).toEqual(payload);
             },
             25
         );

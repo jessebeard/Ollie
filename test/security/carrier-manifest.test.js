@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../utils/pbt.js';
 import {
     MANIFEST_FORMAT,
     MANIFEST_VERSION,
@@ -177,5 +178,55 @@ describe('carrier manifest chunk binding', () => {
         swapped[0] = { index: 1, checksum: m.entries[0].checksum };
         const [, errIndex] = bindChunkRecords(swapped, m);
         if (!(errIndex instanceof Error)) throw new Error('index swap accepted');
+    });
+
+    describe('PBT & Metamorphic Tamper Resistance', () => {
+        it('MR-manifest-tamper: flipping any character in the MAC causes verification failure', async () => {
+            const m = await buildSample();
+            const originalMac = m.mac;
+
+            await assertProperty(
+                [Arbitrary.integer(0, originalMac.length - 1)],
+                async (charPos) => {
+                    // Mutate a single char in the hex/base64 MAC string
+                    const corruptedChar = originalMac[charPos] === 'a' ? 'b' : 'a';
+                    const corruptedMac = originalMac.slice(0, charPos) + corruptedChar + originalMac.slice(charPos + 1);
+                    const corruptedManifest = { ...m, mac: corruptedMac };
+
+                    const [verified, err] = await verifyManifest(corruptedManifest, PASSWORD);
+                    expect(verified).toBe(false);
+                },
+                30
+            );
+        });
+
+        it('Property: wrong password unconditionally fails verification', async () => {
+            const m = await buildSample();
+            await assertProperty(
+                [Arbitrary.string(1, 30)],
+                async (wrongPass) => {
+                    if (wrongPass === PASSWORD) return;
+                    const [verified] = await verifyManifest(m, wrongPass);
+                    expect(verified).toBe(false);
+                },
+                30
+            );
+        });
+
+        it('Property: tampering chunk records invalidates manifest verification', async () => {
+            const m = await buildSample();
+            await assertProperty(
+                [Arbitrary.integer(0, 2), Arbitrary.integer(1, 1000)],
+                async (entryIdx, delta) => {
+                    const tamperedEntries = JSON.parse(JSON.stringify(m.entries));
+                    tamperedEntries[entryIdx].checksum = (tamperedEntries[entryIdx].checksum + delta) >>> 0;
+                    const tamperedManifest = { ...m, entries: tamperedEntries };
+
+                    const [verified] = await verifyManifest(tamperedManifest, PASSWORD);
+                    expect(verified).toBe(false);
+                },
+                30
+            );
+        });
     });
 });

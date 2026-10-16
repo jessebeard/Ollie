@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import {
     decodeDC,
     decodeAC,
@@ -197,5 +198,52 @@ describe('HuffmanDecoder', () => {
         expect(decodeValue(0b0000, 4)).toBe(-15);
         expect(decodeValue(0b1000, 4)).toBe(8);
         expect(decodeValue(0b1111, 4)).toBe(15);
+    });
+
+    describe('PBT Properties', () => {
+        it('Property: decodeValue produces non-zero values strictly within [2^(S-1), 2^S - 1] magnitude range', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 15)],
+                (category) => {
+                    const maxCode = (1 << category) - 1;
+                    const minCode = 0;
+
+                    // Minimum positive code (high bit 1, rest 0)
+                    const minPosCode = 1 << (category - 1);
+                    const minPosVal = decodeValue(minPosCode, category);
+                    expect(minPosVal).toBe(1 << (category - 1));
+
+                    // Maximum positive code (all bits 1)
+                    const maxPosVal = decodeValue(maxCode, category);
+                    expect(maxPosVal).toBe((1 << category) - 1);
+
+                    // Minimum negative code (all bits 0)
+                    const minNegVal = decodeValue(minCode, category);
+                    expect(minNegVal).toBe(-((1 << category) - 1));
+
+                    // Maximum negative code (high bit 0, rest 1)
+                    const maxNegCode = (1 << (category - 1)) - 1;
+                    const maxNegVal = decodeValue(maxNegCode, category);
+                    expect(maxNegVal).toBe(-(1 << (category - 1)));
+                },
+                30
+            );
+        });
+
+        it('Property: DC differential accumulation adds diff to previous DC', () => {
+            const bits = new Uint8Array(16);
+            bits[0] = 1;
+            const values = new Uint8Array([0]);
+            const dcTable = new HuffmanTable(bits, values, 0, 0);
+
+            // Category 0 means diff is 0
+            for (let prev = -500; prev <= 500; prev += 100) {
+                const data = new Uint8Array([0b00000000]);
+                const reader = new BitReader(data);
+                const [dc, err] = decodeDC(reader, dcTable, prev);
+                expect(err).toBe(null);
+                expect(dc).toBe(prev);
+            }
+        });
     });
 });

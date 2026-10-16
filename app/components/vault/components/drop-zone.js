@@ -12,6 +12,7 @@ export class DropZone {
     }
 
     initialize() {
+        if (!this.element) return;
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             this.element.addEventListener(eventName, (e) => {
                 e.preventDefault();

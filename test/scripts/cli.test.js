@@ -1,13 +1,13 @@
 import { describe, it, expect } from '../utils/test-runner.js';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
 
 if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
     describe('Ollie CLI', () => {
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
+    const fs = (await import('fs')).default;
+    const os = (await import('os')).default;
+    const path = (await import('path')).default;
     const { cliSave, cliLoad, cliVerify, cliImportCsv, cliTotp, parseArgs } = await import('../../scripts/cli.mjs');
     const { PasswordVault } = await import('../../src/structures/vault/immutable-vault.js');
     const { JpegEncoder } = await import('../../src/codec/encoder.js');
@@ -23,16 +23,18 @@ if (typeof process === 'undefined' || !process.versions || !process.versions.nod
     }
 
     async function makeCarrierFile(dir, name) {
-        const width = 640;
-        const height = 400;
+        const width = 800;
+        const height = 600;
         const data = new Uint8ClampedArray(width * height * 4);
+        let seed = 1234567;
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = (i * 5) & 0xFF;
-            data[i + 1] = (i * 13) & 0xFF;
-            data[i + 2] = (i * 29) & 0xFF;
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            data[i] = (seed >>> 24) & 0xFF;
+            data[i + 1] = (seed >>> 16) & 0xFF;
+            data[i + 2] = (seed >>> 8) & 0xFF;
             data[i + 3] = 255;
         }
-        const bytes = await new JpegEncoder(90, { subsampling: '4:4:4' }).encode({ width, height, data });
+        const bytes = await new JpegEncoder(90).encode({ width, height, data });
         const filePath = path.join(dir, name);
         fs.writeFileSync(filePath, bytes);
         return filePath;
