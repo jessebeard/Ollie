@@ -29,9 +29,24 @@ export class VaultUI {
         this.activeTags = new Set();
         this.currentQuery = '';
         this.currentSort = 'newest';
+        this.tagSortMode = 'count';
+        this.tagSortDir = 'desc';
         this.totalCapacity = 0;
+        this.totalDirectoryBytes = 0;
+        this.mascotState = 'static';
+        this.viewMode = 'sidebar';
+        if (typeof localStorage !== 'undefined') {
+            try {
+                const savedMode = localStorage.getItem('ollie-view-mode');
+                if (savedMode === 'card' || savedMode === 'both' || savedMode === 'sidebar') {
+                    this.viewMode = savedMode;
+                }
+            } catch (_) {}
+        }
         this._vaultSizeCache = 0;
         this._vaultSizeCacheKey = '';
+        this._clipboardTimer = null;
+        this._lastCopiedSecret = null;
 
         this.initialize();
     }
@@ -41,21 +56,93 @@ export class VaultUI {
         const dropEl = document.getElementById('dropZone');
         if (dropEl) {
             new DropZone(dropEl, (files) => this.handleFilesDropped(files));
+
+            dropEl.addEventListener('dragenter', () => this.setMascotState('animated'));
+            dropEl.addEventListener('dragleave', (e) => {
+                if (!e.relatedTarget) {
+                    this.setMascotState(this.vault && this.vault.isUnlocked ? 'static' : 'static');
+                }
+            });
         }
 
         // View
         const viewEl = document.getElementById('vaultList');
         if (viewEl) {
             this.view = new VaultView(viewEl, this.events);
+            this.view.setViewMode(this.viewMode);
         }
 
         // Bind Events
         this.events.on('edit-entry', (e) => this.editEntry(e));
         this.events.on('scan-qr-file', (e) => this.handleScanQrFile(e));
         this.events.on('copy-password', (p) => this.copyPassword(p));
+        this.events.on('entry-selected', (e) => this.handleEntrySelected(e));
         this.events.on('unsafe-url-blocked', () => {
             this.modals.showAlert('Blocked', 'That entry URL uses an unsupported scheme. Only http(s) links can be opened.', 'error');
         });
+
+        // Layout View Mode Switcher
+        const modeBtns = (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function')
+            ? document.querySelectorAll('.view-mode-btn')
+            : [];
+        modeBtns.forEach(btn => {
+            if (btn.classList) btn.classList.toggle('active', btn.dataset.mode === this.viewMode);
+            btn.addEventListener('click', () => {
+                this.setViewMode(btn.dataset.mode);
+            });
+        });
+        this.setViewMode(this.viewMode);
+
+        // Keyboard Shortcuts Button & Window Keydown Listener
+        const shortcutsBtn = document.getElementById('shortcutsBtn');
+        if (shortcutsBtn) {
+            shortcutsBtn.addEventListener('click', () => this.modals.showShortcutsModal());
+        }
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('keydown', (e) => this.handleKeyDown(e));
+            window.addEventListener('resize', () => {
+                if (this.view && typeof this.view.reanchor === 'function') {
+                    this.view.reanchor();
+                }
+            });
+        }
+
+        // Tag Sort Toggle & Direction Buttons
+        const tagSortBtn = document.getElementById('tagSortToggleBtn');
+        const tagSortDirBtn = document.getElementById('tagSortDirBtn');
+
+        const updateTagSortControls = () => {
+            if (tagSortBtn) {
+                tagSortBtn.textContent = this.tagSortMode === 'count' ? 'Freq' : 'A-Z';
+                tagSortBtn.title = this.tagSortMode === 'count'
+                    ? 'Sorting by frequency (click for A-Z)'
+                    : 'Sorting alphabetically (click for frequency)';
+            }
+            if (tagSortDirBtn) {
+                tagSortDirBtn.textContent = this.tagSortDir === 'desc' ? '↓' : '↑';
+                tagSortDirBtn.title = this.tagSortDir === 'desc'
+                    ? 'Descending (click for Ascending)'
+                    : 'Ascending (click for Descending)';
+            }
+        };
+
+        if (tagSortBtn) {
+            updateTagSortControls();
+            tagSortBtn.addEventListener('click', () => {
+                this.tagSortMode = this.tagSortMode === 'count' ? 'az' : 'count';
+                updateTagSortControls();
+                this.renderTags();
+            });
+        }
+
+        if (tagSortDirBtn) {
+            updateTagSortControls();
+            tagSortDirBtn.addEventListener('click', () => {
+                this.tagSortDir = this.tagSortDir === 'desc' ? 'asc' : 'desc';
+                updateTagSortControls();
+                this.renderTags();
+            });
+        }
 
         // Buttons
         const createBtn = document.getElementById('createBtn');
@@ -143,6 +230,7 @@ export class VaultUI {
 
         const filesToLoad = [];
         this.droppedHandles = new Map();
+        let totalDirBytes = 0;
 
         for (const item of items) {
             if (item.kind === 'file' && item.getFile) {
@@ -150,6 +238,7 @@ export class VaultUI {
                     const file = await item.getFile();
                     if (FileScanner.matchesPattern(file.name, '*.jpg') || FileScanner.matchesPattern(file.name, '*.jpeg')) {
                         filesToLoad.push(file);
+                        totalDirBytes += (file.size || 0);
                         this.droppedHandles.set(file.name, item);
                     }
                 } catch (e) {
@@ -158,26 +247,35 @@ export class VaultUI {
             } else {
                 if (item.name && (FileScanner.matchesPattern(item.name, '*.jpg') || FileScanner.matchesPattern(item.name, '*.jpeg'))) {
                     filesToLoad.push(item);
+                    totalDirBytes += (item.size || 0);
                 } else if (!item.name && (item.type === 'image/jpeg' || item.type === 'image/jpg')) {
                     filesToLoad.push(item);
+                    totalDirBytes += (item.size || 0);
                 }
             }
         }
+        this.totalDirectoryBytes = totalDirBytes;
 
         if (filesToLoad.length === 0) {
+            this.setMascotState('sad');
             this.modals.showAlert('No Carriers Found', 'No JPEG (.jpg / .jpeg) carrier images were found in the dropped files or folders. Only JPEG images can be used.', 'error');
             return;
         }
 
         try {
             const password = await this.modals.prompt('Unlock Vault', 'Enter Master Password:', 'password');
-            if (!password) return;
+            if (!password) {
+                this.setMascotState('static');
+                return;
+            }
 
+            this.setMascotState('thinking');
             this.showLoading(true, 'Decrypting...');
             const [newVault, loadErr] = await PasswordVault.load(filesToLoad, password);
             this.showLoading(false);
 
             if (loadErr) {
+                this.setMascotState('sad');
                 this.modals.showAlert('Error', 'Failed to load vault: ' + loadErr.message, 'error');
                 return;
             }
@@ -187,9 +285,11 @@ export class VaultUI {
             const gateOk = await this.enforceTotpGate();
             if (!gateOk) {
                 this.vault = null;
+                this.setMascotState('static');
                 this.updateUI();
                 return;
             }
+            this.setMascotState('happy');
             this._notify(`Loaded ${this.vault.entries.length} entries.`, 'success');
 
             const [scanResult, scanErr] = await CapacityScanner.scan(filesToLoad, {
@@ -208,6 +308,7 @@ export class VaultUI {
             this.updateUI();
 
         } catch (e) {
+            this.setMascotState('sad');
             this.showLoading(false);
             this.modals.showAlert('Error', 'Unexpected error: ' + e.message, 'error');
         }
@@ -344,6 +445,8 @@ export class VaultUI {
         if (!this.vault) return;
         this.vault = this.vault.lock();
         this._sessionPassword = null;
+        if (this.view) this.view.clearSelection();
+        this.setMascotState('static');
         this.updateUI();
         this._notify('Vault locked', 'info');
     }
@@ -695,12 +798,7 @@ export class VaultUI {
             return;
         }
 
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(decrypted.password);
-            this._notify('Password copied to clipboard', 'success');
-        } else {
-            this.modals.showAlert('Password', decrypted.password);
-        }
+        this.copyToClipboardWithAutoClear(decrypted.password, 'Password');
     }
 
     async importData() {
@@ -825,6 +923,19 @@ export class VaultUI {
     async exportData() {
         if (!this.vault.isUnlocked) return;
 
+        // Master password re-authentication gate
+        const enteredPassword = await this.modals.prompt(
+            'Verify Master Password',
+            'Plaintext Export: Re-enter your master password to authorize unencrypted export:',
+            'password'
+        );
+        if (!enteredPassword) return;
+
+        if (enteredPassword !== this._sessionPassword) {
+            this._notify('Master password verification failed. Export cancelled.', 'error');
+            return;
+        }
+
         const warningMsg = '⚠️ SECURITY WARNING: Plaintext Export\n\n' +
             'You are about to export your entire vault in PLAINTEXT. All passwords will be saved in an unencrypted JSON file on your computer.\n\n' +
             'Anyone with access to this file can view all your passwords.\n\n' +
@@ -849,6 +960,7 @@ export class VaultUI {
         a.download = `ollie-vault-export-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
+        this._notify('Plaintext export downloaded', 'info');
     }
 
     getVaultSize() {
@@ -940,17 +1052,30 @@ export class VaultUI {
                 const usedSize = this.getVaultSize();
                 const usedStr = this.formatSize(usedSize);
                 const totalStr = this.formatSize(this.totalCapacity || 0);
+                const dirSize = this.totalDirectoryBytes || 0;
+                const dirStr = this.formatSize(dirSize);
+
                 capacityText.textContent = `Used: ${usedStr} / Total: ${totalStr}`;
-                capacityText.title = `Vault currently uses ${usedStr} of ${totalStr} available space.`;
+
+                const stegoPercent = dirSize > 0 ? (this.totalCapacity / dirSize) * 100 : 0;
+                const vaultStegoPercent = this.totalCapacity > 0 ? Math.min(100, (usedSize / this.totalCapacity) * 100) : 0;
+                const vaultDirPercent = dirSize > 0 ? (usedSize / dirSize) * 100 : 0;
+
+                capacityText.title = dirSize > 0
+                    ? `Carrier Directory: ${dirStr}\nStego Capacity: ${totalStr} (${stegoPercent.toFixed(2)}% of directory)\nVault Payload: ${usedStr} (${vaultStegoPercent.toFixed(1)}% of stego, ${vaultDirPercent.toFixed(3)}% of directory)`
+                    : `Vault currently uses ${usedStr} of ${totalStr} available space.`;
 
                 const progressEl = document.getElementById('capacityProgress');
                 if (progressEl) {
-                    const percent = this.totalCapacity > 0 ? Math.min(100, (usedSize / this.totalCapacity) * 100) : 0;
-                    progressEl.style.width = `${percent}%`;
-
+                    progressEl.style.width = `${vaultStegoPercent}%`;
                     progressEl.classList.remove('warning', 'danger');
-                    if (percent > 90) progressEl.classList.add('danger');
-                    else if (percent > 75) progressEl.classList.add('warning');
+                    if (vaultStegoPercent > 90) progressEl.classList.add('danger');
+                    else if (vaultStegoPercent > 75) progressEl.classList.add('warning');
+                }
+
+                const vaultProgressEl = document.getElementById('vaultProgress');
+                if (vaultProgressEl) {
+                    vaultProgressEl.style.width = `${Math.min(100, Math.max(0, vaultDirPercent))}%`;
                 }
             }
 
@@ -1051,6 +1176,20 @@ export class VaultUI {
                 const remaining = 30 - (Math.floor(nowSeconds) % 30);
                 countdown.textContent = `${remaining}s`;
             }
+
+            // Also keep detailPane in sync if this entry is currently selected
+            const detailPane = document.getElementById('detailPane');
+            if (detailPane && this.view && this.view.selectedId === record.id) {
+                const detailCode = detailPane.querySelector('.detail-totp-code');
+                const detailCount = detailPane.querySelector('.detail-totp-countdown');
+                if (detailCode) {
+                    detailCode.textContent = label;
+                }
+                if (detailCount) {
+                    const remaining = 30 - (Math.floor(nowSeconds) % 30);
+                    detailCount.textContent = `${remaining}s`;
+                }
+            }
         }
     }
 
@@ -1093,7 +1232,16 @@ export class VaultUI {
         }
 
         tagList.innerHTML = '';
-        const sortedTags = [...tagCounts.keys()].sort((a, b) => a.localeCompare(b));
+        const sortedTags = [...tagCounts.keys()].sort((a, b) => {
+            const isDesc = this.tagSortDir !== 'asc';
+            if (this.tagSortMode === 'az') {
+                return isDesc ? a.localeCompare(b) : b.localeCompare(a);
+            }
+            const countA = tagCounts.get(a) || 0;
+            const countB = tagCounts.get(b) || 0;
+            const diff = isDesc ? countB - countA : countA - countB;
+            return diff !== 0 ? diff : a.localeCompare(b);
+        });
         const filterQuery = (this.tagSearchQuery || '').toLowerCase();
 
         let visibleCount = 0;
@@ -1124,6 +1272,455 @@ export class VaultUI {
         if (visibleCount === 0 && filterQuery) {
             tagList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">No matching tags</span>';
         }
+    }
+
+    setViewMode(mode) {
+        if (!['sidebar', 'card', 'both'].includes(mode)) return;
+        this.viewMode = mode;
+        if (typeof localStorage !== 'undefined') {
+            try { localStorage.setItem('ollie-view-mode', mode); } catch (_) {}
+        }
+
+        const modeBtns = (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function')
+            ? document.querySelectorAll('.view-mode-btn')
+            : [];
+        modeBtns.forEach(b => {
+            if (b.classList) b.classList.toggle('active', b.dataset.mode === mode);
+        });
+
+        this._updateViewModeClasses();
+
+        if (this.view) {
+            this.view.setViewMode(mode);
+        }
+
+        const detailPane = document.getElementById('detailPane');
+        if (detailPane) {
+            if (mode === 'card') {
+                detailPane.style.display = 'none';
+                if (detailPane.classList) detailPane.classList.remove('is-open');
+            } else if (mode === 'both') {
+                detailPane.style.display = 'flex';
+                if (detailPane.classList) detailPane.classList.add('is-open');
+                if (this.view && this.view.selectedId) {
+                    this.handleEntrySelected({ id: this.view.selectedId, viewMode: mode });
+                } else {
+                    this._renderDetailPlaceholder();
+                }
+            } else {
+                // sidebar
+                if (!this.view || !this.view.selectedId) {
+                    detailPane.style.display = 'none';
+                    if (detailPane.classList) detailPane.classList.remove('is-open');
+                } else {
+                    this.handleEntrySelected({ id: this.view.selectedId, viewMode: mode });
+                }
+            }
+        }
+    }
+
+    _updateViewModeClasses() {
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone && dropZone.classList) {
+            dropZone.classList.remove('view-mode-sidebar', 'view-mode-card', 'view-mode-both');
+            dropZone.classList.add(`view-mode-${this.viewMode}`);
+        }
+    }
+
+    _renderDetailPlaceholder() {
+        const detailPane = document.getElementById('detailPane');
+        if (!detailPane) return;
+        detailPane.innerHTML = `
+            <div class="detail-pane-placeholder">
+                <div class="placeholder-icon">👈</div>
+                <h3>No Entry Selected</h3>
+                <p>Select a card from the list to view its credentials and details.</p>
+            </div>
+        `;
+    }
+
+    async handleEntrySelected({ id, viewMode, automata, targetCard }) {
+        const detailPane = document.getElementById('detailPane');
+        if (!id || !this.vault || !this.vault.isUnlocked) {
+            if (detailPane) {
+                if (viewMode === 'both') {
+                    detailPane.style.display = 'flex';
+                    if (detailPane.classList) detailPane.classList.add('is-open');
+                    this._renderDetailPlaceholder();
+                } else {
+                    detailPane.style.display = 'none';
+                    if (detailPane.classList) detailPane.classList.remove('is-open');
+                    detailPane.innerHTML = '';
+                }
+            }
+            return;
+        }
+
+        const secureEntry = this.vault.entries.find(e => e.id === id);
+        if (!secureEntry) return;
+
+        const [sessionKey, , kErr] = await this.vault._getSessionKey();
+        if (kErr || !sessionKey) return;
+
+        const [decrypted, decErr] = await secureEntry.decrypt(sessionKey);
+        if (decErr || !decrypted) return;
+
+        // In 'card' or 'both' mode: populate card's expanded notes and metadata
+        if (viewMode === 'card' || viewMode === 'both') {
+            const cardEl = document.querySelector(`[data-entry-id="${id}"]`);
+            if (cardEl) {
+                const notesSlot = cardEl.querySelector('.expanded-notes-slot');
+                if (notesSlot) {
+                    notesSlot.innerHTML = decrypted.notes
+                        ? `<div class="card-notes-preview"><strong>Notes:</strong><p>${escapeHtml(decrypted.notes)}</p></div>`
+                        : '<div class="card-notes-preview text-muted"><em>No notes recorded</em></div>';
+                }
+                const metaSlot = cardEl.querySelector('.expanded-meta-slot');
+                if (metaSlot) {
+                    const modDate = decrypted.modified ? new Date(decrypted.modified).toLocaleDateString() : '';
+                    metaSlot.innerHTML = `<span class="card-meta-text">Modified: ${escapeHtml(modDate)}</span>`;
+                }
+            }
+        }
+
+        // In 'sidebar' or 'both' mode: populate and display right detail pane
+        if ((viewMode === 'sidebar' || viewMode === 'both') && detailPane) {
+            const escape = (str) => escapeHtml(str);
+            const hasUrl = !!(decrypted.url && decrypted.url.trim());
+            const hasTotp = !!(decrypted.totp && decrypted.totp.trim());
+
+            detailPane.innerHTML = `
+                <div class="detail-pane-header">
+                    <div class="detail-pane-title-group">
+                        <span class="detail-icon">${VaultView.getIcon(decrypted)}</span>
+                        <div>
+                            <h3 class="detail-title">${escape(decrypted.title || 'Untitled')}</h3>
+                            <span class="detail-subtitle">${escape(decrypted.username || 'No username')}</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-icon detail-close-btn" aria-label="Close Inspector">✕</button>
+                </div>
+
+                <div class="detail-pane-body">
+                    <div class="detail-section">
+                        <label class="detail-label">Username</label>
+                        <div class="detail-row">
+                            <span class="detail-value mono">${escape(decrypted.username || '—')}</span>
+                            ${decrypted.username ? `<button type="button" class="btn-icon copy-user-btn" title="Copy username">📋</button>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <label class="detail-label">Password</label>
+                        <div class="detail-row">
+                            <input type="password" readonly class="detail-password-input mono" value="${escape(decrypted.password || '')}">
+                            <button type="button" class="btn-icon toggle-detail-pw-btn" title="Show/Hide password">👁</button>
+                            <button type="button" class="btn-icon copy-detail-pw-btn" title="Copy password">📋</button>
+                        </div>
+                    </div>
+
+                    ${hasTotp ? `
+                    <div class="detail-section">
+                        <label class="detail-label">Two-Factor Authentication (TOTP)</label>
+                        <div class="detail-totp-container">
+                            <button type="button" class="detail-totp-code mono" title="Click to copy code">------</button>
+                            <span class="detail-totp-countdown">--s</span>
+                        </div>
+                    </div>` : ''}
+
+                    ${hasUrl ? `
+                    <div class="detail-section">
+                        <label class="detail-label">Website</label>
+                        <div class="detail-row">
+                            <span class="detail-value url-text">${escape(decrypted.url)}</span>
+                            <button type="button" class="btn-icon launch-url-btn" title="Open website in new tab">↗</button>
+                        </div>
+                    </div>` : ''}
+
+                    <div class="detail-section">
+                        <label class="detail-label">Notes</label>
+                        <div class="detail-notes-box">
+                            ${decrypted.notes ? `<pre class="detail-notes-text">${escape(decrypted.notes)}</pre>` : '<span class="text-muted"><em>No notes</em></span>'}
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <label class="detail-label">Tags</label>
+                        <div class="detail-tags-list">
+                            ${(decrypted.tags || []).length > 0
+                                ? (decrypted.tags || []).map(t => `<button type="button" class="tag detail-tag-pill" data-tag="${escape(t)}">#${escape(t)}</button>`).join('')
+                                : '<span class="text-muted"><em>No tags</em></span>'}
+                        </div>
+                    </div>
+
+                    <div class="detail-section detail-meta-section">
+                        <span class="detail-meta-line">Created: ${decrypted.created ? new Date(decrypted.created).toLocaleString() : '—'}</span>
+                        <span class="detail-meta-line">Modified: ${decrypted.modified ? new Date(decrypted.modified).toLocaleString() : '—'}</span>
+                        <span class="detail-meta-line">Revision: ${escape(String(decrypted.revision || this.vault.metadata?.revision || 0))}</span>
+                    </div>
+                </div>
+
+                <div class="detail-pane-footer">
+                    <button type="button" class="btn btn-secondary detail-edit-btn">✏️ Edit</button>
+                    <button type="button" class="btn btn-danger detail-delete-btn">🗑️ Delete</button>
+                </div>
+            `;
+
+            detailPane.style.display = 'flex';
+            if (detailPane.classList) detailPane.classList.add('is-open');
+
+            const closeBtn = detailPane.querySelector('.detail-close-btn');
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    if (this.view) this.view.clearSelection();
+                };
+            }
+
+            const copyUserBtn = detailPane.querySelector('.copy-user-btn');
+            if (copyUserBtn && decrypted.username) {
+                copyUserBtn.onclick = () => this.copyToClipboardWithAutoClear(decrypted.username, 'Username');
+            }
+
+            const togglePwBtn = detailPane.querySelector('.toggle-detail-pw-btn');
+            const pwInput = detailPane.querySelector('.detail-password-input');
+            if (togglePwBtn && pwInput) {
+                togglePwBtn.onclick = () => {
+                    if (pwInput.type === 'password') {
+                        pwInput.type = 'text';
+                        togglePwBtn.textContent = '🙈';
+                    } else {
+                        pwInput.type = 'password';
+                        togglePwBtn.textContent = '👁';
+                    }
+                };
+            }
+
+            const copyPwBtn = detailPane.querySelector('.copy-detail-pw-btn');
+            if (copyPwBtn && decrypted.password) {
+                copyPwBtn.onclick = () => this.copyToClipboardWithAutoClear(decrypted.password, 'Password');
+            }
+
+            const launchBtn = detailPane.querySelector('.launch-url-btn');
+            if (launchBtn && decrypted.url) {
+                launchBtn.onclick = () => {
+                    if (!isSafeHttpUrl(decrypted.url)) {
+                        this.events.emit('unsafe-url-blocked', { id, url: decrypted.url });
+                        return;
+                    }
+                    window.open(decrypted.url, '_blank', 'noopener,noreferrer');
+                };
+            }
+
+            const tagPills = (detailPane && typeof detailPane.querySelectorAll === 'function')
+                ? detailPane.querySelectorAll('.detail-tag-pill')
+                : [];
+            tagPills.forEach(pill => {
+                pill.onclick = () => {
+                    const tag = pill.dataset.tag;
+                    if (tag) {
+                        this.activeTags.clear();
+                        this.activeTags.add(tag);
+                        this.updateUI();
+                    }
+                };
+            });
+
+            const editBtn = detailPane.querySelector('.detail-edit-btn');
+            if (editBtn) {
+                editBtn.onclick = () => this.editEntry(id);
+            }
+
+            const deleteBtn = detailPane.querySelector('.detail-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.onclick = async () => {
+                    const confirmed = await this.modals.confirm('Are you sure you want to permanently delete this entry?');
+                    if (!confirmed) return;
+                    const [newVault, delErr] = this.vault.deleteEntry(id);
+                    if (delErr) {
+                        this.modals.showAlert('Error', 'Failed to delete entry: ' + delErr.message, 'error');
+                        return;
+                    }
+                    this.vault = newVault;
+                    if (this.view) this.view.clearSelection();
+                    this.updateUI();
+                    this._notify('Entry deleted', 'info');
+                };
+            }
+
+            if (hasTotp) {
+                this._updateDetailTotp(decrypted.totp);
+            }
+        }
+
+        // Post-async layout settlement via CardFlowAutomata to eliminate secondary layout drift
+        const currentAutomata = automata || (this.view && this.view.automata);
+        const cardElement = targetCard || (id ? document.querySelector(`[data-entry-id="${id}"]`) : null);
+        if (currentAutomata && cardElement) {
+            currentAutomata.settle(cardElement);
+        }
+    }
+
+    async _updateDetailTotp(uri) {
+        const detailPane = document.getElementById('detailPane');
+        if (!detailPane) return;
+        const codeBtn = detailPane.querySelector('.detail-totp-code');
+        const countdown = detailPane.querySelector('.detail-totp-countdown');
+        if (!codeBtn) return;
+
+        const [code, err] = await codeFromOtpauthUri(uri);
+        if (!err && code) {
+            const formatted = `${code.slice(0, 3)} ${code.slice(3)}`;
+            codeBtn.textContent = formatted;
+            codeBtn.onclick = () => this.copyToClipboardWithAutoClear(code, 'TOTP code');
+            if (countdown) {
+                const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+                countdown.textContent = `${remaining}s`;
+            }
+        }
+    }
+
+    copyToClipboardWithAutoClear(text, label = 'Secret') {
+        if (!text) return;
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text);
+            this._lastCopiedSecret = text;
+            this._notify(`${label} copied! Auto-clearing in 30s...`, 'success');
+
+            if (this._clipboardTimer) {
+                clearTimeout(this._clipboardTimer);
+            }
+
+            this._clipboardTimer = setTimeout(async () => {
+                try {
+                    if (navigator.clipboard.readText) {
+                        const current = await navigator.clipboard.readText();
+                        if (current === this._lastCopiedSecret) {
+                            await navigator.clipboard.writeText('');
+                            this._notify('Clipboard auto-cleared for security.', 'info');
+                        }
+                    } else {
+                        await navigator.clipboard.writeText('');
+                    }
+                } catch (_) {}
+                this._lastCopiedSecret = null;
+                this._clipboardTimer = null;
+            }, 30000);
+        } else {
+            this.modals.showAlert(label, text);
+        }
+    }
+
+    handleKeyDown(e) {
+        const active = typeof document !== 'undefined' ? document.activeElement : null;
+        const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+
+        if (e.key === 'Escape') {
+            if (this.view && this.view.selectedId) {
+                this.view.clearSelection();
+                return;
+            }
+            if (this.modals && typeof this.modals.hide === 'function') {
+                this.modals.hide();
+            }
+            return;
+        }
+
+        if (isInput) return;
+
+        if (e.key === '/') {
+            e.preventDefault();
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && typeof searchInput.focus === 'function') searchInput.focus();
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+            e.preventDefault();
+            this.addEntry();
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            this.saveVault();
+            return;
+        }
+
+        if (e.key === '?') {
+            e.preventDefault();
+            this.modals.showShortcutsModal();
+            return;
+        }
+
+        const entries = this.vault && this.vault.isUnlocked
+            ? this.vault.search(this.currentQuery, Array.from(this.activeTags))
+            : [];
+        if (!entries.length || !this.view) return;
+
+        if (e.key === 'j' || e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentIdx = entries.findIndex(ent => ent.id === this.view.selectedId);
+            const nextIdx = currentIdx < entries.length - 1 ? currentIdx + 1 : 0;
+            this.view.selectEntry(entries[nextIdx].id, false);
+            return;
+        }
+
+        if (e.key === 'k' || e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const currentIdx = entries.findIndex(ent => ent.id === this.view.selectedId);
+            const prevIdx = currentIdx > 0 ? currentIdx - 1 : entries.length - 1;
+            this.view.selectEntry(entries[prevIdx].id, false);
+            return;
+        }
+
+        if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+            if (this.view.selectedId) {
+                e.preventDefault();
+                this.copyPassword(this.view.selectedId);
+            }
+            return;
+        }
+
+        if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey) {
+            if (this.view.selectedId) {
+                e.preventDefault();
+                this._copySelectedTotp(this.view.selectedId);
+            }
+            return;
+        }
+    }
+
+    async _copySelectedTotp(id) {
+        if (!this.vault || !this.vault.isUnlocked) return;
+        const entry = this.vault.entries.find(e => e.id === id);
+        if (!entry) return;
+        const [sessionKey] = await this.vault._getSessionKey();
+        if (!sessionKey) return;
+        const [decrypted] = await entry.decrypt(sessionKey);
+        if (!decrypted || !decrypted.totp) return;
+        const [code] = await codeFromOtpauthUri(decrypted.totp);
+        if (code) {
+            this.copyToClipboardWithAutoClear(code, 'TOTP code');
+        }
+    }
+
+    setMascotState(state) {
+        this.mascotState = state;
+        const mascotFiles = {
+            static: 'components/assets/ollie-static.svg',
+            animated: 'components/assets/ollie-animated.svg',
+            thinking: 'components/assets/ollie-thinking.svg',
+            happy: 'components/assets/ollie-happy.svg',
+            sad: 'components/assets/ollie-sad.svg'
+        };
+        const src = mascotFiles[state] || mascotFiles.static;
+        if (typeof document === 'undefined') return;
+        const sidebarLogo = document.getElementById('sidebarLogo');
+        if (sidebarLogo) sidebarLogo.src = src;
+        const emptyMascot = document.getElementById('emptyMascot');
+        if (emptyMascot) emptyMascot.src = src;
+        const loadingMascot = document.querySelector('#loadingOverlay img');
+        if (loadingMascot && state === 'thinking') loadingMascot.src = src;
     }
 
     showLoading(show, message = 'Processing...') {

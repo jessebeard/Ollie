@@ -7,150 +7,233 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const htmlContent = fs.readFileSync(path.join(__dirname, '../app/vault.html'), 'utf8');
 
-global.document = {
-    getElementById: (id) => {
-        const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
-        const match = htmlContent.match(regex);
+const elementRegistry = new Map();
 
-        if (match) {
-            const tag = match[0];
-            const element = {
-                tagName: match[1],
-                style: {},
-                dataset: {},
-                addEventListener: () => { },
-                removeEventListener: () => { },
-                classList: {
-                    add: () => { },
-                    remove: () => { },
-                    contains: () => false,
-                    toggle: () => { }
-                },
+function createMockElement(tag, id = null) {
+    const classes = new Set();
+    const attributes = {};
+    if (id) attributes['id'] = id;
+    const children = [];
+    const handlers = {};
+    const dataset = {};
 
-                get style() {
-                    const styleMatch = tag.match(/style=["']([^"']*)["']/);
-                    const styleObj = {};
-                    if (styleMatch) {
-                        const styles = styleMatch[1].split(';');
-                        styles.forEach(s => {
-                            const [key, val] = s.split(':');
-                            if (key && val) styleObj[key.trim()] = val.trim();
-                        });
+    const styleObj = {
+        setProperty: (prop, val) => { styleObj[prop] = String(val); },
+        removeProperty: (prop) => { delete styleObj[prop]; },
+        getPropertyValue: (prop) => styleObj[prop] || ''
+    };
+
+    const el = {
+        tagName: tag.toUpperCase(),
+        style: styleObj,
+        dataset,
+        children,
+        title: '',
+        textContent: '',
+        disabled: false,
+        classList: {
+            add: (...c) => c.forEach(x => classes.add(x)),
+            remove: (...c) => c.forEach(x => classes.delete(x)),
+            contains: (x) => classes.has(x),
+            toggle: (x, force) => {
+                if (force !== undefined) {
+                    if (force) classes.add(x); else classes.delete(x);
+                } else {
+                    if (classes.has(x)) classes.delete(x); else classes.add(x);
+                }
+            }
+        },
+        scrollTop: 0,
+        getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }),
+        addEventListener: (evt, h) => {
+            handlers[evt] = handlers[evt] || [];
+            handlers[evt].push(h);
+        },
+        removeEventListener: (evt, h) => {
+            if (handlers[evt]) handlers[evt] = handlers[evt].filter(f => f !== h);
+        },
+        dispatchEvent: (evt) => {
+            const list = handlers[evt.type] || [];
+            list.forEach(h => h(evt));
+        },
+        click: () => {
+            el.dispatchEvent({ type: 'click', target: el, stopPropagation: () => {} });
+        },
+        appendChild: (child) => {
+            if (child) {
+                child.parentNode = el;
+                children.push(child);
+            }
+            return child;
+        },
+        remove: () => {
+            if (el.parentNode && Array.isArray(el.parentNode.children)) {
+                const idx = el.parentNode.children.indexOf(el);
+                if (idx !== -1) el.parentNode.children.splice(idx, 1);
+            }
+        },
+        getAttribute: (attr) => attributes[attr] !== undefined ? attributes[attr] : null,
+        setAttribute: (attr, val) => {
+            attributes[attr] = String(val);
+            if (attr === 'id') elementRegistry.set(String(val), el);
+            if (attr === 'class') {
+                el.className = String(val);
+            }
+            if (attr.startsWith('data-')) {
+                const key = attr.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+                dataset[key] = String(val);
+            }
+        },
+        removeAttribute: (attr) => {
+            delete attributes[attr];
+        },
+        querySelector: function (sel) {
+            const match = (item) => {
+                if (!item) return false;
+                if (sel.startsWith('.')) return item.classList && item.classList.contains(sel.slice(1));
+                if (sel.startsWith('#')) return item.getAttribute && item.getAttribute('id') === sel.slice(1);
+                if (sel.startsWith('[') && sel.includes('=')) {
+                    const m = sel.match(/\[([a-zA-Z0-9-]+)="([^"]+)"\]/);
+                    if (m) return item.getAttribute && item.getAttribute(m[1]) === m[2];
+                }
+                return item.tagName && item.tagName.toLowerCase() === sel.toLowerCase();
+            };
+            const search = (node) => {
+                for (const child of node.children || []) {
+                    if (match(child)) return child;
+                    const found = search(child);
+                    if (found) return found;
+                }
+                return null;
+            };
+            const foundChild = search(el);
+            if (foundChild) return foundChild;
+
+            if (_innerHTML) {
+                if (sel.startsWith('.')) {
+                    const cls = sel.slice(1);
+                    if (new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"`, 'i').test(_innerHTML)) {
+                        const dummy = createMockElement('div');
+                        dummy.classList.add(cls);
+                        return dummy;
                     }
-                    return styleObj;
-                },
-
-                getAttribute: (attr) => {
-                    const attrMatch = tag.match(new RegExp(`${attr}=["']([^"']*)["']`));
-                    return attrMatch ? attrMatch[1] : null;
+                }
+                if (sel.startsWith('#')) {
+                    const id = sel.slice(1);
+                    if (new RegExp(`id="${id}"`, 'i').test(_innerHTML)) {
+                        return global.document.getElementById(id);
+                    }
+                }
+                if (new RegExp(`<${sel}\\b`, 'i').test(_innerHTML)) {
+                    return createMockElement(sel);
+                }
+            }
+            return null;
+        },
+        querySelectorAll: function (sel) {
+            const results = [];
+            const match = (item) => {
+                if (!item) return false;
+                if (sel.startsWith('.')) return item.classList && item.classList.contains(sel.slice(1));
+                if (sel.startsWith('#')) return item.getAttribute && item.getAttribute('id') === sel.slice(1);
+                if (sel.startsWith('[') && sel.includes('=')) {
+                    const m = sel.match(/\[([a-zA-Z0-9-]+)="([^"]+)"\]/);
+                    if (m) return item.getAttribute && item.getAttribute(m[1]) === m[2];
+                }
+                return item.tagName && item.tagName.toLowerCase() === sel.toLowerCase();
+            };
+            const search = (node) => {
+                for (const child of node.children || []) {
+                    if (match(child)) results.push(child);
+                    search(child);
                 }
             };
+            search(el);
+            return results;
+        },
+        focus: () => { }
+    };
 
-            Object.defineProperty(element, 'href', {
-                get: () => element.getAttribute('href') || '',
-                set: () => { }
-            });
-            Object.defineProperty(element, 'download', {
-                get: () => element.getAttribute('download') || '',
-                set: () => { }
-            });
-            Object.defineProperty(element, 'type', {
-                get: () => element.getAttribute('type') || '',
-                set: () => { }
-            });
-            Object.defineProperty(element, 'checked', {
-                get: () => element.getAttribute('checked') !== null,
-                set: () => { }
-            });
+    Object.defineProperty(el, 'className', {
+        get: () => Array.from(classes).join(' '),
+        set: (v) => {
+            classes.clear();
+            if (v) String(v).split(/\s+/).filter(Boolean).forEach(c => classes.add(c));
+        }
+    });
 
-            return element;
+    Object.defineProperty(el, 'href', {
+        get: () => el.getAttribute('href') || '',
+        set: (v) => el.setAttribute('href', v)
+    });
+    Object.defineProperty(el, 'download', {
+        get: () => el.getAttribute('download') || '',
+        set: (v) => el.setAttribute('download', v)
+    });
+    Object.defineProperty(el, 'type', {
+        get: () => el.getAttribute('type') || '',
+        set: (v) => el.setAttribute('type', v)
+    });
+    Object.defineProperty(el, 'checked', {
+        get: () => el.getAttribute('checked') !== null,
+        set: (v) => { if (v) el.setAttribute('checked', ''); else el.removeAttribute('checked'); }
+    });
+    let _innerHTML = '';
+    Object.defineProperty(el, 'innerHTML', {
+        get: () => _innerHTML,
+        set: (v) => {
+            _innerHTML = String(v);
+            if (!_innerHTML) {
+                children.length = 0;
+            }
         }
-        return {
-            tagName: 'DIV',
-            style: {},
-            classList: {
-                add: () => { },
-                remove: () => { },
-                contains: () => false,
-                toggle: () => { }
-            },
-            addEventListener: () => { },
-            appendChild: () => { },
-            getAttribute: () => null,
-            setAttribute: () => { },
-            removeAttribute: () => { },
-            textContent: '',
-            innerHTML: '',
-            querySelector: function () { return this; },
-            querySelectorAll: () => [],
-            focus: () => { }
-        };
-    },
-    createElement: (tag) => {
-        const classes = new Set();
-        const element = {
-            tagName: tag.toUpperCase(),
-            style: {},
-            className: '',
-            classList: {
-                add: (...c) => c.forEach(x => classes.add(x)),
-                remove: (...c) => c.forEach(x => classes.delete(x)),
-                contains: (x) => classes.has(x) || (element.className && element.className.split(/\s+/).includes(x)),
-                toggle: (x, force) => {
-                    if (force !== undefined) {
-                        if (force) classes.add(x); else classes.delete(x);
-                    } else {
-                        if (classes.has(x)) classes.delete(x); else classes.add(x);
-                    }
-                }
-            },
-            addEventListener: () => { },
-            removeEventListener: () => { },
-            appendChild: () => { },
-            remove: () => { },
-            getAttribute: () => null,
-            setAttribute: () => { },
-            removeAttribute: () => { },
-            textContent: '',
-            innerHTML: '',
-            querySelector: function () { return this; },
-            querySelectorAll: () => [],
-            focus: () => { }
-        };
-        return element;
-    },
-    querySelector: () => {
-        return {
-            addEventListener: () => { },
-            removeEventListener: () => { },
-            appendChild: () => { },
-            remove: () => { },
-            style: {},
-            classList: { add: () => { }, remove: () => { }, toggle: () => { }, contains: () => false },
-            textContent: '',
-            innerHTML: ''
-        };
-    },
-    querySelectorAll: () => [],
-    body: {
-        appendChild: () => { },
-        classList: {
-            add: () => { },
-            remove: () => { },
-            contains: () => false,
-            toggle: () => { }
+    });
+
+    if (id) elementRegistry.set(id, el);
+    return el;
+}
+
+const bodyElement = createMockElement('body');
+
+global.document = {
+    body: bodyElement,
+    createElement: (tag) => createMockElement(tag),
+    getElementById: (id) => {
+        if (elementRegistry.has(id)) {
+            return elementRegistry.get(id);
         }
-    }
+        const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
+        const match = htmlContent.match(regex);
+        const tag = match ? match[1] : 'div';
+        const el = createMockElement(tag, id);
+        return el;
+    },
+    querySelector: (sel) => {
+        if (sel.startsWith('#')) {
+            return global.document.getElementById(sel.slice(1));
+        }
+        return bodyElement.querySelector(sel);
+    },
+    querySelectorAll: (sel) => bodyElement.querySelectorAll(sel)
+};
+
+const storageStore = new Map();
+global.localStorage = {
+    getItem: (k) => (storageStore.has(k) ? storageStore.get(k) : null),
+    setItem: (k, v) => storageStore.set(k, String(v)),
+    removeItem: (k) => storageStore.delete(k),
+    clear: () => storageStore.clear()
 };
 
 global.window = {
     __TEST_RUNNER__: true,
     addEventListener: (event, callback) => {
         if (event === 'DOMContentLoaded') {
-
             callback();
         }
-    }
+    },
+    removeEventListener: () => { },
+    open: () => { }
 };
 
 async function runTests() {
@@ -285,6 +368,7 @@ async function runTests() {
         await import('./utils/compression.test.js');
         await import('./utils/crc32.test.js');
         await import('./utils/csv.test.js');
+        await import('./utils/password-strength.test.js');
         await import('./structures/vault/secure-record.test.js');
         await import('./structures/vault/csv-import.test.js');
         await import('./structures/vault/immutable-vault.test.js');
@@ -312,6 +396,8 @@ async function runTests() {
         await import('./information-theory/cryptography/pbkdf2-benchmark.test.js');
         await import('./fuzz/kdf-fuzz.test.js');
         await import('./integration/vault/vault-ui-redesign.test.js');
+        await import('./integration/vault/vault-ui-polish.test.js');
+        await import('./integration/vault/card-flow-automata.test.js');
         await import("./ui-xss.test.js");
         await import("./security/xss.test.js");
 

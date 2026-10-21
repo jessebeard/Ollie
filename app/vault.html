@@ -39,7 +39,11 @@
             <div class="tag-section" aria-label="Filter by tags">
                 <div class="tag-section-header">
                     <span class="tag-section-title">Tags <span id="tagCountBadge" class="badge">0</span></span>
-                    <button id="clearTagsBtn" class="tag-clear-btn" style="display: none;" aria-label="Clear all active tag filters">✕ Clear</button>
+                    <div class="tag-header-actions">
+                        <button id="tagSortToggleBtn" class="tag-sort-btn" title="Toggle tag sort order (Frequency / A-Z)">Freq</button>
+                        <button id="tagSortDirBtn" class="tag-sort-btn" title="Reverse sort direction">↓</button>
+                        <button id="clearTagsBtn" class="tag-clear-btn" style="display: none;" aria-label="Clear all active tag filters">✕ Clear</button>
+                    </div>
                 </div>
                 <input type="search" id="tagSearchInput" class="tag-search-input" placeholder="Filter tags..." aria-label="Search and filter tags">
                 <div id="tagList" class="tag-list" role="group" aria-label="Available Tags">
@@ -59,6 +63,11 @@
                 </div>
 
                 <div class="header-controls">
+                    <div class="view-mode-selector" role="radiogroup" aria-label="Layout View Mode">
+                        <button type="button" class="view-mode-btn active" data-mode="sidebar" id="viewModeSidebar" title="Side Bar view (clean cards, inspector pane on right)">Side Bar</button>
+                        <button type="button" class="view-mode-btn" data-mode="card" id="viewModeCard" title="Card view (4x expansion animation)">Card View</button>
+                        <button type="button" class="view-mode-btn" data-mode="both" id="viewModeBoth" title="Both (4x card expansion and inspector pane)">Both</button>
+                    </div>
                     <input type="search" id="searchInput" class="search-input" placeholder="Search entries..."
                         aria-label="Search items by title, username, or URL">
                     <select id="sortSelect" class="sort-select" aria-label="Sort Entries">
@@ -68,29 +77,37 @@
                         <option value="za">Z-A Name</option>
                     </select>
                     <button class="btn btn-primary" id="addBtn" aria-label="Add a new entry">➕ Add Entry</button>
+                    <button class="btn-icon" id="shortcutsBtn" title="Keyboard Shortcuts (?)" aria-label="Keyboard Shortcuts">⌨️</button>
                 </div>
             </header>
 
-            <div id="vaultList">
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <img src="components/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120"
-                            height="120" />
+            <div class="vault-workspace" id="vaultWorkspace">
+                <div id="vaultList" class="vault-list-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <img id="emptyMascot" src="components/assets/ollie-animated.svg" alt="Ollie the Maine Coon Mascot" width="120"
+                                height="120" />
+                        </div>
+                        <h3>Drop Vault Here</h3>
+                        <p>Drag and drop a folder of images to load your vault.</p>
                     </div>
-                    <h3>Drop Vault Here</h3>
-                    <p>Drag and drop a folder of images to load your vault.</p>
                 </div>
+
+                <aside id="detailPane" class="detail-pane" aria-label="Entry Details" style="display: none;">
+                    <!-- Populated dynamically upon card selection -->
+                </aside>
             </div>
 
             <div class="status-bar" role="status" aria-live="polite">
                 <span id="itemCount">0 Items</span>
-                <div class="capacity-meter">
-                    <div class="capacity-bar">
-                        <div id="capacityProgress" class="capacity-progress"></div>
+                <div class="capacity-meter" id="capacityMeterContainer">
+                    <div class="capacity-bar dual-gauge">
+                        <div id="capacityProgress" class="capacity-progress" title="Steganographic storage capacity"></div>
+                        <div id="vaultProgress" class="vault-progress" title="Secrets library footprint"></div>
                     </div>
                     <span id="capacityText" title="Total steganographic storage capacity across loaded images">Used: 0 B / Total: 0 B</span>
                 </div>
-                <span>Ollie v0.3</span>
+                <span id="versionText">Ollie v0.3</span>
             </div>
         </main>
     </div>

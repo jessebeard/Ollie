@@ -500,9 +500,20 @@ body {
 /* Password Card Grid */
 .password-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.15rem;
     padding-bottom: 2.5rem;
+}
+
+.view-mode-both .password-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.9rem;
+}
+
+.view-mode-both .detail-pane {
+    width: 330px;
+    min-width: 280px;
+    display: flex;
 }
 
 .password-card {
@@ -610,8 +621,9 @@ body {
     min-height: 2rem;
 }
 
-.totp-slot:empty {
-    display: none;
+.totp-slot:empty,
+.password-card:not(.is-expanded) .totp-slot {
+    display: none !important;
 }
 
 .totp-code {
@@ -1070,7 +1082,7 @@ body {
         padding: 1.25rem 1.5rem;
     }
     .password-grid {
-        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 0.85rem;
     }
     .search-input {
@@ -1130,6 +1142,13 @@ body {
     .password-grid {
         grid-template-columns: 1fr;
     }
+    .password-card.is-expanded,
+    .password-card.is-expanded.edge-right,
+    .password-card.is-expanded.edge-left,
+    .password-card.is-expanded.edge-interior,
+    .password-card.is-expanded.edge-single {
+        grid-column: 1 / -1;
+    }
     .status-bar {
         flex-direction: column;
         gap: 0.75rem;
@@ -1140,4 +1159,561 @@ body {
         max-width: 100%;
         width: 100%;
     }
+    .detail-pane {
+        width: 100%;
+        max-width: 100%;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        height: 70vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+}
+
+/* --- View Mode Switcher --- */
+.view-mode-selector {
+    display: inline-flex;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 2px;
+    gap: 2px;
+}
+
+.view-mode-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.view-mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.view-mode-btn.active {
+    background: var(--bg-surface-overlay);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Tag Header Actions --- */
+.tag-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.tag-sort-btn {
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tag-sort-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-default);
+}
+
+/* --- Vault Workspace & Detail Pane --- */
+.vault-workspace {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    gap: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.vault-list-container {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.detail-pane {
+    width: 360px;
+    min-width: 320px;
+    max-width: 420px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 20;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.detail-pane-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1.5rem;
+    height: 100%;
+    color: var(--text-muted);
+}
+
+.detail-pane-placeholder .placeholder-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.8rem;
+    opacity: 0.6;
+}
+
+.detail-pane-placeholder h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.detail-pane-placeholder p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.detail-pane-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: var(--bg-surface-raised);
+}
+
+.detail-pane-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.detail-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+}
+
+.detail-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.detail-pane-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    flex: 1;
+}
+
+.detail-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.detail-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.detail-value {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-value.url-text {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.detail-password-input {
+    flex: 1;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 0.45rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+}
+
+.detail-totp-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--radius-md);
+}
+
+.detail-totp-code {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.detail-totp-code:hover {
+    color: var(--accent-hover);
+}
+
+.detail-totp-countdown {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.detail-notes-box {
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.detail-notes-text {
+    margin: 0;
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.detail-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.detail-tag-pill {
+    cursor: pointer;
+}
+
+.detail-tag-pill:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.detail-meta-section {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-pane-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface-raised);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+/* --- Card Selection & 4x Expansion Grid Animation --- */
+.password-card {
+    cursor: pointer;
+    outline: none;
+}
+
+.password-card:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.password-card.is-selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+    background: var(--bg-surface-raised);
+}
+
+.password-card.is-expanded {
+    grid-column: span 2;
+    grid-row: span 2;
+    min-height: 280px;
+    box-shadow: var(--shadow-lg), var(--accent-glow);
+    border-color: var(--accent);
+    z-index: 5;
+    animation: cardEnlarge 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes cardEnlarge {
+    from {
+        transform: scale(0.96);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+@keyframes cardSlideIn {
+    from {
+        transform: translateX(var(--slide-dx, 0px)) scale(0.96);
+    }
+    to {
+        transform: translateX(0px) scale(1);
+    }
+}
+
+.password-card.is-expanded.is-sliding {
+    animation: cardSlideIn 0.28s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Card Flow Automata - Edge & Projection Spatial States */
+/* Ensure 2x2 expansion on both columns and prevent right-edge cards from wrapping down to column 0 */
+.password-card.is-expanded.edge-right {
+    grid-column-end: -1;
+    grid-column-start: span 2;
+    transform-origin: top right;
+}
+
+.password-card.is-expanded.edge-left {
+    grid-column-start: 1;
+    grid-column-end: span 2;
+    transform-origin: top left;
+}
+
+.password-card.is-expanded.edge-interior {
+    grid-column: span 2;
+    transform-origin: top left;
+}
+
+.password-card.is-expanded.edge-single {
+    grid-column: 1 / -1;
+    grid-row: span 2;
+    transform-origin: top center;
+}
+
+.password-card.edge-left {
+    transform-origin: left center;
+}
+
+.password-card.edge-right {
+    transform-origin: right center;
+}
+
+.password-card.project-down,
+.password-card.is-expanded.project-down {
+    transform-origin: top center;
+}
+
+.password-card.project-up,
+.password-card.is-expanded.project-up {
+    transform-origin: bottom center;
+}
+
+.password-card.edge-left.project-down,
+.password-card.is-expanded.edge-left.project-down {
+    transform-origin: top left;
+}
+
+.password-card.edge-right.project-down,
+.password-card.is-expanded.edge-right.project-down {
+    transform-origin: top right;
+}
+
+.password-card.is-expanded.edge-interior.project-down {
+    transform-origin: top left;
+}
+
+.password-card.is-expanded.edge-single.project-down {
+    transform-origin: top center;
+}
+
+.password-card.edge-left.project-up,
+.password-card.is-expanded.edge-left.project-up {
+    transform-origin: bottom left;
+}
+
+.password-card.edge-right.project-up,
+.password-card.is-expanded.edge-right.project-up {
+    transform-origin: bottom right;
+}
+
+.password-card.is-expanded.edge-interior.project-up {
+    transform-origin: bottom left;
+}
+
+.password-card.is-expanded.edge-single.project-up {
+    transform-origin: bottom center;
+}
+
+.password-card.is-expanded .card-expanded-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.password-card:not(.is-expanded) .card-expanded-content {
+    display: none;
+}
+
+.card-notes-preview {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.card-notes-preview p {
+    margin: 0.2rem 0 0 0;
+    white-space: pre-wrap;
+}
+
+.card-meta-text {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* --- Button Visibility Rules by Display Mode --- */
+/* In Side Bar view mode: only selected card has action buttons visible */
+.view-mode-sidebar .password-card:not(.is-selected):not(:hover) .card-actions,
+.view-mode-sidebar .password-card:not(.is-selected):not(:hover) .more-btn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.view-mode-sidebar .password-card.is-selected .card-actions,
+.view-mode-sidebar .password-card.is-selected .more-btn,
+.view-mode-sidebar .password-card:hover .card-actions,
+.view-mode-sidebar .password-card:hover .more-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* In Card View and Both: copy and launch buttons still on card at all times, even when unselected */
+.view-mode-card .password-card .card-actions,
+.view-mode-both .password-card .card-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* --- Relative Gauge & Dual Progress --- */
+.capacity-bar.dual-gauge {
+    position: relative;
+    overflow: hidden;
+}
+
+.vault-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #30d158;
+    opacity: 0.85;
+    transition: width 0.3s ease;
+    border-radius: var(--radius-full);
+}
+
+/* --- Password Strength Meter & Generator --- */
+.password-strength-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+}
+
+.password-strength-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-surface-raised);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    width: 0;
+    transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.strength-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* --- Keyboard Shortcuts Table --- */
+.shortcuts-table kbd {
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    color: var(--accent);
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
 }

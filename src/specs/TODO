@@ -1,12 +1,12 @@
 I would like to make the User Interface more engaging with more features.
 My roadmap right now is to:
 x add a way to export the secrets library to a file
-o comprehensive end to end testing
-- add some sort of size gauge that indicates how big the current directory is and how big the secrets library is.relative.
-- suport for totp secrets
-- add a way to import the secrets library from chrome, firefox and apple keychain
-- require master password re-entry to export the secrets library
-- allow resetting the master password
+x comprehensive end to end testing
+x add some sort of size gauge that indicates how big the current directory is and how big the secrets library is.relative.
+x suport for totp secrets
+x add a way to import the secrets library from chrome, firefox and apple keychain
+x require master password re-entry to export the secrets library
+x allow resetting the master password
 
 
 ## RESOLVED 2026-08-24 - Whole-container ECC framing (format v3)
@@ -149,3 +149,35 @@ Remaining 6: dropbox/github/gitlab fixtures need adaptive block sizing
 (BLOCK=8 too coarse for ~2.4px/module images); jitter x2 needs spatially-
 correlated noise model; darkbg fixed by flat-block polarity comparison.
 
+## RESOLVED 2026-10-19 - Interactive UI Polish & Display Modes
+- [x] UI, make cards selectable:
+      - Active selection tracking with `aria-selected` and `.is-selected` styling.
+      - In Side Bar mode, action buttons visible only on selected card (or hover).
+      - In Card View and Both modes, copy and launch buttons stay accessible on all cards.
+- [x] Display view mode switcher (Side Bar / Card View / Both):
+      - Segmented control in header with localStorage persistence.
+      - Side Bar: compact cards + right detail pane showing notes, live TOTP countdown, tags, and edit actions.
+      - Card View: 4x grid slot expansion animation (`is-expanded`) with inline notes and metadata.
+      - Both: combines 4x card expansion with the right detail pane inspector.
+- [x] Card View scroll anchoring & spatial state automata:
+      - `CardFlowAutomata` state machine resolves spatial boundary states (`edge-left`, `edge-right`, `edge-interior`, `edge-single`) and vertical projection (`project-up`, `project-down`).
+      - Anchors cards in-place using directional CSS `transform-origin` (e.g. `top right` for right column, `top left` for left column), eliminating delayed horizontal sliding animations.
+      - Synchronous vertical displacement anchoring (`deltaY = newRect.top - oldRect.top`) applied directly to container `scrollTop`, with asynchronous `settle()` pass post notes/TOTP rendering.
+      - Maintains strict 2x2 grid expansion (`grid-column: span 2; grid-row: span 2; min-height: 280px`) with `grid-auto-flow: dense;` so elements below never drift under the cursor.
+- [x] Reversible tag sorting (Dual count vs A-Z):
+      - `tagSortDir` (`desc` and `asc`) with an interactive direction button (`#tagSortDirBtn`).
+      - Supports bidirectional sorting: Frequency descending (highest first) / ascending (least first), and Alphabetical descending (A-Z) / ascending (Z-A).
+- [x] OTP visibility scoping:
+      - `.totp-slot` relocated inside `.card-expanded-content` with CSS gating (`.password-card:not(.is-expanded) .totp-slot { display: none !important; }`).
+      - Compact home view cards strictly omit OTP; live ticking codes appear exclusively on expanded cards and in the right inspector pane.
+- [x] ModalManager refactoring & file size optimization:
+      - Factored out `password-strength.js`, `qr-canvas.js`, `onboarding-wizard.js`, and `vault-modals.js` into focused, reusable modules.
+      - Reduced `modal-manager.js` from 1,004 lines down to 443 lines, backed by dedicated unit and integration tests.
+- [x] Relative storage gauge:
+      - Multi-tiered gauge in status bar displaying carrier directory size, stego capacity, and vault footprint with relative percentage tooltips.
+- [x] Master password re-entry gate for plaintext export:
+      - Prompts for master password verification before unencrypted JSON download is authorized.
+- [x] Password strength & generator:
+      - Real-time entropy evaluation and random generator in Add/Edit modal.
+- [x] Keyboard shortcuts & Mascot state machine:
+      - Navigation shortcuts (`/`, `J`/`K`, `Enter`, `Esc`, `C`, `T`, `?`) and reactive mascot states (`static`, `animated`, `thinking`, `happy`, `sad`).

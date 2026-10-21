@@ -185,8 +185,13 @@ describe('carrier manifest chunk binding', () => {
             const m = await buildSample();
             const originalMac = m.mac;
 
+            // Test characters that directly encode payload bytes (excluding the last partial padding char and '=')
+            const maxPayloadChar = (originalMac.indexOf('=') !== -1)
+                ? originalMac.indexOf('=') - 2
+                : originalMac.length - 2;
+
             await assertProperty(
-                [Arbitrary.integer(0, originalMac.length - 1)],
+                [Arbitrary.integer(0, maxPayloadChar)],
                 async (charPos) => {
                     // Mutate a single char in the hex/base64 MAC string
                     const corruptedChar = originalMac[charPos] === 'a' ? 'b' : 'a';

@@ -1,6 +1,11 @@
 import { escapeHtml } from '../../../../src/utils/escape-html.js';
 import { decodeQR } from '../../../../src/codec/qr-decoder.js';
-import { encodeQR } from '../../../../src/codec/qr-encoder.js';
+import { calculatePasswordStrength, generateStrongPassword } from '../../../../src/utils/password-strength.js';
+import { renderQrOnCanvas } from './qr-canvas.js';
+import { OnboardingWizard } from './onboarding-wizard.js';
+import { ChangePasswordModal, TwoFactorSettingsModal, ShortcutsModal } from './vault-modals.js';
+
+export { calculatePasswordStrength, generateStrongPassword, renderQrOnCanvas };
 
 export class ModalManager {
     constructor() {
@@ -77,19 +82,23 @@ export class ModalManager {
      * @returns {string}
      */
     generateStrongPassword(length = 20) {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:,.<>?';
-        const bytes = new Uint8Array(length);
-        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-            crypto.getRandomValues(bytes);
-        } else {
-            for (let i = 0; i < length; i++) bytes[i] = Math.floor(Math.random() * 256);
-        }
+        return generateStrongPassword(length);
+    }
 
-        let result = '';
-        for (let i = 0; i < length; i++) {
-            result += chars[bytes[i] % chars.length];
-        }
-        return result;
+    /**
+     * Calculates entropy and qualitative strength of a password string.
+     * @param {string} pass
+     * @returns {{ score: number, label: string, color: string, percent: number }}
+     */
+    static calculatePasswordStrength(pass) {
+        return calculatePasswordStrength(pass);
+    }
+
+    /**
+     * Renders an otpauth URI as a pixelated QR code onto a canvas.
+     */
+    renderQrOnCanvas(canvas, uri) {
+        return renderQrOnCanvas(canvas, uri);
     }
 
     async prompt(title, label, type = 'text') {
@@ -131,8 +140,10 @@ export class ModalManager {
                 setTimeout(() => resolve(null), 50);
             };
 
-            modal.querySelector('.confirm-btn').onclick = confirm;
-            modal.querySelector('.cancel-btn').onclick = cancel;
+            const confirmBtn = modal.querySelector('.confirm-btn');
+            if (confirmBtn) confirmBtn.onclick = confirm;
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) cancelBtn.onclick = cancel;
             const closeBtn = modal.querySelector('.close-btn');
             if (closeBtn) closeBtn.onclick = cancel;
 
@@ -170,15 +181,19 @@ export class ModalManager {
                 this.hide();
             };
 
-            modal.querySelector('.confirm-btn').onclick = () => {
-                cleanup();
-                setTimeout(() => resolve(true), 50);
-            };
+            const confirmBtn = modal.querySelector('.confirm-btn');
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    cleanup();
+                    setTimeout(() => resolve(true), 50);
+                };
+            }
             const cancel = () => {
                 cleanup();
                 setTimeout(() => resolve(false), 50);
             };
-            modal.querySelector('.cancel-btn').onclick = cancel;
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) cancelBtn.onclick = cancel;
             const closeBtn = modal.querySelector('.close-btn');
             if (closeBtn) closeBtn.onclick = cancel;
         });
@@ -208,7 +223,8 @@ export class ModalManager {
                 setTimeout(() => resolve(), 50);
             };
 
-            modal.querySelector('.ok-btn').onclick = cleanup;
+            const okBtn = modal.querySelector('.ok-btn');
+            if (okBtn) okBtn.onclick = cleanup;
             const closeBtn = modal.querySelector('.close-btn');
             if (closeBtn) closeBtn.onclick = cleanup;
         });
@@ -244,6 +260,10 @@ export class ModalManager {
                                 <input type="password" name="${this.escape(field.name)}" value="${this.escape(val)}" class="form-control password-input" ${required}>
                                 <button type="button" class="btn-input-action toggle-reveal-btn" title="Show/Hide Password" aria-label="Show password">👁</button>
                                 <button type="button" class="btn-input-action generate-pw-btn" title="Generate Strong Password" aria-label="Generate password">🎲</button>
+                            </div>
+                            <div class="password-strength-container">
+                                <div class="password-strength-bar"><div class="strength-fill"></div></div>
+                                <span class="strength-text"></span>
                             </div>
                         </div>`;
                 }
@@ -318,7 +338,28 @@ export class ModalManager {
                 };
             }
 
-            // Password Generator
+            // Password Strength and Generator
+            const updateStrength = () => {
+                if (!passwordInput) return;
+                const val = passwordInput.value || '';
+                const { label, color, percent } = ModalManager.calculatePasswordStrength(val);
+                const fill = modal.querySelector('.strength-fill');
+                const text = modal.querySelector('.strength-text');
+                if (fill && fill.style) {
+                    fill.style.width = `${percent}%`;
+                    fill.style.backgroundColor = color;
+                }
+                if (text) {
+                    text.textContent = val ? `Strength: ${label}` : '';
+                    if (text.style) text.style.color = color;
+                }
+            };
+
+            if (passwordInput) {
+                passwordInput.addEventListener('input', updateStrength);
+                updateStrength();
+            }
+
             const generatePwBtn = modal.querySelector('.generate-pw-btn');
             if (generatePwBtn && passwordInput) {
                 generatePwBtn.onclick = () => {
@@ -326,6 +367,7 @@ export class ModalManager {
                     passwordInput.value = generated;
                     passwordInput.type = 'text';
                     if (toggleRevealBtn) toggleRevealBtn.textContent = '🙈';
+                    updateStrength();
                     this.showToast('Generated strong 20-character password', 'success');
                 };
             }
@@ -404,26 +446,31 @@ export class ModalManager {
             }
 
             const form = modal.querySelector('form');
-            form.onsubmit = (e) => {
-                e.preventDefault();
-                const formData = new FormData(form);
-                const data = {};
-                for (const [key, val] of formData.entries()) {
-                    data[key] = val;
-                }
+            if (form) {
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(form);
+                    const data = {};
+                    for (const [key, val] of formData.entries()) {
+                        data[key] = val;
+                    }
 
-                if (data.tags) {
-                    data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
-                }
+                    if (data.tags) {
+                        data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+                    }
 
-                cleanup();
-                setTimeout(() => resolve(data), 50);
-            };
+                    cleanup();
+                    setTimeout(() => resolve(data), 50);
+                };
+            }
 
-            modal.querySelector('.cancel-btn').onclick = () => {
-                cleanup();
-                setTimeout(() => resolve(null), 50);
-            };
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    cleanup();
+                    setTimeout(() => resolve(null), 50);
+                };
+            }
         });
     }
 
@@ -431,469 +478,27 @@ export class ModalManager {
      * Guided Multi-step Onboarding Wizard for new vault creation.
      */
     async showOnboardingWizard(options = {}) {
-        return new Promise((resolve) => {
-            let currentStep = 1;
-            let chosenPassword = '';
-            let chosenIterations = 600000;
-            let enableTotp = false;
-            let enrolledSecret = null;
-            let enrolledUri = null;
-
-            const modal = document.createElement('div');
-            modal.className = 'modal-dialog modal-wizard modal-lg';
-
-            const renderStep = () => {
-                let bodyHtml = '';
-                if (currentStep === 1) {
-                    bodyHtml = `
-                        <div class="wizard-step">
-                            <div class="wizard-header">
-                                <h3>✨ Create New Vault</h3>
-                                <p class="wizard-subtitle">Step 1 of 3: Master Password & Security Calibration</p>
-                            </div>
-                            <div class="form-group">
-                                <label>Master Password</label>
-                                <div class="password-input-group">
-                                    <input type="password" id="wzMasterPass" class="form-control" placeholder="Enter a strong master password">
-                                    <button type="button" class="btn-input-action wz-toggle-pass" aria-label="Show password">👁</button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Confirm Master Password</label>
-                                <input type="password" id="wzConfirmPass" class="form-control" placeholder="Re-enter your master password">
-                            </div>
-                            <div class="kdf-iteration-section">
-                                <label>PBKDF2 Iteration Count (Cryptographic Work Factor)</label>
-                                <div class="iteration-pills">
-                                    <button type="button" class="iter-pill active" data-iter="600000">600k (OWASP)</button>
-                                    <button type="button" class="iter-pill" data-iter="1000000">1M (Enhanced)</button>
-                                    <button type="button" class="iter-pill" data-iter="2500000">2.5M (Paranoid)</button>
-                                </div>
-                                <div class="benchmark-container">
-                                    <button type="button" class="btn btn-secondary wz-benchmark-btn">⚡ Benchmark My Device</button>
-                                    <span class="benchmark-status" style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;"></span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else if (currentStep === 2) {
-                    bodyHtml = `
-                        <div class="wizard-step">
-                            <div class="wizard-header">
-                                <h3>🛡️ Second Factor Protection (Optional)</h3>
-                                <p class="wizard-subtitle">Step 2 of 3: Tier B TOTP Security Gate</p>
-                            </div>
-                            <div class="totp-gate-disclaimer">
-                                <p><strong>Disclaimer:</strong> This gate deters shoulder-surfing by requesting a rotating 6-digit code upon unlock.</p>
-                            </div>
-                            <div class="form-group" style="margin-top: 1rem;">
-                                <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="wzTotpCheck" ${enableTotp ? 'checked' : ''}>
-                                    <span>Enable 6-digit Authenticator Gate on unlock</span>
-                                </label>
-                            </div>
-                            <div class="wz-qr-preview" style="display: ${enableTotp ? 'block' : 'none'}; text-align: center; margin-top: 1rem;">
-                                <canvas class="wz-qr-canvas" width="180" height="180" style="border: 4px solid #fff; border-radius: 6px;"></canvas>
-                                <p class="wz-totp-uri" style="font-family: monospace; font-size: 0.75rem; word-break: break-all; margin-top: 0.5rem;"></p>
-                            </div>
-                        </div>
-                    `;
-                } else if (currentStep === 3) {
-                    bodyHtml = `
-                        <div class="wizard-step">
-                            <div class="wizard-header">
-                                <h3>🎉 Vault Ready!</h3>
-                                <p class="wizard-subtitle">Step 3 of 3: How would you like to start?</p>
-                            </div>
-                            <div class="quick-action-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
-                                <button type="button" class="btn btn-secondary quick-btn" data-action="add-entry" style="padding: 1rem; text-align: left;">
-                                    <strong>➕ Add First Password</strong>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Create a new login entry manually.</div>
-                                </button>
-                                <button type="button" class="btn btn-secondary quick-btn" data-action="import-csv" style="padding: 1rem; text-align: left;">
-                                    <strong>📥 Import from CSV</strong>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Bitwarden, Chrome, 1Password, etc.</div>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                modal.innerHTML = `
-                    ${bodyHtml}
-                    <div class="modal-actions" style="margin-top: 1.5rem;">
-                        <button type="button" class="btn btn-secondary wz-cancel-btn">Cancel</button>
-                        ${currentStep > 1 ? '<button type="button" class="btn btn-secondary wz-back-btn">Back</button>' : ''}
-                        ${currentStep < 3
-                            ? '<button type="button" class="btn btn-primary wz-next-btn">Next →</button>'
-                            : '<button type="button" class="btn btn-primary wz-finish-btn">Finish</button>'}
-                    </div>
-                `;
-
-                this.show(modal);
-
-                // Wire Step 1 controls
-                if (currentStep === 1) {
-                    const passInput = modal.querySelector('#wzMasterPass');
-                    const toggleBtn = modal.querySelector('.wz-toggle-pass');
-                    if (passInput && toggleBtn) {
-                        toggleBtn.onclick = () => {
-                            passInput.type = passInput.type === 'password' ? 'text' : 'password';
-                        };
-                    }
-
-                    const iterPills = modal.querySelectorAll('.iter-pill');
-                    iterPills.forEach(pill => {
-                        pill.onclick = () => {
-                            iterPills.forEach(p => p.classList.remove('active'));
-                            pill.classList.add('active');
-                            chosenIterations = parseInt(pill.getAttribute('data-iter'), 10);
-                        };
-                    });
-
-                    const benchBtn = modal.querySelector('.wz-benchmark-btn');
-                    const benchStatus = modal.querySelector('.benchmark-status');
-                    if (benchBtn && options.onBenchmark) {
-                        benchBtn.onclick = async () => {
-                            benchBtn.disabled = true;
-                            benchStatus.textContent = 'Benchmarking CPU...';
-                            const [result, err] = await options.onBenchmark();
-                            benchBtn.disabled = false;
-                            if (err) {
-                                benchStatus.textContent = 'Benchmark error: ' + err.message;
-                            } else {
-                                chosenIterations = result.recommendedIterations;
-                                benchStatus.textContent = `Recommended: ${chosenIterations.toLocaleString()} iterations (~${result.estimatedUnlockMs}ms)`;
-                                iterPills.forEach(p => p.classList.remove('active'));
-                            }
-                        };
-                    }
-                }
-
-                // Wire Step 2 controls
-                if (currentStep === 2) {
-                    const totpCheck = modal.querySelector('#wzTotpCheck');
-                    const qrPreview = modal.querySelector('.wz-qr-preview');
-                    const qrCanvas = modal.querySelector('.wz-qr-canvas');
-                    const uriText = modal.querySelector('.wz-totp-uri');
-
-                    const updateTotpState = async () => {
-                        enableTotp = totpCheck.checked;
-                        qrPreview.style.display = enableTotp ? 'block' : 'none';
-                        if (enableTotp && options.generateQr) {
-                            const [qrData, qrErr] = await options.generateQr();
-                            if (!qrErr && qrData) {
-                                enrolledSecret = qrData.secret;
-                                enrolledUri = qrData.uri;
-                                uriText.textContent = enrolledUri;
-                                if (qrCanvas) {
-                                    this.renderQrOnCanvas(qrCanvas, enrolledUri);
-                                }
-                            }
-                        }
-                    };
-
-                    if (totpCheck) {
-                        totpCheck.onchange = updateTotpState;
-                        if (enableTotp) updateTotpState();
-                    }
-                }
-
-                // Navigation
-                const nextBtn = modal.querySelector('.wz-next-btn');
-                if (nextBtn) {
-                    nextBtn.onclick = () => {
-                        if (currentStep === 1) {
-                            const p1 = modal.querySelector('#wzMasterPass').value;
-                            const p2 = modal.querySelector('#wzConfirmPass').value;
-                            if (!p1 || p1.length === 0) {
-                                this.showToast('Master password cannot be empty', 'error');
-                                return;
-                            }
-                            if (p1 !== p2) {
-                                this.showToast('Passwords do not match', 'error');
-                                return;
-                            }
-                            chosenPassword = p1;
-                        }
-                        currentStep++;
-                        renderStep();
-                    };
-                }
-
-                const backBtn = modal.querySelector('.wz-back-btn');
-                if (backBtn) {
-                    backBtn.onclick = () => {
-                        currentStep--;
-                        renderStep();
-                    };
-                }
-
-                const finishBtn = modal.querySelector('.wz-finish-btn');
-                if (finishBtn) {
-                    finishBtn.onclick = () => {
-                        this.hide();
-                        resolve({
-                            password: chosenPassword,
-                            iterations: chosenIterations,
-                            enableTotp,
-                            totpSecret: enrolledSecret,
-                            totpUri: enrolledUri,
-                            quickAction: null
-                        });
-                    };
-                }
-
-                const quickBtns = modal.querySelectorAll('.quick-btn');
-                quickBtns.forEach(qb => {
-                    qb.onclick = () => {
-                        const action = qb.getAttribute('data-action');
-                        this.hide();
-                        resolve({
-                            password: chosenPassword,
-                            iterations: chosenIterations,
-                            enableTotp,
-                            totpSecret: enrolledSecret,
-                            totpUri: enrolledUri,
-                            quickAction: action
-                        });
-                    };
-                });
-
-                const cancelBtn = modal.querySelector('.wz-cancel-btn');
-                if (cancelBtn) {
-                    cancelBtn.onclick = () => {
-                        this.hide();
-                        resolve(null);
-                    };
-                }
-            };
-
-            renderStep();
-        });
+        return new OnboardingWizard(this).show(options);
     }
 
     /**
      * Modal for changing the master password with live hardware benchmark calibration.
      */
     async showChangePasswordModal(options = {}) {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal-dialog modal-lg';
-
-            let chosenIterations = options.currentIterations || 600000;
-
-            modal.innerHTML = `
-                <div class="modal-header">
-                    <h3>🔑 Change Master Password</h3>
-                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
-                </div>
-                <form id="changePasswordForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Current Master Password</label>
-                            <input type="password" id="cpCurrent" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label>New Master Password</label>
-                            <input type="password" id="cpNew" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Confirm New Master Password</label>
-                            <input type="password" id="cpConfirm" class="form-control" required>
-                        </div>
-                        <div class="kdf-iteration-section">
-                            <label>PBKDF2 Iteration Count</label>
-                            <div class="iteration-pills">
-                                <button type="button" class="iter-pill ${chosenIterations === 600000 ? 'active' : ''}" data-iter="600000">600k (OWASP)</button>
-                                <button type="button" class="iter-pill ${chosenIterations === 1000000 ? 'active' : ''}" data-iter="1000000">1M (Enhanced)</button>
-                                <button type="button" class="iter-pill ${chosenIterations === 2500000 ? 'active' : ''}" data-iter="2500000">2.5M (Paranoid)</button>
-                            </div>
-                            <div class="benchmark-container">
-                                <button type="button" class="btn btn-secondary cp-benchmark-btn">⚡ Benchmark My Device</button>
-                                <span class="benchmark-status" style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;"></span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
-                        <button type="submit" class="btn btn-primary submit-btn">Update Password</button>
-                    </div>
-                </form>
-            `;
-
-            this.show(modal);
-
-            const iterPills = modal.querySelectorAll('.iter-pill');
-            iterPills.forEach(pill => {
-                pill.onclick = () => {
-                    iterPills.forEach(p => p.classList.remove('active'));
-                    pill.classList.add('active');
-                    chosenIterations = parseInt(pill.getAttribute('data-iter'), 10);
-                };
-            });
-
-            const benchBtn = modal.querySelector('.cp-benchmark-btn');
-            const benchStatus = modal.querySelector('.benchmark-status');
-            if (benchBtn && options.onBenchmark) {
-                benchBtn.onclick = async () => {
-                    benchBtn.disabled = true;
-                    benchStatus.textContent = 'Benchmarking...';
-                    const [result, err] = await options.onBenchmark();
-                    benchBtn.disabled = false;
-                    if (err) {
-                        benchStatus.textContent = 'Error: ' + err.message;
-                    } else {
-                        chosenIterations = result.recommendedIterations;
-                        benchStatus.textContent = `Recommended: ${chosenIterations.toLocaleString()} iterations (~${result.estimatedUnlockMs}ms)`;
-                        iterPills.forEach(p => p.classList.remove('active'));
-                    }
-                };
-            }
-
-            const form = modal.querySelector('form');
-            form.onsubmit = (e) => {
-                e.preventDefault();
-                const current = modal.querySelector('#cpCurrent').value;
-                const next = modal.querySelector('#cpNew').value;
-                const confirm = modal.querySelector('#cpConfirm').value;
-
-                if (!next || next.length === 0) {
-                    this.showToast('New password cannot be empty', 'error');
-                    return;
-                }
-                if (next !== confirm) {
-                    this.showToast('New passwords do not match', 'error');
-                    return;
-                }
-
-                this.hide();
-                resolve({
-                    currentPassword: current,
-                    newPassword: next,
-                    iterations: chosenIterations
-                });
-            };
-
-            const close = () => {
-                this.hide();
-                resolve(null);
-            };
-            modal.querySelector('.cancel-btn').onclick = close;
-            const closeBtn = modal.querySelector('.close-btn');
-            if (closeBtn) closeBtn.onclick = close;
-        });
+        return new ChangePasswordModal(this).show(options);
     }
 
     /**
      * Modal for viewing and configuring 2FA Tier B TOTP gate settings.
      */
     async show2FaSettingsModal(options = {}) {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.className = 'modal-dialog modal-lg';
-
-            const isEnrolled = options.isEnrolled;
-            const enrolledUri = options.enrolledUri || '';
-
-            modal.innerHTML = `
-                <div class="modal-header">
-                    <h3>🛡️ 2FA Security Gate Settings</h3>
-                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="2fa-status-card" style="padding: 1rem; background: var(--bg-base); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
-                        <strong>Status:</strong> ${isEnrolled ? '<span style="color: var(--success);">Enabled</span>' : '<span style="color: var(--text-muted);">Disabled</span>'}
-                        <p style="font-size: 0.825rem; color: var(--text-secondary); margin-top: 0.5rem; line-height: 1.45;">
-                            ${isEnrolled ? 'A rotating 6-digit TOTP code is required to unlock this vault.' : 'No second-factor code is currently requested on unlock.'}
-                        </p>
-                    </div>
-                    ${isEnrolled ? `
-                        <div class="qr-display-section" style="text-align: center; margin: 1rem 0;">
-                            <canvas class="settings-qr-canvas" width="180" height="180" style="border: 4px solid #fff; border-radius: var(--radius-sm);"></canvas>
-                            <p style="font-family: monospace; font-size: 0.75rem; word-break: break-all; margin-top: 0.5rem; color: var(--text-secondary);">${this.escape(enrolledUri)}</p>
-                        </div>
-                    ` : ''}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary cancel-btn">Close</button>
-                    ${isEnrolled
-                        ? '<button type="button" class="btn btn-danger disable-2fa-btn">Disable 2FA</button>'
-                        : '<button type="button" class="btn btn-primary enable-2fa-btn">Enable 2FA Gate</button>'}
-                </div>
-            `;
-
-            this.show(modal);
-
-            if (isEnrolled && enrolledUri) {
-                const canvas = modal.querySelector('.settings-qr-canvas');
-                if (canvas) this.renderQrOnCanvas(canvas, enrolledUri);
-            }
-
-            const enableBtn = modal.querySelector('.enable-2fa-btn');
-            if (enableBtn) {
-                enableBtn.onclick = () => {
-                    this.hide();
-                    resolve({ action: 'enable' });
-                };
-            }
-
-            const disableBtn = modal.querySelector('.disable-2fa-btn');
-            if (disableBtn) {
-                disableBtn.onclick = () => {
-                    this.hide();
-                    resolve({ action: 'disable' });
-                };
-            }
-
-            const close = () => {
-                this.hide();
-                resolve(null);
-            };
-            modal.querySelector('.cancel-btn').onclick = close;
-            const closeBtn = modal.querySelector('.close-btn');
-            if (closeBtn) closeBtn.onclick = close;
-        });
+        return new TwoFactorSettingsModal(this).show(options);
     }
 
     /**
-     * Renders an otpauth URI as a pixelated QR code onto a canvas.
+     * Shows Keyboard Shortcuts cheat-sheet modal.
      */
-    renderQrOnCanvas(canvas, uri) {
-        if (!canvas || !uri) return;
-        try {
-            const bytes = typeof uri === 'string' ? new TextEncoder().encode(uri) : uri;
-            const { size, modules } = encodeQR(bytes);
-            if (!size || !modules) return;
-
-            const quietZone = 2;
-            const totalModules = size + quietZone * 2;
-            const scale = Math.max(1, Math.floor(canvas.width / totalModules));
-            const totalRenderWidth = totalModules * scale;
-            const offsetX = Math.floor((canvas.width - totalRenderWidth) / 2);
-            const offsetY = Math.floor((canvas.height - totalRenderWidth) / 2);
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#000000';
-
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    if (modules[y * size + x]) {
-                        ctx.fillRect(
-                            offsetX + (x + quietZone) * scale,
-                            offsetY + (y + quietZone) * scale,
-                            scale,
-                            scale
-                        );
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('Failed to render QR canvas:', e);
-        }
+    async showShortcutsModal() {
+        return new ShortcutsModal(this).show();
     }
 }

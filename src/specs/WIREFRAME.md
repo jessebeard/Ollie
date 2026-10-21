@@ -26,9 +26,12 @@ Ollie/
 │           ├── vault-ui.js       # Vault orchestrator (onboarding, rotation, 2FA, save/load/search)
 │           ├── vault.css         # Styling: toasts, wizard, card grid, modals
 │           └── components/
-│               ├── drop-zone.js      # File drop (folder traversal)
-│               ├── modal-manager.js  # Wizard, password rotation, 2FA settings, toasts
-│               └── vault-view.js     # Card grid renderer + URL safety gate
+│               ├── drop-zone.js          # File drop (folder traversal)
+│               ├── modal-manager.js      # Modal manager orchestrator
+│               ├── onboarding-wizard.js  # First-run onboarding wizard
+│               ├── qr-canvas.js          # QR code canvas renderer
+│               ├── vault-modals.js       # Change password, 2FA settings, shortcuts modals
+│               └── vault-view.js         # Card grid renderer + selection & scroll anchor
 ├── scripts/
 │   ├── cli.mjs                   # Headless vault save/load/verify
 │   ├── dev-server.js             # Local dev server
@@ -55,7 +58,7 @@ Ollie/
 │   │                             # chunk-manager, carrier-manifest, batch-embedder/-extractor
 │   ├── structures/vault/         # immutable-vault, secure-record, csv-import
 │   ├── utils/                    # crc32, encoding, compression, logger, url-safety,
-│   │                             # escape-html, atomic-writer, csv, base32
+│   │                             # escape-html, atomic-writer, csv, base32, password-strength
 │   ├── vendor/argon2/            # Vendored OpenPGP.js Argon2id WASM SIMD/non-SIMD engine
 │   └── specs/                    # Normative specs and project rules
 ├── test/                         # Node runner + browser suite (see §6)
@@ -372,7 +375,7 @@ flowchart TB
     subgraph INTEG["2. Integration Tests"]
         ROUND["roundtrip · steganography-roundtrip"]
         VE2E["vault-e2e · vault-e2e-crud · vault-e2e-carriers · vault-spread-save"]
-        VUIFLOW["vault-ui-redesign · vault-capacity-ui · vault-totp-display · vault-tierb-flow"]
+        VUIFLOW["vault-ui-redesign · vault-ui-polish · vault-capacity-ui · vault-totp-display · vault-tierb-flow"]
     end
 
     subgraph E2E["3. End-to-End Tests"]
