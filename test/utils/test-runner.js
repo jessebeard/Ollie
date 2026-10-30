@@ -509,5 +509,8 @@ export function resetStats() {
     stats = { total: 0, passed: 0, failed: 0 };
     testResults = [];
     currentAssertionCount = 0;
+    rootNode.suites.length = 0;
+    rootNode.tests.length = 0;
+    currentSuiteObj = rootNode;
 }
 

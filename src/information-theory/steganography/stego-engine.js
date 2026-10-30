@@ -23,6 +23,7 @@ import { sha256 } from '../cryptography/crypto-provider.js';
 import { deriveStegoKeys } from '../cryptography/kdf-chain.js';
 
 export const STC_MATRIX_CONTEXT = 'ollie/v4/stc-matrix/';
+export const MAX_STEGO_PAYLOAD_BYTES = 131072; // 128 KB safety ceiling per carrier to prevent excessive memory/trellis growth
 
 export class StegoEngine {
 
@@ -54,7 +55,8 @@ export class StegoEngine {
         if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return 0;
 
         let nonZeroCount = 0;
-        for (let b = 0; b < blocks.length; b++) {
+        const limitBlocks = (options.luminanceOnly && options.yBlockCount) ? options.yBlockCount : blocks.length;
+        for (let b = 0; b < limitBlocks; b++) {
             const block = blocks[b];
             for (let c = 1; c < 64; c++) {
                 if (block[c] !== 0) nonZeroCount++;
@@ -71,6 +73,55 @@ export class StegoEngine {
         const maxPayload = safeWireBytes - overhead;
 
         return Math.max(0, maxPayload);
+    }
+
+    /**
+     * Extracts non-zero AC coefficients and their block/subband index locations.
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Object} [options]
+     * @returns {{ values: Int32Array, locations: Uint32Array }}
+     */
+    static getNonZeroAC(blocks, options = {}) {
+        let count = 0;
+        const totalBlocks = blocks.length;
+        const limitBlocks = (options.luminanceOnly && options.yBlockCount) ? options.yBlockCount : totalBlocks;
+        for (let b = 0; b < limitBlocks; b++) {
+            const blk = blocks[b];
+            for (let c = 1; c < 64; c++) {
+                if (blk[c] !== 0) count++;
+            }
+        }
+        const values = new Int32Array(count);
+        const locations = new Uint32Array(count);
+        let idx = 0;
+        for (let b = 0; b < limitBlocks; b++) {
+            const blk = blocks[b];
+            for (let c = 1; c < 64; c++) {
+                if (blk[c] !== 0) {
+                    values[idx] = blk[c];
+                    locations[idx] = (b << 6) | c;
+                    idx++;
+                }
+            }
+        }
+        return { values, locations };
+    }
+
+    /**
+     * Writes non-zero stego coefficients back into their original block slots.
+     *
+     * @param {Int32Array} stegoValues
+     * @param {Uint32Array} locations
+     * @param {Array<Int32Array>} blocks
+     */
+    static putNonZeroAC(stegoValues, locations, blocks) {
+        for (let i = 0; i < locations.length; i++) {
+            const loc = locations[i];
+            const b = loc >>> 6;
+            const c = loc & 63;
+            blocks[b][c] = stegoValues[i];
+        }
     }
 
     /**
@@ -126,51 +177,117 @@ export class StegoEngine {
         if (!blocks || blocks.length === 0) {
             return [null, new Error('stego-engine: no blocks provided for embedding')];
         }
-        if (!(payload instanceof Uint8Array)) {
-            return [null, new Error('stego-engine: payload must be a Uint8Array')];
+
+        let wire;
+        if (options.sealedWire) {
+            wire = options.sealedWire;
+        } else {
+            if (!(payload instanceof Uint8Array)) {
+                return [null, new Error('stego-engine: payload must be a Uint8Array')];
+            }
+            if (payload.length > MAX_STEGO_PAYLOAD_BYTES) {
+                return [null, new Error(`stego-engine: payload (${payload.length}B) exceeds safety ceiling (${MAX_STEGO_PAYLOAD_BYTES}B)`)];
+            }
+
+            const effectivePassword = password || 'OL4S:v4:public';
+            const bucketSize = options.bucketSize || selectBucketSize(payload.length);
+            const [sealed, sealErr] = await sealOpaque(payload, effectivePassword, { bucketSize, kdfOpts: options.kdfOpts });
+            if (sealErr) return [null, sealErr];
+            wire = sealed;
         }
 
-        const effectivePassword = password || 'OL4S:v4:public';
-        const bucketSize = options.bucketSize || selectBucketSize(payload.length);
-        const [wire, sealErr] = await sealOpaque(payload, effectivePassword, { bucketSize, kdfOpts: options.kdfOpts });
-        if (sealErr) return [null, sealErr];
-
         const messageBits = bytesToBits(wire);
-        const totalAC = blocks.length * 63;
-        const w = Math.floor(totalAC / messageBits.length);
+        const { values: coverValues, locations } = this.getNonZeroAC(blocks, options);
+        const totalNZ = coverValues.length;
+        const w = Math.floor(totalNZ / messageBits.length);
 
         if (w < 1) {
             return [null, new Error(
-                `stego-engine: carrier too small (${totalAC} AC slots) for payload bucket (${messageBits.length} bits)`
+                `stego-engine: carrier too small (${totalNZ} non-zero AC slots) for payload bucket (${messageBits.length} bits)`
             )];
         }
 
-        const stcSeed = await this.resolveSTCSeed(effectivePassword, options);
+        const stcSeed = options.stcSeed || await this.resolveSTCSeed(password || 'OL4S:v4:public', options);
 
-        // Only compute J-UNIWARD costs for blocks that STC will actually touch
-        const neededCoeffs = messageBits.length * 16;
-        const neededBlocks = Math.min(blocks.length, Math.ceil(neededCoeffs / 63) + 2);
-        const targetBlocks = blocks.slice(0, neededBlocks);
-
-        const { rhoPlus, rhoMinus } = calculateJUniwardCosts(targetBlocks, options.qTable, {
-            costSeed: stcSeed
+        const { rhoPlus: fullRhoPlus, rhoMinus: fullRhoMinus } = calculateJUniwardCosts(blocks, options.qTable, {
+            costSeed: stcSeed,
+            includeIndices: false,
+            yBlockCount: options.yBlockCount,
+            chromaPenalty: options.chromaPenalty !== undefined ? options.chromaPenalty : 4.0,
+            luminanceOnly: options.luminanceOnly
         });
 
-        // Flatten AC coefficients
-        const cover = this.flattenACCoefficients(blocks);
+        // Filter distortion costs strictly to the non-zero cover positions
+        const nzRhoPlus = new Float64Array(totalNZ);
+        const nzRhoMinus = new Float64Array(totalNZ);
+        for (let i = 0; i < locations.length; i++) {
+            const loc = locations[i];
+            const b = loc >>> 6;
+            const c = loc & 63;
+            const flatIdx = b * 63 + (c - 1);
+            nzRhoPlus[i] = fullRhoPlus[flatIdx];
+            nzRhoMinus[i] = fullRhoMinus[flatIdx];
+        }
 
-        // Run STC Viterbi embedding
-        const [stego, stcErr] = stcEmbed(cover, messageBits, rhoPlus, rhoMinus, {
+        // Run STC Viterbi embedding strictly across non-zero AC coefficients
+        const [stegoValues, stcErr] = stcEmbed(coverValues, messageBits, nzRhoPlus, nzRhoMinus, {
             h: 8,
-            maxW: 16,
+            maxW: options.maxW,
             seed: stcSeed
         });
         if (stcErr) return [null, stcErr];
 
-        // Write stego coefficients back into blocks
-        this.unflattenACCoefficients(stego, blocks);
+        // Write stego coefficients back into original block locations
+        this.putNonZeroAC(stegoValues, locations, blocks);
 
         return [true, null];
+    }
+
+    /**
+     * Extracts candidate wire envelopes from JPEG DCT blocks using STC without requiring master password.
+     *
+     * @param {Array<Int32Array>} blocks - Quantized DCT blocks
+     * @param {Object} [options]
+     * @param {string} [options.stcSeed] - Pre-derived STC seed hash
+     * @returns {Array<Uint8Array>} Array of candidate wire byte buffers
+     */
+    static extractCandidateWires(blocks, options = {}) {
+        if (!blocks || blocks.length === 0) return [];
+        const { values: stegoValues } = this.getNonZeroAC(blocks, options);
+        const totalNZ = stegoValues.length;
+        const stcSeed = options.stcSeed || 'OL4S:v4:public';
+
+        const candidateBuckets = STANDARD_BUCKETS.filter(b => {
+            const wireLen = SALT_BYTES + b + TAG_BYTES;
+            return Math.floor(totalNZ / (wireLen * 8)) >= 1;
+        });
+
+        if (candidateBuckets.length === 0) return [];
+
+        const perceivedCapacity = this.calculateCapacity(blocks, {
+            targetBpnzAC: options.targetBpnzAC,
+            luminanceOnly: options.luminanceOnly,
+            yBlockCount: options.yBlockCount
+        });
+
+        candidateBuckets.sort((a, b) => {
+            const diffA = Math.abs(a - perceivedCapacity);
+            const diffB = Math.abs(b - perceivedCapacity);
+            return diffA - diffB;
+        });
+
+        const wires = [];
+        for (const bucket of candidateBuckets) {
+            const wireLen = SALT_BYTES + bucket + TAG_BYTES;
+            const messageBitLength = wireLen * 8;
+            const extractedBits = stcExtract(stegoValues, messageBitLength, {
+                h: 8,
+                maxW: options.maxW,
+                seed: stcSeed
+            });
+            wires.push(bitsToBytes(extractedBits));
+        }
+        return wires;
     }
 
     /**
@@ -189,24 +306,27 @@ export class StegoEngine {
         }
 
         const effectivePassword = password || 'OL4S:v4:public';
-        const cover = this.flattenACCoefficients(blocks);
-        const totalAC = cover.length;
+        const { values: stegoValues } = this.getNonZeroAC(blocks, options);
+        const totalNZ = stegoValues.length;
         const stcSeed = await this.resolveSTCSeed(effectivePassword, options);
 
         // Try candidate bucket sizes from smallest fitting up to largest
         const candidateBuckets = STANDARD_BUCKETS.filter(b => {
             const wireLen = SALT_BYTES + b + TAG_BYTES;
-            return Math.floor(totalAC / (wireLen * 8)) >= 1;
+            return Math.floor(totalNZ / (wireLen * 8)) >= 1;
         });
 
         if (candidateBuckets.length === 0) {
             return [null, new Error('stego-engine: carrier too small for stego extraction')];
         }
 
-        const perceivedCapacity = this.calculateCapacity(blocks, { targetBpnzAC: options.targetBpnzAC });
+        const perceivedCapacity = this.calculateCapacity(blocks, {
+            targetBpnzAC: options.targetBpnzAC,
+            luminanceOnly: options.luminanceOnly,
+            yBlockCount: options.yBlockCount
+        });
 
         // Sort candidate buckets so the most probable bucket based on carrier capacity is tried first.
-        // Under Option C, embed pads the payload to the carrier's safe capacity.
         candidateBuckets.sort((a, b) => {
             const diffA = Math.abs(a - perceivedCapacity);
             const diffB = Math.abs(b - perceivedCapacity);
@@ -219,8 +339,9 @@ export class StegoEngine {
             const wireLen = SALT_BYTES + bucket + TAG_BYTES;
             const messageBitLength = wireLen * 8;
 
-            const extractedBits = stcExtract(cover, messageBitLength, {
+            const extractedBits = stcExtract(stegoValues, messageBitLength, {
                 h: 8,
+                maxW: options.maxW,
                 seed: stcSeed
             });
             const extractedWire = bitsToBytes(extractedBits);

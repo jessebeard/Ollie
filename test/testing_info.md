@@ -12,8 +12,12 @@ The test runner logic is centralized in `test/utils/test-runner.js`. It detects 
 ## Key Files
 
 *   `test/utils/test-runner.js`: The core logic implementing `describe`, `it`, and `expect`.
-*   `test/runner.js`: The Node.js entry point. It mocks the DOM environment and imports all test files.
-*   `test.html`: The Browser entry point. It imports the test files as ES modules.
+*   `test/runner.js`: The Node.js test runner entry point. Runs tests across worker threads in parallel by default, with sequential fallback (`--sequential`).
+*   `test/runner-parallel.js`: The multithreaded test orchestrator managing worker pools, work-stealing queues, and live reporting.
+*   `test/utils/worker-test-executor.js`: Isolated worker thread executor running within `node:worker_threads`.
+*   `test/utils/mock-env.js`: Clean DOM, `localStorage`, and `window` isolation stubs.
+*   `test/utils/test-files.js`: Canonical manifest of all test files.
+*   `app/test.html`: The Browser entry point. It imports the test files as ES modules.
 
 ## API Reference
 
@@ -67,9 +71,30 @@ The `expect(actual)` function returns an object with the following matchers:
 ### CLI (Node.js)
 Run the following command from the project root:
 ```bash
+npm test
+# or
 node test/runner.js
 ```
-This will execute all tests and output the results to the terminal.
+This will execute all 155 test suites across hardware worker threads in parallel (defaulting to `os.availableParallelism() - 1` workers).
+
+#### CLI Flags & Options
+*   **Single-threaded / Sequential execution**:
+    ```bash
+    node test/runner.js --sequential
+    ```
+*   **Target specific suites or patterns**:
+    ```bash
+    node test/runner.js threshold-vault
+    node test/runner.js test/algebraic/colorspace/
+    ```
+*   **Configure worker thread concurrency**:
+    ```bash
+    node test/runner.js --workers=4
+    ```
+*   **Deterministic Property-Based Testing (PBT)**:
+    ```bash
+    PBT_SEED=4074677058 npm test
+    ```
 
 ### Browser
 Open `test.html` in a modern web browser. You can use a local server:

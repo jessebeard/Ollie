@@ -46,6 +46,8 @@
         </directory>
         <directory name="codec">
             <file name="capacity-scanner.js" description="CapacityScanner: cooperative async capacity analysis across multiple JPEGs using Format v4 bounds." />
+            <file name="carrier-pool.js" description="CarrierPool: managed background worker pool for parallel carrier operations." />
+            <file name="carrier.worker.js" description="Carrier worker thread entry point: decode, scan capacity, transcode embed, extract payload." />
             <file name="decoder.js" description="JpegDecoder: full decode pipeline with Format v4 steganography extraction, fail-loud bounds checking." />
             <file name="encoder.js" description="JpegEncoder: baseline sequential DCT encoder with Format v4 J-UNIWARD/STC steganography embedding." />
             <file name="file-scanner.js" description="FileScanner: directory scanning via File System Access API." />
@@ -58,8 +60,10 @@
             <directory name="cryptography">
                 <file name="aes-gcm.js" description="AES-256-GCM encryption/decryption with optional AAD binding." />
                 <file name="crypto-provider.js" description="Single source of truth for Web Crypto access across browser and Node." />
+                <file name="feistel-permutation.js" description="Zero-dependency Keyed Cycle-Walking Feistel Permutation for high-entropy aperiodic steganographic cover sampling across arbitrary integer domains." />
                 <file name="hmac.js" description="HMAC-SHA256 signing/verification for carrier manifest authentication." />
                 <file name="kdf-chain.js" description="Unified Argon2id (t=3, m=64MB, p=1) + HKDF-Expand domain separation for AES key/IV, STC submatrix seed, and anti-SCA cost seed." />
+                <file name="kdf.worker.js" description="Argon2id KDF background worker thread entry point for off-main-thread key derivation." />
                 <file name="pbkdf2.js" description="PBKDF2-HMAC-SHA-256 key derivation with OWASP-aligned defaults (600k iterations)." />
                 <file name="totp.js" description="RFC 6238 TOTP: hotp/totp/verifyTotp with SHA-1/SHA-256/SHA-512, drift-window verification, otpauth:// URI parse/build, codeFromOtpauthUri (Base32-correct code generation) and normalizeTotpInput (bare-secret wrapping for entry authoring)." />
             </directory>
@@ -70,7 +74,7 @@
                 <file name="rs-interleaver.js" description="ECC profiles (Low through Extreme), block splitting, interleaving, protect/recover tuple API." />
             </directory>
             <directory name="secret-sharing">
-                <file name="cauchy-ec.js" description="Cauchy MDS erasure codec: encodeErasure/decodeErasure/planErasureAllocation over GF(256) with proportional parity multi-block allocation across heterogeneous carriers." />
+                <file name="cauchy-ec.js" description="Cauchy MDS erasure codec: encodeErasure/decodeErasure/planErasureAllocation over GF(256) with proportional parity multi-block allocation across heterogeneous carriers, No-SPOF carrier block caps, and DEFAULT_MAX_CARRIER_BYTES clamping." />
                 <file name="css-envelope.js" description="Computationally Secure Secret Sharing envelope: AES-GCM payload + Shamir-split DEK." />
                 <file name="gf-shamir.js" description="Shamir secret sharing over GF(256): splitSecret/combineShares with injectable RNG." />
                 <file name="gf256.js" description="Shared GF(2^8) field arithmetic: exp/log tables, multiplication, inversion." />
@@ -83,8 +87,8 @@
                 <file name="encrypted-container.js" description="EncryptedContainer: Format v4 seal/unseal wrapper with backward-compatible API." />
                 <file name="juniward.js" description="J-UNIWARD spatial wavelet distortion engine: 2D IDCT, 8-tap Daubechies (db8) directional wavelets, spatial sensitivity map, anti-SCA key randomization." />
                 <file name="opaque-container.js" description="Format v4 zero-length opaque framing: Deflate/Inflate, CRC-32, CSPRNG bucket padding (256B-128KB), unsealWithKeys candidate bucket fast testing." />
-                <file name="stc-matrix.js" description="Syndrome-Trellis Codes (STC): dual-trellis Viterbi encoder, submatrix generator, maxW=16 bounded trellis, linear parity extractor." />
-                <file name="stego-engine.js" description="StegoEngine: unified Format v4 orchestrator (embed, extract, calculateCapacity) with cached-key derivation." />
+                <file name="stc-matrix.js" description="Syndrome-Trellis Codes (STC): dual-trellis Viterbi encoder, submatrix generator, maxW=4 bounded trellis, algebraic predecessor recovery, 2-bit packed decision matrix, linear parity extractor." />
+                <file name="stego-engine.js" description="StegoEngine: unified Format v4 orchestrator (embed, extract, calculateCapacity) with cached-key derivation and MAX_STEGO_PAYLOAD_BYTES hard safety ceiling." />
             </directory>
         </directory>
         <directory name="structures">
@@ -95,6 +99,12 @@
             </directory>
         </directory>
         <directory name="utils">
+            <directory name="concurrency">
+                <file name="tuple-serializer.js" description="Deterministic [value, error] Result tuple wire serialization across worker thread boundaries." />
+                <file name="worker-adapter.js" description="Platform worker adapter unifying Web Workers and node:worker_threads with hardware core detection." />
+                <file name="worker-pool.js" description="Universal WorkerPool managing lifecycle, priority queueing, core scaling, timeouts, and fallback." />
+                <file name="worker-runtime.js" description="Worker thread runtime bootstrap and reply channel." />
+            </directory>
             <file name="atomic-writer.js" description="writeAllWithRollback: atomic multi-file writes with rollback on partial failure." />
             <file name="base32.js" description="RFC 4648 Base32 encoding/decoding." />
             <file name="compression.js" description="Native zero-dependency CompressionStream / DecompressionStream deflate/inflate helper." />

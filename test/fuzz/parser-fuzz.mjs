@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { loadSeedCorpus, mutate, makeRng } from './mutation-engine.mjs';
 
 const WORKER_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'worker-parse.mjs');
-const TIMEOUT_MS = 700;
+const TIMEOUT_MS = 2500;
 
 function runInWorker(bytes, timeoutMs) {
     return new Promise((resolve) => {

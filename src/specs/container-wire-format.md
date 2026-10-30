@@ -72,11 +72,18 @@ For each $8 \times 8$ quantized DCT block $\mathbf{D}$:
 ### 3.2 Syndrome-Trellis Codes (STC) Dual-Trellis Encoding
 Embedding a message $\mathbf{m} \in \{0, 1\}^M$ into AC cover coefficients $\mathbf{x} \in \mathbb{Z}^N$:
 - Constraint height $h = 8$ ($2^8 = 256$ trellis states).
-- Submatrix width $w = \max(1, \min(\lfloor N / M \rfloor, 16))$.
+- Submatrix width $w = \text{calculateSTCWidth}(N, M, \text{options})$ dynamically scales up to $w \le 16$ for small/medium payloads while bounding trellis transitions strictly below 256 MB memory ($w \le 4$ for 128 KB payloads).
 - Parity-check submatrix $\hat{\mathbf{h}} \in \mathbb{F}_2^{h \times w}$ is deterministically generated from `stcSeed`.
-- Viterbi dynamic programming determines optimal modification sequence $\mathbf{y} \in \{\mathbf{x}-1, \mathbf{x}, \mathbf{x}+1\}^N$ minimizing $\sum \rho_i |\mathbf{y}_i - \mathbf{x}_i|$ subject to $\mathbf{H}\mathbf{y} = \mathbf{m} \pmod 2$.
+- **Keyed Cycle-Walking Feistel Permutation:** To eliminate spatial clustering and periodic spectral combs (cyclostationary signatures detected by DCTR/GFR/SRM), cover elements are sampled via a zero-allocation, 8-round keyed cycle-walking Feistel permutation:
+  $$i_t = \pi_{\text{seed}, N}(t) \quad \text{for } t = 0, \dots, M \cdot w - 1$$
+  This mathematically guarantees an exact collision-free bijection over $\{0, \dots, N-1\}$ with high-entropy aperiodic step deltas, full key-width SAC avalanche, and zero heap memory ($0$ bytes allocated).
+- **Algebraic Predecessor Recovery:** Viterbi dynamic programming determines optimal modification sequence $\mathbf{y} \in \{\mathbf{x}-1, \mathbf{x}, \mathbf{x}+1\}^N$ minimizing $\sum \rho_i |\mathbf{y}_i - \mathbf{x}_i|$ subject to $\mathbf{H}\mathbf{y} = \mathbf{m} \pmod 2$. During traceback, because XOR is self-inverting over $\mathbb{F}_2$, predecessor state is computed algebraically without storing a predecessor state matrix:
+  $$s_{\text{prev}} = s_{\text{next}} \oplus (\text{chosenParity} \cdot \hat{\mathbf{h}}_j)$$
+  This completely eliminates the 8.59 GB `prevStates` (`Uint16Array`) allocation.
+- **2-Bit Packed Decision Matrix:** Transition decisions ($0 = \text{no change}, 1 = +1, 2 = -1$) are packed 4 decisions per byte in a `Uint8Array`, bounding decision storage to $\le 268\text{ MB}$ even at the 128 KB bucket limit.
+- **StegoEngine Safety Ceiling:** Payloads are hard-capped at $\text{MAX\_STEGO\_PAYLOAD\_BYTES} = 131072$ (128 KB). Any payload exceeding 128 KB fails closed with an explicit error before any trellis allocation.
 - Extracting bits from stego sequence $\mathbf{y}$ is linear time $O(M \cdot w)$:
-  $$\mathbf{m}_k = \bigoplus_{j=0}^{w-1} \left(|\mathbf{y}_{k \cdot w + j}| \bmod 2\right) \cdot \hat{\mathbf{h}}_j \pmod 2$$
+  $$\mathbf{m}_k = \bigoplus_{j=0}^{w-1} \left(|\mathbf{y}_{\pi(k \cdot w + j)}| \bmod 2\right) \cdot \hat{\mathbf{h}}_j \pmod 2$$
 
 ---
 
@@ -161,7 +168,9 @@ Total wire envelope length: $16 + B + 16 = B + 32$ bytes.
 
 When splitting a vault across $n$ photo carriers with threshold $k$:
 1. The vault document is erasure-coded using **Cauchy MDS Reed-Solomon Parity Coding** over $\text{GF}(256)$.
-2. Carrier capacities are allocated proportionally according to available non-zero AC coefficients.
+2. Carrier capacities are allocated proportionally according to available non-zero AC coefficients, subject to:
+   - **Carrier Capacity Clamping:** Each carrier's usable capacity is clamped to `DEFAULT_MAX_CARRIER_BYTES = 65536` (64 KB) to prevent oversized photos from dominating total capacity.
+   - **No-SPOF Invariant:** In proportional parity mode, no single carrier may hold $\ge k$ blocks or exceed $40\%$ of threshold $k$ (`maxSharePerCarrier = 0.4`), ensuring no single image becomes a single point of failure or unilaterally holds reconstruction quorum.
 3. The cryptographic DEK is secret-shared across carriers using **$\text{GF}(256)$ Shamir Secret Sharing**.
 4. Recovery succeeds from **any valid $k$-subset** of carriers and fails closed on $k-1$ carriers.
 

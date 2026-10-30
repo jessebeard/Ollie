@@ -275,7 +275,7 @@ describe('CardFlowAutomata (Spatial State Machine & Scroll Anchoring)', () => {
         cardB.setAttribute('data-entry-id', 'card-b');
         grid.appendChild(cardB);
 
-        let cardBCoordTop = 450;
+        const cardBCoordTop = 450;
         cardB.getBoundingClientRect = () => ({
             top: cardBCoordTop,
             bottom: cardBCoordTop + 140,
@@ -658,7 +658,7 @@ describe('CardFlowAutomata (Spatial State Machine & Scroll Anchoring)', () => {
         card2.offsetTop = 200;
 
         // Initial unexpanded rect: bottom is at 340
-        let currentRect = { top: 200, bottom: 340, left: 0, right: 290, width: 290, height: 140 };
+        const currentRect = { top: 200, bottom: 340, left: 0, right: 290, width: 290, height: 140 };
         card2.getBoundingClientRect = () => currentRect;
         grid.appendChild(card2);
 

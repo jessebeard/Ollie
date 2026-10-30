@@ -22,6 +22,8 @@ export class JpegEncoder {
             secretData: options.secretData || null,
             metadata: options.metadata || null,
             password: options.password || null,
+            sealedWire: options.sealedWire || null,
+            stcSeed: options.stcSeed || null,
             subsampling: options.subsampling || '4:4:4', // '4:4:4' or '4:2:0'
             restartInterval: options.restartInterval || 0
         };
@@ -43,9 +45,9 @@ export class JpegEncoder {
     /**
      * Embeds secret data into blocks using Format v4 StegoEngine.
      */
-    async embedSecretData(allBlocks) {
+    async embedSecretData(allBlocks, embedOpts = {}) {
         const metadata = this.options.metadata || {};
-        const capacity = StegoEngine.calculateCapacity(allBlocks);
+        const capacity = StegoEngine.calculateCapacity(allBlocks, { yBlockCount: embedOpts.yBlockCount });
 
         logger.debug(`Capacity: ${capacity} bytes, Data: ${this.options.secretData.length} bytes`);
 
@@ -53,12 +55,32 @@ export class JpegEncoder {
             return [null, new Error(`Secret data (${this.options.secretData.length} bytes) exceeds image capacity (${capacity} bytes). Try a larger image or smaller file.`)];
         }
 
-        const carrierPayload = new TextEncoder().encode(JSON.stringify({
-            data: bytesToBase64(this.options.secretData),
-            metadata: metadata
-        }));
+        let qTable = embedOpts.qTable || null;
+        if (!qTable && embedOpts.quantizationTables) {
+            qTable = embedOpts.quantizationTables.get ? embedOpts.quantizationTables.get(0) : embedOpts.quantizationTables[0];
+        }
 
-        const [ok, embedErr] = await StegoEngine.embed(allBlocks, carrierPayload, this.options.password);
+        let ok, embedErr;
+        if (this.options.sealedWire) {
+            [ok, embedErr] = await StegoEngine.embed(allBlocks, null, null, {
+                sealedWire: this.options.sealedWire,
+                stcSeed: this.options.stcSeed,
+                qTable,
+                yBlockCount: embedOpts.yBlockCount,
+                chromaPenalty: 4.0
+            });
+        } else {
+            const carrierPayload = new TextEncoder().encode(JSON.stringify({
+                data: bytesToBase64(this.options.secretData),
+                metadata: metadata
+            }));
+
+            [ok, embedErr] = await StegoEngine.embed(allBlocks, carrierPayload, this.options.password, {
+                qTable,
+                yBlockCount: embedOpts.yBlockCount,
+                chromaPenalty: 4.0
+            });
+        }
         if (embedErr || !ok) {
             return [null, new Error(`Failed to embed secret data into image: ${embedErr ? embedErr.message : 'unknown error'}`)];
         }
@@ -317,7 +339,11 @@ export class JpegEncoder {
                 blocksForEmbedding = { Y: rowMajorY, Cb: blocks.Cb, Cr: blocks.Cr };
             }
 
-            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocksForEmbedding));
+            const yCount = blocksForEmbedding.Y ? blocksForEmbedding.Y.length : 0;
+            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocksForEmbedding), {
+                qTable: qTables ? qTables.luma : null,
+                yBlockCount: yCount
+            });
             if (embedErr) throw embedErr;
         }
 
@@ -440,7 +466,10 @@ export class JpegEncoder {
 
         if (this.options.secretData) {
             logger.debug('Embedding secret data into coefficients...');
-            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocks));
+            const [, embedErr] = await this.embedSecretData(this.flattenBlocks(blocks), {
+                quantizationTables,
+                yBlockCount: yCount
+            });
             if (embedErr) throw embedErr;
         }
 

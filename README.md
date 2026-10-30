@@ -64,7 +64,7 @@ The enrollment dialog states this disclaimer verbatim.
 |----------|-----------|
 | Confidentiality | AES-256-GCM per entry + AES-256-GCM opaque container envelope |
 | Key Derivation | Argon2id ($t=3, m=64\text{MB}, p=1$) $\to$ HKDF-Expand (RFC 5869) |
-| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 16$) + J-UNIWARD spatial wavelet costs |
+| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 4$, 2-bit packed trellis) + J-UNIWARD spatial wavelet costs |
 | Length Hiding | Zero-length framing + CSPRNG noise bucket padding ($256\text{B} \dots 128\text{KB}$) |
 | Tamper Detection | HMAC-SHA-256 carrier manifests (password-gated) |
 | Loss Tolerance | Cauchy MDS erasure coding + Shamir secret sharing (any $k$ of $n$ carriers) |

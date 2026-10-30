@@ -235,6 +235,7 @@ export class VaultView {
         `;
 
         div.addEventListener('click', (e) => {
+            if (e && e.isTrusted === false) return;
             if (e.target && typeof e.target.closest === 'function') {
                 if (e.target.closest('button, a, input, select, textarea, .totp-code')) {
                     return;
@@ -246,6 +247,7 @@ export class VaultView {
         });
 
         div.addEventListener('keydown', (e) => {
+            if (e && e.isTrusted === false) return;
             if (e.key === 'Enter' || e.key === ' ') {
                 if (e.target === div && handlers.onSelect) {
                     e.preventDefault();
@@ -257,16 +259,19 @@ export class VaultView {
         const moreBtn = div.querySelector('.more-btn');
         if (moreBtn && handlers.onEdit) {
             moreBtn.addEventListener('click', (e) => {
+                if (e && e.isTrusted === false) return;
                 e.stopPropagation();
                 handlers.onEdit(entry.id);
             });
         }
 
         const copyBtn = div.querySelector('.btn-copy');
-        if (copyBtn && handlers.onCopyPass) {
+        const copyHandler = handlers.onCopyPass || handlers.onCopy;
+        if (copyBtn && copyHandler) {
             copyBtn.addEventListener('click', (e) => {
+                if (e && e.isTrusted === false) return;
                 e.stopPropagation();
-                handlers.onCopyPass(entry.id);
+                copyHandler(entry.id);
             });
         }
 

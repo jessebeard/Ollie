@@ -2,7 +2,7 @@ import { describe, it, expect } from '../utils/test-runner.js';
 import { Arbitrary, assertProperty } from '../utils/pbt.js';
 import { stcEmbed, stcExtract, bytesToBits } from '../../src/information-theory/steganography/stc-matrix.js';
 import { sealOpaque, unsealOpaque, selectBucketSize } from '../../src/information-theory/steganography/opaque-container.js';
-import { StegoEngine } from '../../src/information-theory/steganography/stego-engine.js';
+import { StegoEngine, MAX_STEGO_PAYLOAD_BYTES } from '../../src/information-theory/steganography/stego-engine.js';
 
 describe('Steganography Dedicated PBT Suite', () => {
     it('Property: STC Viterbi trellis coding recovers message bits exactly and bounds distortion (|delta| <= 1)', async () => {
@@ -78,5 +78,16 @@ describe('Steganography Dedicated PBT Suite', () => {
             },
             30
         );
+    });
+
+    it('Property: StegoEngine strictly rejects payloads exceeding MAX_STEGO_PAYLOAD_BYTES (hard cap)', async () => {
+        const dummyBlock = new Int32Array(64);
+        const blocks = Array.from({ length: 50 }, () => dummyBlock);
+        const oversizedPayload = new Uint8Array(MAX_STEGO_PAYLOAD_BYTES + 1);
+
+        const [result, err] = await StegoEngine.embed(blocks, oversizedPayload, 'password');
+        expect(result).toBe(null);
+        expect(err instanceof Error).toBe(true);
+        expect(err.message).toMatch(/exceeds safety ceiling/);
     });
 });

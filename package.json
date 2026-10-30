@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "vectors": "node scripts/generate-golden-vectors.mjs",
-    "fuzz": "node scripts/fuzz.mjs"
+    "fuzz": "node scripts/fuzz.mjs",
+    "bench:concurrency": "node scripts/benchmark-concurrency.mjs"
   },
   "engines": {
     "node": ">=22"

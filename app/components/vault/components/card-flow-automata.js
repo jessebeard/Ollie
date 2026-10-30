@@ -221,7 +221,7 @@ export class CardFlowAutomata {
         const cardList = [];
         let curR = 1;
         let curC = 0;
-        let targetLayout = { row: 1, col: 0, span: (expandedIndex >= 0 ? 2 : 1), totalRows: 1 };
+        const targetLayout = { row: 1, col: 0, span: (expandedIndex >= 0 ? 2 : 1), totalRows: 1 };
 
         for (let i = 0; i < totalCards; i++) {
             if (i === expandedIndex) {

@@ -217,6 +217,8 @@ export function decodeErasure(chunks, options) {
  * @param {{threshold?: number, margin?: number, payloadSize?: number, proportional?: boolean}} options
  * @returns {[{counts: number[], stripeSize: number, k: number, n: number, maxPayload: number}|null, Error|null]}
  */
+export const DEFAULT_MAX_CARRIER_BYTES = 65536;
+
 export function planErasureAllocation(capacities, options = {}) {
     if (!Array.isArray(capacities) || capacities.length < 1) {
         return [null, new Error('cauchy-ec: capacities must be a non-empty array')];
@@ -299,7 +301,8 @@ export function planErasureAllocation(capacities, options = {}) {
         }, null];
     }
 
-    const usable = capacities.map((cap) => Math.max(0, cap - margin));
+    const maxCarrierBytes = options && options.maxCarrierBytes !== undefined ? options.maxCarrierBytes : DEFAULT_MAX_CARRIER_BYTES;
+    const usable = capacities.map((cap) => Math.min(maxCarrierBytes, Math.max(0, cap - margin)));
     const totalUsable = usable.reduce((a, b) => a + b, 0);
     const effPayload = payloadSize !== undefined ? payloadSize : 1024;
 
@@ -351,15 +354,39 @@ export function planErasureAllocation(capacities, options = {}) {
     // Compute target total parity blocks (providing ~1.2x to 1.5x redundancy)
     const targetRedundancy = Math.min(255 - k, Math.max(k, Math.ceil(k * 1.5)));
 
+    // Maximum share of k or target redundancy any single carrier may receive in proportional mode
+    // To prevent single point of failure and single-carrier dominance, cap each carrier at:
+    // 1) At most 40% of k (or at least 1)
+    // 2) At most floor(maxCarrierBytes / stripeSize)
+    const maxShare = options && options.maxSharePerCarrier !== undefined ? options.maxSharePerCarrier : 0.4;
+    const maxBlocksCap = Math.max(1, Math.min(
+        Math.floor(k * maxShare),
+        Math.floor(maxCarrierBytes / stripeSize)
+    ));
+
     // Calculate proportional block counts m_i for each carrier based on capacity share
     let counts = usable.map((u) => {
         const rawBlocks = Math.floor((u * 0.75) / stripeSize);
         const propBlocks = Math.ceil(targetRedundancy * (u / totalUsable));
-        return Math.min(rawBlocks, propBlocks);
+        return Math.min(rawBlocks, propBlocks, maxBlocksCap);
     });
     let totalBlocks = counts.reduce((a, b) => a + b, 0);
 
-    // If totalBlocks < k, scale up to available capacity
+    // If totalBlocks < targetRedundancy, scale up across carriers with headroom under maxBlocksCap
+    if (totalBlocks < targetRedundancy) {
+        for (let i = 0; i < counts.length; i++) {
+            const rawBlocks = Math.floor((usable[i] * 0.75) / stripeSize);
+            const canAdd = Math.min(rawBlocks - counts[i], maxBlocksCap - counts[i]);
+            if (canAdd > 0) {
+                const add = Math.min(canAdd, targetRedundancy - totalBlocks);
+                counts[i] += add;
+                totalBlocks += add;
+                if (totalBlocks >= targetRedundancy) break;
+            }
+        }
+    }
+
+    // If still totalBlocks < k, scale up to available capacity without maxBlocksCap
     if (totalBlocks < k) {
         counts = usable.map((u) => Math.floor((u * 0.75) / stripeSize));
         totalBlocks = counts.reduce((a, b) => a + b, 0);

@@ -271,7 +271,9 @@ export class VaultUI {
 
             this.setMascotState('thinking');
             this.showLoading(true, 'Decrypting...');
-            const [newVault, loadErr] = await PasswordVault.load(filesToLoad, password);
+            const [newVault, loadErr] = await PasswordVault.load(filesToLoad, password, (cur, tot, status) => {
+                this.showLoading(true, status);
+            });
             this.showLoading(false);
 
             if (loadErr) {
@@ -281,7 +283,6 @@ export class VaultUI {
             }
 
             this.vault = newVault;
-            this._sessionPassword = password;
             const gateOk = await this.enforceTotpGate();
             if (!gateOk) {
                 this.vault = null;
@@ -348,7 +349,6 @@ export class VaultUI {
             }
 
             this.vault = new PasswordVault([], metadata, true, result.password);
-            this._sessionPassword = result.password;
 
             this.updateUI();
             this._notify('New vault initialized!', 'success');
@@ -370,13 +370,19 @@ export class VaultUI {
             }
 
             this.vault = new PasswordVault([], null, true, pass1);
-            this._sessionPassword = pass1;
 
             await this.enrollTotpGateFlow();
 
             this.updateUI();
             this.modals.showAlert('Created', 'New vault created. Add entries and save.');
         }
+    }
+
+    _getMasterPassword() {
+        if (this.vault && typeof this.vault._password === 'function') {
+            return this.vault._password();
+        }
+        return this._sessionPassword || null;
     }
 
     async changeMasterPasswordFlow() {
@@ -389,7 +395,7 @@ export class VaultUI {
 
         if (!result) return;
 
-        if (result.currentPassword !== this._sessionPassword) {
+        if (result.currentPassword !== this._getMasterPassword()) {
             this._notify('Current master password incorrect', 'error');
             return;
         }
@@ -406,7 +412,6 @@ export class VaultUI {
         }
 
         this.vault = newVault;
-        this._sessionPassword = result.newPassword;
         this.updateUI();
         this._notify('Master password and salt rotated successfully!', 'success');
     }
@@ -444,7 +449,6 @@ export class VaultUI {
     lockVault() {
         if (!this.vault) return;
         this.vault = this.vault.lock();
-        this._sessionPassword = null;
         if (this.view) this.view.clearSelection();
         this.setMascotState('static');
         this.updateUI();
@@ -616,7 +620,8 @@ export class VaultUI {
     }
 
     async saveVault() {
-        if (!this.vault.isUnlocked || !this._sessionPassword) return;
+        const masterPw = this._getMasterPassword();
+        if (!this.vault || !this.vault.isUnlocked || !masterPw) return;
 
         try {
             const confirmed = await this.modals.confirm(
@@ -667,7 +672,9 @@ export class VaultUI {
                 fileObjs.push(await h.getFile());
             }
 
-            const [results, saveErr] = await this.vault.save(fileObjs, this._sessionPassword);
+            const [results, saveErr] = await this.vault.save(fileObjs, masterPw, (cur, tot, status) => {
+                this.showLoading(true, status);
+            });
             if (saveErr) {
                 this.showLoading(false);
                 this.modals.showAlert('Error', 'Failed to embed vault: ' + saveErr.message, 'error');
@@ -832,7 +839,6 @@ export class VaultUI {
                             return;
                         }
                         this.vault = importedVault;
-                        this._sessionPassword = pass;
                         this.updateUI();
                         this.modals.showAlert('Import Complete', `Restored ${importedVault.entries.length} entries from backup!`);
                         return;
@@ -902,7 +908,7 @@ export class VaultUI {
         if (!this.vault.isUnlocked) return;
 
         this.showLoading(true, 'Packaging encrypted backup...');
-        const [envelopeJson, err] = await this.vault.exportEncrypted(this._sessionPassword);
+        const [envelopeJson, err] = await this.vault.exportEncrypted(this._getMasterPassword());
         this.showLoading(false);
 
         if (err) {
@@ -931,7 +937,7 @@ export class VaultUI {
         );
         if (!enteredPassword) return;
 
-        if (enteredPassword !== this._sessionPassword) {
+        if (enteredPassword !== this._getMasterPassword()) {
             this._notify('Master password verification failed. Export cancelled.', 'error');
             return;
         }

@@ -1,17 +1,16 @@
-import { JpegDecoder } from './decoder.js';
-import { BatchEmbedder } from '../information-theory/steganography/batch-embedder.js';
+import { getCarrierPool } from './carrier-pool.js';
 
 /**
  * CapacityScanner - Orchestrates steganographic capacity analysis across multiple JPEGs.
- * Concurrency is cooperative (async tasks on the main thread, `options.concurrency`);
- * no Worker threads are involved. Deterministic error propagation throughout.
+ * Supports hardware-parallel execution via WorkerPool with cooperative async queueing
+ * and deterministic error propagation throughout.
  */
 export class CapacityScanner {
     /**
      * Scans a list of files for their steganographic capacity.
      * 
      * @param {File[]|Object[]} files - List of File objects or mocks
-     * @param {Object} options - { concurrency, analyzer }
+     * @param {Object} options - { concurrency, analyzer, multithreaded }
      * @param {Function} onProgress - (current, total, status) callback
      * @returns {Promise<[Object|null, Error|null]>} Result tuple
      */
@@ -20,7 +19,8 @@ export class CapacityScanner {
             return [{ totalCapacity: 0, imageCount: 0, fileCapacities: new Map() }, null];
         }
 
-        const concurrency = options.concurrency || 1;
+        const pool = getCarrierPool();
+        const concurrency = options.concurrency || (pool.maxWorkers || 2);
         let analyzer = options.analyzer;
         
         // Default analyzer: Decodes JPEG and calculates capacity via the
@@ -28,23 +28,31 @@ export class CapacityScanner {
         if (!analyzer) {
             const { format, metadata, ...capacityOpts } = options.f5Options || {};
             analyzer = async (file) => {
-                const decoder = new JpegDecoder();
                 const buffer = await file.arrayBuffer();
                 const bytes = new Uint8Array(buffer);
 
-                const [info, err] = await decoder.decode(bytes, { skipExtraction: true, coefficientsOnly: true });
-                if (err) return [null, err];
-
-                const allBlocks = [];
-                for (const compId in info.coefficients) {
-                    const comp = info.coefficients[compId];
-                    for (let i = 0; i < comp.blocks.length; i++) {
-                        allBlocks.push(comp.blocks[i]);
-                    }
+                if (options.multithreaded === false) {
+                    const [res, err] = await pool.fallbackHandler('scan-capacity', {
+                        jpegBytes: bytes,
+                        options: capacityOpts,
+                        metadata
+                    });
+                    if (err) return [null, err];
+                    return [res.capacity, null];
                 }
 
-                const capacity = BatchEmbedder.calculateCarrierCapacity(allBlocks, capacityOpts, metadata);
-                return [capacity, null];
+                // Slice an isolated buffer for worker transfer to protect caller's buffer from detachment
+                const payloadBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+                const payloadBytes = new Uint8Array(payloadBuffer);
+
+                const [res, err] = await pool.dispatch('scan-capacity', {
+                    jpegBytes: payloadBytes,
+                    options: capacityOpts,
+                    metadata
+                }, [payloadBuffer]);
+
+                if (err) return [null, err];
+                return [res.capacity, null];
             };
         }
 

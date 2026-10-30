@@ -40,14 +40,26 @@ function isNonEmptyString(v, maxLen = Infinity) {
  * @param {{algo: string, iterations: number, salt: string}} kdf
  * @returns {Promise<[CryptoKey|null, Error|null]>}
  */
-async function deriveMacKey(password, kdf) {
-    const [saltBytes] = base64ToBytes(kdf.salt);
+export async function deriveMacKey(password, kdf) {
+    if (typeof password !== 'string' || password.length === 0) {
+        return [null, new Error('deriveMacKey: password required')];
+    }
+    if (!kdf || typeof kdf !== 'object' || !kdf.salt || !kdf.iterations) {
+        return [null, new Error('deriveMacKey: malformed kdf parameters')];
+    }
+
+    const [saltBytes, saltErr] = base64ToBytes(kdf.salt);
+    if (saltErr || !saltBytes) {
+        return [null, saltErr || new Error('deriveMacKey: invalid salt')];
+    }
+
     const [raw, rawErr] = await KeyDerivation.deriveRawBits(password, saltBytes, {
         iterations: kdf.iterations,
         bits: 256
     });
-    if (rawErr) return [null, rawErr];
-    return importHmacKey(raw);
+    if (rawErr || !raw) return [null, rawErr || new Error('deriveMacKey: derivation failed')];
+
+    return await importHmacKey(raw);
 }
 
 /**
@@ -171,7 +183,8 @@ export function validateManifestStructure(m) {
  * @param {string} spec.chunkSetId - UUID binding this manifest to one save
  * @param {Array<{index: number, checksum: number}>} spec.records - One per carrier
  * @param {number} spec.revision - Vault document revision at save time
- * @param {string} spec.password - Master password (MAC key source)
+ * @param {string} [spec.password] - Master password (MAC key source)
+ * @param {CryptoKey} [spec.macKey] - Optional pre-derived HMAC key (ephemeral, avoids re-deriving)
  * @param {string} [spec.created] - ISO timestamp override (tests)
  * @param {{index: number, threshold: number, data: string}} [spec.share] - CSS envelope (H2)
  * @param {Array<{index: number, threshold: number, data: string}>} [spec.shares] - Per-carrier CSS key shares (erasure sets)
@@ -196,8 +209,11 @@ export async function createManifest(spec) {
         if (!Number.isInteger(spec.revision) || spec.revision < 0) {
             return [null, new Error('manifest: revision must be a non-negative integer')];
         }
-        if (typeof spec.password !== 'string' || spec.password.length === 0) {
-            return [null, new Error('manifest: password required for signing')];
+        let macKey = spec.macKey || null;
+        if (!macKey) {
+            if (typeof spec.password !== 'string' || spec.password.length === 0) {
+                return [null, new Error('manifest: password required for signing')];
+            }
         }
 
         let salt;
@@ -225,8 +241,11 @@ export async function createManifest(spec) {
                 salt: bytesToBase64(salt)
             };
 
-        const [macKey, keyErr] = await deriveMacKey(spec.password, kdf);
-        if (keyErr) return [null, keyErr];
+        if (!macKey) {
+            const [derived, keyErr] = await deriveMacKey(spec.password, kdf);
+            if (keyErr || !derived) return [null, keyErr || new Error('manifest: key derivation failed')];
+            macKey = derived;
+        }
 
         /** @type {Object} */
         const unsigned = {
@@ -269,23 +288,34 @@ export async function createManifest(spec) {
 }
 
 /**
- * Verifies a manifest's structure and MAC under the given password.
+ * Verifies a manifest's structure and MAC under the given password or pre-derived CryptoKey.
  * Structural problems yield tuple errors; authentication failure yields false.
  *
  * @param {Object} manifest
- * @param {string} password
+ * @param {string|CryptoKey} passwordOrKey
+ * @param {Object} [options]
+ * @param {CryptoKey} [options.macKey] - Optional pre-derived HMAC key (ephemeral, avoids re-deriving)
  * @returns {Promise<[boolean|null, Error|null]>}
  */
-export async function verifyManifest(manifest, password) {
+export async function verifyManifest(manifest, passwordOrKey, options = {}) {
     const structural = validateManifestStructure(manifest);
     if (structural) return [null, structural];
 
-    if (typeof password !== 'string' || password.length === 0) {
-        return [null, new Error('manifest: password required for verification')];
+    let macKey = (options && options.macKey) || null;
+    if (!macKey) {
+        if (typeof passwordOrKey === 'string') {
+            if (passwordOrKey.length === 0) {
+                return [null, new Error('manifest: password required for verification')];
+            }
+            const [derived, keyErr] = await deriveMacKey(passwordOrKey, manifest.kdf);
+            if (keyErr || !derived) return [null, keyErr || new Error('manifest: key derivation failed')];
+            macKey = derived;
+        } else if (passwordOrKey && typeof passwordOrKey === 'object') {
+            macKey = passwordOrKey;
+        } else {
+            return [null, new Error('manifest: password required for verification')];
+        }
     }
-
-    const [macKey, keyErr] = await deriveMacKey(password, manifest.kdf);
-    if (keyErr) return [null, keyErr];
 
     const [canonical, canonErr] = canonicalManifestBytes(manifest);
     if (canonErr) return [null, canonErr];

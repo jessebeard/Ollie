@@ -12,6 +12,26 @@
  */
 import { deriveArgon2id } from '../../vendor/argon2/index.js';
 import { importHmacKey, signBytes } from './hmac.js';
+import { WorkerPool } from '../../utils/concurrency/worker-pool.js';
+
+let sharedKdfPool = null;
+
+export function getKdfPool() {
+    if (!sharedKdfPool) {
+        sharedKdfPool = new WorkerPool({
+            workerScript: new URL('./kdf.worker.js', import.meta.url),
+            maxWorkers: 1,
+            fallbackHandler: async (action, payload) => {
+                if (action === 'derive-argon2id') {
+                    const key = await deriveArgon2id(payload);
+                    return [key, null];
+                }
+                return [null, new Error(`kdf fallback: unrecognized action "${action}"`)];
+            }
+        });
+    }
+    return sharedKdfPool;
+}
 
 const HASH_LEN = 32; // SHA-256 digest length
 
@@ -68,6 +88,7 @@ export async function hkdfExpand(prk, info, length) {
  * @param {number} [options.passes=3]
  * @param {number} [options.memorySize=65536] - 64 MB
  * @param {number} [options.parallelism=1]
+ * @param {boolean} [options.multithreaded=true]
  * @returns {Promise<[{masterKey: Uint8Array, aesKey: Uint8Array, aesIV: Uint8Array, stcSeed: Uint8Array, costSeed: Uint8Array}|null, Error|null]>}
  */
 export async function deriveStegoKeys(password, salt, options = {}) {
@@ -79,14 +100,24 @@ export async function deriveStegoKeys(password, salt, options = {}) {
     }
 
     try {
-        const masterKey = await deriveArgon2id({
+        const kdfPayload = {
             password,
             salt,
             passes: options.passes || 3,
             memorySize: options.memorySize || 65536,
             parallelism: options.parallelism || 1,
             tagLength: 32
-        });
+        };
+
+        let masterKey;
+        if (options.allowWorkerPassword && options.multithreaded !== false) {
+            const pool = getKdfPool();
+            const [kdfRes, kdfErr] = await pool.dispatch('derive-argon2id', kdfPayload);
+            if (kdfErr) return [null, kdfErr];
+            masterKey = kdfRes;
+        } else {
+            masterKey = await deriveArgon2id(kdfPayload);
+        }
 
         const [aesKey, aesKeyErr] = await hkdfExpand(masterKey, 'ollie/v4/aes-key', 32);
         if (aesKeyErr) return [null, aesKeyErr];

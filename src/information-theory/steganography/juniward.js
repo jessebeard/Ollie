@@ -9,6 +9,9 @@
  * - Zero-allocation working buffers for maximum performance on multi-megapixel carriers.
  */
 import { idct } from '../../algebraic/discrete-cosine/inverse-dct.js';
+import { inverseZigZag, ZIGZAG_ORDER } from '../../algebraic/mappings/inverse-zigzag.js';
+
+export const WET_COST = 1e12;
 
 // Daubechies 8-tap (db8) wavelet filter coefficients
 const H_COEFFS = new Float64Array([
@@ -22,7 +25,21 @@ const G_COEFFS = new Float64Array([
 ]);
 
 const SIGMA = 0.015625; // 2^(-6) stabilizing constant
-const DEFAULT_Q_TABLE = new Float32Array([
+
+// 8x8 Daubechies (db8) wavelet response norms for unit DCT basis functions
+// Indexed by natural 2D mode r = v * 8 + u (r = 0..63)
+export const BASIS_RESPONSE_NORMS = new Float64Array([
+    0.00,  0.12,  1.52,  5.38,  8.87, 13.39, 14.65, 14.50,
+    0.12,  0.21,  1.49,  5.01,  8.17, 12.27, 13.40, 13.24,
+    1.52,  1.49,  2.92,  6.70,  9.81, 14.04, 14.95, 14.66,
+    5.38,  5.01,  6.70, 10.80, 13.39, 17.51, 17.70, 17.04,
+    8.87,  8.17,  9.81, 13.39, 14.76, 17.83, 17.09, 16.14,
+   13.39, 12.27, 14.04, 17.51, 17.83, 20.20, 18.46, 17.10,
+   14.65, 13.40, 14.95, 17.70, 17.09, 18.46, 16.20, 14.76,
+   14.50, 13.24, 14.66, 17.04, 16.14, 17.10, 14.76, 13.35
+]);
+
+const DEFAULT_Q_TABLE_RASTER = new Float32Array([
     16, 11, 10, 16, 24, 40, 51, 61,
     12, 12, 14, 19, 26, 58, 60, 55,
     14, 13, 16, 24, 40, 57, 69, 56,
@@ -32,6 +49,12 @@ const DEFAULT_Q_TABLE = new Float32Array([
     49, 64, 78, 87, 103, 121, 120, 101,
     72, 92, 95, 98, 112, 100, 103, 99
 ]);
+
+// Standard luminance quantization table in zigzag scan order
+export const DEFAULT_Q_TABLE = new Float32Array(64);
+for (let z = 0; z < 64; z++) {
+    DEFAULT_Q_TABLE[z] = DEFAULT_Q_TABLE_RASTER[ZIGZAG_ORDER[z]];
+}
 
 /**
  * Creates a seeded uniform float generator in [0, 1) for anti-SCA cost perturbation.
@@ -129,47 +152,58 @@ export function calculateJUniwardCosts(blocks, qTable = DEFAULT_Q_TABLE, options
 
     const rhoPlus = new Float64Array(totalAC);
     const rhoMinus = new Float64Array(totalAC);
-    const flatACIndices = new Array(totalAC);
+    const includeIndices = options.includeIndices !== false && (options.includeIndices === true || totalBlocks <= 1000);
+    const flatACIndices = includeIndices ? new Array(totalAC) : null;
 
     // Scratchpad buffers scoped to this invocation for thread/reentrancy safety
     const workConvTemp = new Float64Array(64);
     const workW1 = new Float64Array(64);
     const workW2 = new Float64Array(64);
     const workW3 = new Float64Array(64);
-    const workDequant = new Float64Array(64);
+    const workDequantZigzag = new Float64Array(64);
+    const workDequant2D = new Float32Array(64);
 
     const uniformPRNG = options.costSeed ? createUniformPRNG(options.costSeed) : null;
-    const lambda = options.lambda !== undefined ? options.lambda : 0.3;
+    const lambda = options.lambda !== undefined ? options.lambda : 0.01;
+
+    const yBlockCount = options.yBlockCount !== undefined ? options.yBlockCount : totalBlocks;
+    const chromaPenalty = options.chromaPenalty !== undefined ? options.chromaPenalty : 4.0;
+    const luminanceOnly = options.luminanceOnly === true;
+    const asymmetric = options.asymmetric !== false;
 
     let flatIdx = 0;
 
     for (let b = 0; b < totalBlocks; b++) {
         const block = blocks[b];
+        const isChroma = b >= yBlockCount;
 
-        // 1. Dequantize block: C = D * Q
+        // 1. Dequantize block in zigzag order: C_zigzag = D_zigzag * Q_zigzag
         for (let c = 0; c < 64; c++) {
-            workDequant[c] = block[c] * qTable[c];
+            workDequantZigzag[c] = block[c] * qTable[c];
         }
 
-        // 2. Spatial IDCT: dequantized DCT -> spatial pixel domain
-        const [spatialBlock, idctErr] = idct(workDequant);
+        // 2. Map from zigzag to natural 2D raster order before IDCT
+        inverseZigZag(workDequantZigzag, workDequant2D);
+
+        // 3. Spatial IDCT: dequantized DCT (2D raster) -> spatial pixel domain
+        const [spatialBlock, idctErr] = idct(workDequant2D);
         if (idctErr || !spatialBlock) {
             // Fallback to uniform costs if IDCT fails
             for (let coeffIdx = 1; coeffIdx < 64; coeffIdx++) {
                 rhoPlus[flatIdx] = 1.0;
                 rhoMinus[flatIdx] = 1.0;
-                flatACIndices[flatIdx] = { blockIdx: b, coeffIdx };
+                if (flatACIndices) flatACIndices[flatIdx] = { blockIdx: b, coeffIdx };
                 flatIdx++;
             }
             continue;
         }
 
-        // 3. Compute 3 directional wavelet subbands with reentrant invocation-local buffers
+        // 4. Compute 3 directional wavelet subbands with reentrant invocation-local buffers
         convolveBlock2DInto(spatialBlock, H_COEFFS, G_COEFFS, workW1, workConvTemp); // horizontal
         convolveBlock2DInto(spatialBlock, G_COEFFS, H_COEFFS, workW2, workConvTemp); // vertical
         convolveBlock2DInto(spatialBlock, G_COEFFS, G_COEFFS, workW3, workConvTemp); // diagonal
 
-        // 4. Compute average block sensitivity directly: xi(r, c) = sum_k (1 / (|W_k(r, c)| + sigma))
+        // 5. Compute average block sensitivity directly: xi(r, c) = sum_k (1 / (|W_k(r, c)| + sigma))
         let blockAvgSens = 0;
         for (let p = 0; p < 64; p++) {
             const sensP = (1.0 / (Math.abs(workW1[p]) + SIGMA)) +
@@ -179,31 +213,72 @@ export function calculateJUniwardCosts(blocks, qTable = DEFAULT_Q_TABLE, options
         }
         blockAvgSens /= 64.0;
 
-        // 5. Evaluate factored cost per AC coefficient (coeffIdx 1..63)
+        // 6. Evaluate factored cost per AC coefficient (coeffIdx 1..63 in zigzag order)
         for (let coeffIdx = 1; coeffIdx < 64; coeffIdx++) {
             const qVal = qTable[coeffIdx];
+            const r = ZIGZAG_ORDER[coeffIdx];
+            const basisNorm = Math.max(0.1, BASIS_RESPONSE_NORMS[r]);
             const val = block[coeffIdx];
 
-            // Base cost is proportional to quantization step and spatial sensitivity
-            let baseCost = (qVal * blockAvgSens) / 100.0;
+            // Base cost is proportional to quantization step Q_u,v, unit basis wavelet response norm,
+            // and spatial texture sensitivity
+            let baseCost = (qVal * basisNorm * blockAvgSens) / 25.0;
 
-            // Zero coefficients have substantially higher cost (10x) to prevent carrier bloating
-            // and strictly prefer embedding into existing non-zero texture coefficients.
-            if (val === 0) {
-                baseCost *= 10.0;
-            }
-
-            // Anti-SCA randomization: perturb cost by (1 + lambda * u)
+            // Anti-SCA key-randomized perturbation (default <= 1% jitter)
             if (uniformPRNG) {
                 const u = uniformPRNG();
                 baseCost *= (1.0 + lambda * u);
             }
 
-            const finalCost = Math.max(0.01, baseCost);
-            rhoPlus[flatIdx] = finalCost;
-            rhoMinus[flatIdx] = finalCost;
-            flatACIndices[flatIdx] = { blockIdx: b, coeffIdx };
+            // Chroma channel handling (Cb / Cr)
+            if (isChroma) {
+                if (luminanceOnly) {
+                    rhoPlus[flatIdx] = WET_COST;
+                    rhoMinus[flatIdx] = WET_COST;
+                    if (flatACIndices) flatACIndices[flatIdx] = { blockIdx: b, coeffIdx };
+                    flatIdx++;
+                    continue;
+                }
+                baseCost *= chromaPenalty;
+            }
 
+            baseCost = Math.max(0.01, baseCost);
+
+            if (!asymmetric) {
+                // Legacy / symmetric test mode fallback
+                if (val === 0) baseCost *= 10.0;
+                rhoPlus[flatIdx] = baseCost;
+                rhoMinus[flatIdx] = baseCost;
+            } else {
+                // Hardened Anti-Steganalysis Mode:
+                // Rule 1: Lock zero coefficients (never allow 0 -> +1 or 0 -> -1, prevents EOB shifts and file bloating)
+                if (val === 0) {
+                    rhoPlus[flatIdx] = WET_COST;
+                    rhoMinus[flatIdx] = WET_COST;
+                }
+                // Rule 2: Lock +1 -> 0 shrinkage (cannot decrement +1 to 0)
+                else if (val === 1) {
+                    rhoMinus[flatIdx] = WET_COST;
+                    rhoPlus[flatIdx] = baseCost;
+                }
+                // Rule 3: Lock -1 -> 0 shrinkage (cannot increment -1 to 0)
+                else if (val === -1) {
+                    rhoPlus[flatIdx] = WET_COST;
+                    rhoMinus[flatIdx] = baseCost;
+                }
+                // Rule 4: Histogram-conscious asymmetry for |val| >= 2
+                // Slightly favor moving toward zero (0.9x) vs away from zero (1.1x) to preserve Laplacian decay
+                else if (val >= 2) {
+                    rhoMinus[flatIdx] = Math.max(0.01, 0.9 * baseCost);
+                    rhoPlus[flatIdx] = val >= 1023 ? WET_COST : Math.max(0.01, 1.1 * baseCost);
+                }
+                else { // val <= -2
+                    rhoPlus[flatIdx] = Math.max(0.01, 0.9 * baseCost);
+                    rhoMinus[flatIdx] = val <= -1024 ? WET_COST : Math.max(0.01, 1.1 * baseCost);
+                }
+            }
+
+            if (flatACIndices) flatACIndices[flatIdx] = { blockIdx: b, coeffIdx };
             flatIdx++;
         }
     }

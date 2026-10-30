@@ -8,9 +8,36 @@
  * - Wet cost handling for untouchable coefficients (DC components, out-of-bounds).
  * - Linear-time message extractor from cover/stego AC parity sequences.
  */
+import { createCycleWalkingFeistel } from '../cryptography/feistel-permutation.js';
+
 export const WET_COST = 1e12;
 export const DEFAULT_SUBMATRIX_HEIGHT = 8; // h=8 constraint height (2^8 = 256 states)
-export const DEFAULT_MAX_W = 16; // Maximum submatrix width to prevent unbounded trellis allocations
+export const DEFAULT_MAX_MEMORY_BYTES = 268435456; // 256 MB memory budget for trellis transitions
+export const DEFAULT_ABSOLUTE_MAX_W = 16; // Restores maximum rate-distortion search flexibility
+
+/**
+ * Dynamically calculates the optimal STC submatrix width w.
+ * Balances rate-distortion performance (favoring higher w up to 16)
+ * while strictly bounding peak trellis transition memory below maxMemoryBytes (default 256MB).
+ *
+ * @param {number} N - Cover coefficient length
+ * @param {number} M - Message bit length
+ * @param {Object} [options]
+ * @param {number} [options.maxW] - Explicit maximum width clamp
+ * @param {number} [options.maxMemoryBytes] - Memory budget for trellis transitions
+ * @param {number} [options.h] - Constraint height
+ * @returns {number} Optimal width w
+ */
+export function calculateSTCWidth(N, M, options = {}) {
+    if (M <= 0 || N < M) return 0;
+    const rawW = Math.floor(N / M);
+    const absMaxW = options.maxW !== undefined ? options.maxW : DEFAULT_ABSOLUTE_MAX_W;
+    const maxMemory = options.maxMemoryBytes !== undefined ? options.maxMemoryBytes : DEFAULT_MAX_MEMORY_BYTES;
+    const h = options.h || DEFAULT_SUBMATRIX_HEIGHT;
+    const numStates = 1 << h;
+    const memMaxW = Math.max(1, Math.floor((maxMemory * 4) / (M * numStates)));
+    return Math.max(1, Math.min(rawW, absMaxW, memMaxW));
+}
 
 /**
  * Generates an h x w binary submatrix H_hat deterministically from a 32-byte seed.
@@ -72,13 +99,14 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
 
     if (M === 0) return [new Int32Array(cover), null];
 
-    const maxW = options.maxW !== undefined ? options.maxW : DEFAULT_MAX_W;
-    const rawW = Math.floor(N / M);
-    if (rawW < 1) {
+    const w = calculateSTCWidth(N, M, options);
+    if (w < 1) {
         return [null, new Error(`stc: payload too large for cover size (M=${M}, N=${N})`)];
     }
-    const w = Math.max(1, Math.min(rawW, maxW));
     const totalUsedCoeffs = M * w;
+
+    const stcSeed = options.seed || 'default-stc-matrix-seed';
+    const { permute } = createCycleWalkingFeistel(N, stcSeed);
 
     const h = options.h || DEFAULT_SUBMATRIX_HEIGHT;
     const numStates = 1 << h;
@@ -88,10 +116,11 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
     let currMetrics = new Float64Array(numStates).fill(Infinity);
     currMetrics[0] = 0;
 
-    // We record fromState and decision for each transition:
-    // fromState[i][nextState] and decision[i][nextState] (0: no change, 1: +1, 2: -1)
-    const prevStates = new Uint16Array(totalUsedCoeffs * numStates);
-    const decisions = new Uint8Array(totalUsedCoeffs * numStates);
+    // We record decision for each transition:
+    // decision[t][nextState] (0: no change, 1: +1, 2: -1).
+    // Predecessor state is algebraically deterministic: sPrev = sNext ^ (parity * col).
+    // Stored 4 decisions per byte (2 bits each: 0, 1, or 2) to maintain a low memory footprint (<268MB even for 128KB payloads).
+    const decisions = new Uint8Array(Math.ceil((totalUsedCoeffs * numStates) / 4));
 
     // Pre-shift state transition array for block boundaries
     const blockShiftFrom = new Uint16Array(M * numStates);
@@ -100,14 +129,15 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
 
     for (let k = 0; k < M; k++) {
         for (let j = 0; j < w; j++) {
-            const i = k * w + j;
+            const t = k * w + j;
+            const i = permute(t);
             const col = submatrix[j];
             const origParity = Math.abs(cover[i]) & 1;
-            const costPlus = rhoPlus[i] !== undefined ? rhoPlus[i] : 1.0;
-            const costMinus = rhoMinus[i] !== undefined ? rhoMinus[i] : 1.0;
+            const costPlus = rhoPlus && rhoPlus[i] !== undefined ? rhoPlus[i] : 1.0;
+            const costMinus = rhoMinus && rhoMinus[i] !== undefined ? rhoMinus[i] : 1.0;
 
             nextMetrics.fill(Infinity);
-            const offset = i * numStates;
+            const offset = t * numStates;
 
             for (let s = 0; s < numStates; s++) {
                 const curM = currMetrics[s];
@@ -117,8 +147,10 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
                 const s0 = s ^ (origParity * col);
                 if (curM < nextMetrics[s0]) {
                     nextMetrics[s0] = curM;
-                    prevStates[offset + s0] = s;
-                    decisions[offset + s0] = 0;
+                    const idx = offset + s0;
+                    const bIdx = idx >>> 2;
+                    const sh = (idx & 3) << 1;
+                    decisions[bIdx] = (decisions[bIdx] & ~(3 << sh));
                 }
 
                 // Flip parity: (1 - origParity)
@@ -127,15 +159,23 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
                 // Option 1: +1
                 if (costPlus < WET_COST && curM + costPlus < nextMetrics[sFlipped]) {
                     nextMetrics[sFlipped] = curM + costPlus;
-                    prevStates[offset + sFlipped] = s;
-                    decisions[offset + sFlipped] = 1;
+                    const idx = offset + sFlipped;
+                    const bIdx = idx >>> 2;
+                    const sh = (idx & 3) << 1;
+                    decisions[bIdx] = (decisions[bIdx] & ~(3 << sh)) | (1 << sh);
                 }
 
                 // Option 2: -1
-                if (costMinus < WET_COST && curM + costMinus < nextMetrics[sFlipped]) {
-                    nextMetrics[sFlipped] = curM + costMinus;
-                    prevStates[offset + sFlipped] = s;
-                    decisions[offset + sFlipped] = 2;
+                if (costMinus < WET_COST) {
+                    const costM = curM + costMinus;
+                    // Symmetrical tie-break: if costM equals nextMetrics[sFlipped], balance decisions between +1 and -1
+                    if (costM < nextMetrics[sFlipped] || (costM === nextMetrics[sFlipped] && (((t ^ s) & 1) === 1))) {
+                        nextMetrics[sFlipped] = costM;
+                        const idx = offset + sFlipped;
+                        const bIdx = idx >>> 2;
+                        const sh = (idx & 3) << 1;
+                        decisions[bIdx] = (decisions[bIdx] & ~(3 << sh)) | (2 << sh);
+                    }
                 }
             }
 
@@ -187,10 +227,12 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
         state = blockShiftFrom[k * numStates + state];
 
         for (let j = w - 1; j >= 0; j--) {
-            const i = k * w + j;
-            const offset = i * numStates;
-            const dec = decisions[offset + state];
-            const prevState = prevStates[offset + state];
+            const t = k * w + j;
+            const i = permute(t);
+            const col = submatrix[j];
+            const origParity = Math.abs(cover[i]) & 1;
+            const idx = t * numStates + state;
+            const dec = (decisions[idx >>> 2] >>> ((idx & 3) << 1)) & 3;
 
             if (dec === 1) {
                 stego[i] = cover[i] + 1;
@@ -200,7 +242,8 @@ export function stcEmbed(cover, messageBits, rhoPlus, rhoMinus, options = {}) {
                 stego[i] = cover[i];
             }
 
-            state = prevState;
+            const chosenParity = (dec === 0) ? origParity : (1 - origParity);
+            state = state ^ (chosenParity * col);
         }
     }
 
@@ -221,10 +264,11 @@ export function stcExtract(stego, messageBitLength, options = {}) {
 
     if (M === 0) return new Uint8Array(0);
 
-    const maxW = options.maxW !== undefined ? options.maxW : DEFAULT_MAX_W;
-    const rawW = Math.floor(N / M);
-    if (rawW < 1) return new Uint8Array(0);
-    const w = Math.max(1, Math.min(rawW, maxW));
+    const w = calculateSTCWidth(N, M, options);
+    if (w < 1) return new Uint8Array(0);
+
+    const stcSeed = options.seed || 'default-stc-matrix-seed';
+    const { permute } = createCycleWalkingFeistel(N, stcSeed);
 
     const h = options.h || DEFAULT_SUBMATRIX_HEIGHT;
     const submatrix = generateSubmatrix(h, w, options.seed);
@@ -234,7 +278,8 @@ export function stcExtract(stego, messageBitLength, options = {}) {
 
     for (let k = 0; k < M; k++) {
         for (let j = 0; j < w; j++) {
-            const i = k * w + j;
+            const t = k * w + j;
+            const i = permute(t);
             const parity = Math.abs(stego[i]) & 1;
             state = (state ^ (parity * submatrix[j])) >>> 0;
         }

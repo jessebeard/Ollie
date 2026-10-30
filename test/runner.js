@@ -1,417 +1,28 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { TEST_FILES } from './utils/test-files.js';
+import { setupMockEnvironment } from './utils/mock-env.js';
+import { runParallelTests } from './runner-parallel.js';
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const htmlContent = fs.readFileSync(path.join(__dirname, '../app/vault.html'), 'utf8');
-
-const elementRegistry = new Map();
-
-function createMockElement(tag, id = null) {
-    const classes = new Set();
-    const attributes = {};
-    if (id) attributes['id'] = id;
-    const children = [];
-    const handlers = {};
-    const dataset = {};
-
-    const styleObj = {
-        setProperty: (prop, val) => { styleObj[prop] = String(val); },
-        removeProperty: (prop) => { delete styleObj[prop]; },
-        getPropertyValue: (prop) => styleObj[prop] || ''
-    };
-
-    const el = {
-        tagName: tag.toUpperCase(),
-        style: styleObj,
-        dataset,
-        children,
-        title: '',
-        textContent: '',
-        disabled: false,
-        classList: {
-            add: (...c) => c.forEach(x => classes.add(x)),
-            remove: (...c) => c.forEach(x => classes.delete(x)),
-            contains: (x) => classes.has(x),
-            toggle: (x, force) => {
-                if (force !== undefined) {
-                    if (force) classes.add(x); else classes.delete(x);
-                } else {
-                    if (classes.has(x)) classes.delete(x); else classes.add(x);
-                }
-            }
-        },
-        scrollTop: 0,
-        getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }),
-        addEventListener: (evt, h) => {
-            handlers[evt] = handlers[evt] || [];
-            handlers[evt].push(h);
-        },
-        removeEventListener: (evt, h) => {
-            if (handlers[evt]) handlers[evt] = handlers[evt].filter(f => f !== h);
-        },
-        dispatchEvent: (evt) => {
-            const list = handlers[evt.type] || [];
-            list.forEach(h => h(evt));
-        },
-        click: () => {
-            el.dispatchEvent({ type: 'click', target: el, stopPropagation: () => {} });
-        },
-        appendChild: (child) => {
-            if (child) {
-                child.parentNode = el;
-                children.push(child);
-            }
-            return child;
-        },
-        remove: () => {
-            if (el.parentNode && Array.isArray(el.parentNode.children)) {
-                const idx = el.parentNode.children.indexOf(el);
-                if (idx !== -1) el.parentNode.children.splice(idx, 1);
-            }
-        },
-        getAttribute: (attr) => attributes[attr] !== undefined ? attributes[attr] : null,
-        setAttribute: (attr, val) => {
-            attributes[attr] = String(val);
-            if (attr === 'id') elementRegistry.set(String(val), el);
-            if (attr === 'class') {
-                el.className = String(val);
-            }
-            if (attr.startsWith('data-')) {
-                const key = attr.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-                dataset[key] = String(val);
-            }
-        },
-        removeAttribute: (attr) => {
-            delete attributes[attr];
-        },
-        querySelector: function (sel) {
-            const match = (item) => {
-                if (!item) return false;
-                if (sel.startsWith('.')) return item.classList && item.classList.contains(sel.slice(1));
-                if (sel.startsWith('#')) return item.getAttribute && item.getAttribute('id') === sel.slice(1);
-                if (sel.startsWith('[') && sel.includes('=')) {
-                    const m = sel.match(/\[([a-zA-Z0-9-]+)="([^"]+)"\]/);
-                    if (m) return item.getAttribute && item.getAttribute(m[1]) === m[2];
-                }
-                return item.tagName && item.tagName.toLowerCase() === sel.toLowerCase();
-            };
-            const search = (node) => {
-                for (const child of node.children || []) {
-                    if (match(child)) return child;
-                    const found = search(child);
-                    if (found) return found;
-                }
-                return null;
-            };
-            const foundChild = search(el);
-            if (foundChild) return foundChild;
-
-            if (_innerHTML) {
-                if (sel.startsWith('.')) {
-                    const cls = sel.slice(1);
-                    if (new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"`, 'i').test(_innerHTML)) {
-                        const dummy = createMockElement('div');
-                        dummy.classList.add(cls);
-                        return dummy;
-                    }
-                }
-                if (sel.startsWith('#')) {
-                    const id = sel.slice(1);
-                    if (new RegExp(`id="${id}"`, 'i').test(_innerHTML)) {
-                        return global.document.getElementById(id);
-                    }
-                }
-                if (new RegExp(`<${sel}\\b`, 'i').test(_innerHTML)) {
-                    return createMockElement(sel);
-                }
-            }
-            return null;
-        },
-        querySelectorAll: function (sel) {
-            const results = [];
-            const match = (item) => {
-                if (!item) return false;
-                if (sel.startsWith('.')) return item.classList && item.classList.contains(sel.slice(1));
-                if (sel.startsWith('#')) return item.getAttribute && item.getAttribute('id') === sel.slice(1);
-                if (sel.startsWith('[') && sel.includes('=')) {
-                    const m = sel.match(/\[([a-zA-Z0-9-]+)="([^"]+)"\]/);
-                    if (m) return item.getAttribute && item.getAttribute(m[1]) === m[2];
-                }
-                return item.tagName && item.tagName.toLowerCase() === sel.toLowerCase();
-            };
-            const search = (node) => {
-                for (const child of node.children || []) {
-                    if (match(child)) results.push(child);
-                    search(child);
-                }
-            };
-            search(el);
-            return results;
-        },
-        focus: () => { }
-    };
-
-    Object.defineProperty(el, 'className', {
-        get: () => Array.from(classes).join(' '),
-        set: (v) => {
-            classes.clear();
-            if (v) String(v).split(/\s+/).filter(Boolean).forEach(c => classes.add(c));
-        }
-    });
-
-    Object.defineProperty(el, 'href', {
-        get: () => el.getAttribute('href') || '',
-        set: (v) => el.setAttribute('href', v)
-    });
-    Object.defineProperty(el, 'download', {
-        get: () => el.getAttribute('download') || '',
-        set: (v) => el.setAttribute('download', v)
-    });
-    Object.defineProperty(el, 'type', {
-        get: () => el.getAttribute('type') || '',
-        set: (v) => el.setAttribute('type', v)
-    });
-    Object.defineProperty(el, 'checked', {
-        get: () => el.getAttribute('checked') !== null,
-        set: (v) => { if (v) el.setAttribute('checked', ''); else el.removeAttribute('checked'); }
-    });
-    let _innerHTML = '';
-    Object.defineProperty(el, 'innerHTML', {
-        get: () => _innerHTML,
-        set: (v) => {
-            _innerHTML = String(v);
-            if (!_innerHTML) {
-                children.length = 0;
-            }
-        }
-    });
-
-    if (id) elementRegistry.set(id, el);
-    return el;
-}
-
-const bodyElement = createMockElement('body');
-
-global.document = {
-    body: bodyElement,
-    createElement: (tag) => createMockElement(tag),
-    getElementById: (id) => {
-        if (elementRegistry.has(id)) {
-            return elementRegistry.get(id);
-        }
-        const regex = new RegExp(`<(\\w+)[^>]*id=["']${id}["'][^>]*>`, 'i');
-        const match = htmlContent.match(regex);
-        const tag = match ? match[1] : 'div';
-        const el = createMockElement(tag, id);
-        return el;
-    },
-    querySelector: (sel) => {
-        if (sel.startsWith('#')) {
-            return global.document.getElementById(sel.slice(1));
-        }
-        return bodyElement.querySelector(sel);
-    },
-    querySelectorAll: (sel) => bodyElement.querySelectorAll(sel)
-};
-
-const storageStore = new Map();
-global.localStorage = {
-    getItem: (k) => (storageStore.has(k) ? storageStore.get(k) : null),
-    setItem: (k, v) => storageStore.set(k, String(v)),
-    removeItem: (k) => storageStore.delete(k),
-    clear: () => storageStore.clear()
-};
-
-global.window = {
-    __TEST_RUNNER__: true,
-    addEventListener: (event, callback) => {
-        if (event === 'DOMContentLoaded') {
-            callback();
-        }
-    },
-    removeEventListener: () => { },
-    open: () => { }
-};
-
-async function runTests() {
-    console.log('\x1b[1mRunning Tests...\x1b[0m\n');
+async function runSequentialTests(targetFiles) {
+    console.log('\x1b[1m=== Ollie Test Runner (Sequential Mode) ===\x1b[0m\n');
+    setupMockEnvironment();
 
     try {
-
         const { setSeed, getSeed } = await import('./utils/pbt.js');
         const pbtSeed = process.env.PBT_SEED !== undefined && process.env.PBT_SEED !== ''
             ? (Number(process.env.PBT_SEED) >>> 0)
             : ((Date.now() ^ (process.pid << 16)) >>> 0);
         setSeed(pbtSeed);
-        console.log(`[PBT] seed=${getSeed()} (replay with PBT_SEED=${getSeed()} node test/runner.js)\n`);
+        console.log(`[PBT] seed=${getSeed()} (replay with PBT_SEED=${getSeed()} node test/runner.js --sequential)\n`);
 
-        const { getStats, resetStats, executeTests } = await import('./utils/test-runner.js');
-
+        const { getStats, resetStats, executeTests, getTestResults } = await import('./utils/test-runner.js');
         resetStats();
 
-        await import('./algebraic/colorspace/rgb-to-ycbcr.test.js');
-        await import('./algebraic/mappings/blocks.test.js');
-        await import('./codec/encoder/headers.test.js');
-        await import('./algebraic/discrete-cosine/forward-dct.test.js');
-        await import('./algebraic/quantization/forward-quantization.test.js');
-        await import('./algebraic/mappings/forward-zigzag.test.js');
-        await import('./automata/entropy-coding/huffman-encoder-fsm.test.js');
-        await import('./algebraic/mappings/downsampling.test.js');
-        await import('./automata/parsers/spiff-generation.test.js');
-        await import('./codec/encoder.test.js');
-        await import('./codec/encoder/quality.test.js');
-        await import('./codec/encoder/subsampling-420.test.js');
-
-        await import('./automata/parsers/sof-automaton.test.js');
-        await import('./automata/parsers/sos-automaton.test.js');
-        await import('./automata/parsers/dht-automaton.test.js');
-        await import('./automata/parsers/dqt-automaton.test.js');
-        await import('./automata/entropy-coding/huffman-decoder-fsm.test.js');
-        await import('./automata/entropy-coding/huffman-optimized-fsm.test.js');
-        await import('./algebraic/mappings/inverse-zigzag.test.js');
-        await import('./algebraic/quantization/inverse-quantization.test.js');
-        await import('./algebraic/discrete-cosine/inverse-dct.test.js');
-        await import('./algebraic/discrete-cosine/inverse-dct-spec.test.js');
-        await import('./codec/decoder/idct-switching.test.js');
-        await import('./algebraic/colorspace/ycbcr-to-rgb.test.js');
-        await import('./algebraic/mappings/upsampling.test.js');
-        await import('./algebraic/mappings/block-assembly.test.js');
-        await import('./codec/decoder/rst-markers.test.js');
-        await import('./utils/bit-reader.test.js');
-        await import('./automata/bit-streams/bit-core.test.js');
-        await import('./automata/bit-streams/bit-writer.test.js');
-        await import('./utils/marker-parser.test.js');
-
-        await import('./information-theory/steganography/chunk-manager.test.js');
-        await import('./codec/decoder/spiff-parsing.test.js');
-        await import('./vendor/argon2id.test.js');
-        await import('./information-theory/cryptography/kdf-chain.test.js');
-        await import('./information-theory/steganography/opaque-container.test.js');
-        await import('./information-theory/steganography/stc-matrix.test.js');
-        await import('./information-theory/steganography/juniward.test.js');
-        await import('./information-theory/steganography/stego-engine.test.js');
-        await import('./codec/steganography/batch-process.test.js');
-        await import('./information-theory/error-correction/rs-interleaver.test.js');
-        await import('./codec/capacity-scanner.test.js');
-        await import('./codec/capacity-scanner.pbt.js');
-
-        await import('./information-theory/cryptography/aes-gcm.test.js');
-        await import('./information-theory/cryptography/pbkdf2.test.js');
-        await import('./information-theory/cryptography/hmac.test.js');
-        await import('./security/carrier-manifest.test.js');
-        await import('./security/manifest-enforcement.test.js');
-        await import('./security/gf-shamir.test.js');
-        await import('./security/css-envelope.test.js');
-        await import('./security/threshold-vault.test.js');
-        await import('./security/gf256.test.js');
-        await import('./fuzz/cli-fuzz.test.js');
-        await import('./fuzz/crypto-fuzz.test.js');
-        await import('./security/bitreader-differential.test.js');
-        await import('./security/ecc-edges.test.js');
-        await import('./fuzz/parser-fuzz.test.js');
-        await import('./fuzz/codec-mr.test.js');
-        await import('./fuzz/vault-batch.test.js');
-        await import('./fuzz/stego-fuzz.test.js');
-        await import('./fuzz/steganography-mr.test.js');
-        await import('./fuzz/csv-fuzz.test.js');
-        await import('./fuzz/utils-fuzz.test.js');
-        await import('./fuzz/qr-fuzz.test.js');
-        await import('./fuzz/juniward-mr.test.js');
-        await import('./utils/test-runner.test.js');
-        await import('./utils/test-runner.pbt.js');
-        await import('./utils/base32.test.js');
-        await import('./utils/encoding.test.js');
-        await import('./security/totp.test.js');
-        await import('./security/encrypted-container.test.js');
-        await import('./security/qr-encoder.test.js');
-        await import('./security/qr-capacity.test.js');
-        await import('./security/qr-format-tolerance.test.js');
-        await import('./security/qr-binarizer.test.js');
-        await import('./security/qr-decoder.test.js');
-        await import('./security/qr-fixtures.test.js');
-        await import('./security/cauchy-ec.test.js');
-        await import('./security/proportional-cauchy-ec.test.js');
-
-        await import('./integration/error-correction/reed-solomon-integration.test.js');
-        await import('./information-theory/error-correction/galois-field.test.js');
-        await import('./information-theory/error-correction/reed-solomon-codec.test.js');
-        await import('./integration/error-correction/reedsolomon.test.js');
-
-        await import('./codec/decoder.test.js');
-        await import('./codec/decoder/defensive.test.js');
-        await import('./integration/roundtrip.test.js');
-        await import('./integration/steganography-roundtrip.test.js');
-        await import('./scripts/auto_detection_roundtrip.test.js');
-        await import('./scripts/capacity_validation.test.js');
-
-        await import('./codec/encoder/coefficients.test.js');
-        await import('./codec/transcoder.test.js');
-        await import('./codec/orchestration/orchestrator.test.js');
-
-        await import('./security/secure-id-generation.test.js');
-        await import('./security/chunk-integrity.test.js');
-        await import('./security/decoder-hardening.test.js');
-        await import('./security/capacity-consistency.test.js');
-        await import('./security/vault-hardening.test.js');
-        await import('./security/totp-gate.test.js');
-        await import('./security/url-safety.test.js');
-        await import('./security/probe-regressions.test.js');
-        await import('./conformance/wire-format-conformance.test.js');
-        await import('./conformance/wire-format.pbt.js');
-        await import('./security/ui-legacy-xss.test.js');
-        await import('./security/drop-zone-pagination.test.js');
-        await import('./security/drop-zone-folders.test.js');
-        await import('./utils/atomic-writer.test.js');
-        await import('./utils/compression.test.js');
-        await import('./utils/crc32.test.js');
-        await import('./utils/csv.test.js');
-        await import('./utils/password-strength.test.js');
-        await import('./structures/vault/secure-record.test.js');
-        await import('./structures/vault/csv-import.test.js');
-        await import('./structures/vault/immutable-vault.test.js');
-        await import('./structures/vault/key-wrapping.test.js');
-        await import('./structures/vault/revision-tracking.test.js');
-        await import('./structures/vault/encrypted-export.test.js');
-        await import('./scripts/cli.test.js');
-        await import('./integration/vault/vault-e2e.test.js');
-        await import('./integration/vault/vault-e2e-crud.test.js');
-        await import('./integration/vault/vault-e2e-carriers.test.js');
-        await import('./integration/vault/vault-e2e-crypto-boundary.test.js');
-        await import('./integration/vault/vault-e2e-ecc.test.js');
-        await import('./integration/vault/vault-e2e-empty.test.js');
-        await import('./integration/vault/vault-e2e-multigen.test.js');
-        await import('./integration/vault/vault-capacity-ui.test.js');
-        await import('./integration/vault/vault-save-permission.test.js');
-        await import('./integration/vault/vault-csv-import-ui.test.js');
-        await import('./integration/vault/vault-totp-form.test.js');
-        await import('./integration/vault/vault-totp-display.test.js');
-        
-        await import('./integration/vault/vault-qr-scan.test.js');
-        await import('./integration/vault/vault-tierb-flow.test.js');
-        await import('./integration/vault/vault-spread-save.test.js');
-        await import('./structures/vault/password-rotation.test.js');
-        await import('./information-theory/cryptography/pbkdf2-benchmark.test.js');
-        await import('./fuzz/kdf-fuzz.test.js');
-        await import('./integration/vault/vault-ui-redesign.test.js');
-        await import('./integration/vault/vault-ui-polish.test.js');
-        await import('./integration/vault/card-flow-automata.test.js');
-        await import("./ui-xss.test.js");
-        await import("./security/xss.test.js");
-
-        // Dedicated PBT Suite
-        await import('./pbt/algebraic.pbt.js');
-        await import('./pbt/automata.pbt.js');
-        await import('./pbt/codec.pbt.js');
-        await import('./pbt/crypto.pbt.js');
-        await import('./pbt/ecc.pbt.js');
-        await import('./pbt/secret-sharing.pbt.js');
-        await import('./pbt/steganography.pbt.js');
-        await import('./pbt/qr.pbt.js');
-        await import('./pbt/vault.pbt.js');
-        await import('./pbt/utils.pbt.js');
+        for (const file of targetFiles) {
+            const fullPath = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+            await import(pathToFileURL(fullPath).href);
+        }
 
         await executeTests();
         const stats = getStats();
@@ -423,7 +34,6 @@ async function runTests() {
 
         if (stats.failed > 0) {
             console.log(`\n\x1b[31mFailed Test Details:\x1b[0m`);
-            const { getTestResults } = await import('./utils/test-runner.js');
             const failed = getTestResults().filter(r => r.status === 'fail');
             failed.forEach(f => {
                 console.log(`  ✗ [${f.suite}] ${f.test}: ${f.error}`);
@@ -432,11 +42,42 @@ async function runTests() {
         } else {
             process.exit(0);
         }
-
     } catch (error) {
-        console.error('\x1b[31mError running tests:\x1b[0m', error);
+        console.error('\x1b[31mError running tests sequentially:\x1b[0m', error);
         process.exit(1);
     }
 }
 
-runTests();
+async function main() {
+    const args = process.argv.slice(2);
+    const isSequential = args.includes('--sequential') || args.includes('--single-thread');
+    const workerArg = args.find(a => a.startsWith('--workers='));
+    const workers = workerArg ? parseInt(workerArg.split('=')[1], 10) : undefined;
+    const verbose = args.includes('--verbose');
+
+    // Extract filter strings (arguments not prefixed with --)
+    const filterArgs = args.filter(a => !a.startsWith('--'));
+    let targetFiles = TEST_FILES;
+    if (filterArgs.length > 0) {
+        targetFiles = TEST_FILES.filter(f =>
+            filterArgs.some(pattern => f.includes(pattern))
+        );
+        if (targetFiles.length === 0) {
+            console.error(`No test files matched filter: ${filterArgs.join(', ')}`);
+            process.exit(1);
+        }
+    }
+
+    if (isSequential) {
+        await runSequentialTests(targetFiles);
+    } else {
+        const [, err] = await runParallelTests({
+            files: targetFiles,
+            workers,
+            verbose
+        });
+        process.exit(err ? 1 : 0);
+    }
+}
+
+main();

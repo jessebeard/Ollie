@@ -32,11 +32,8 @@ async function importSessionKey(rawBytes) {
 }
 
 export class PasswordVault {
-    /**
-     * Hidden credential slot; installed non-enumerably in the constructor.
-     * @type {{password: string|null, sessionKey: CryptoKey|null}|null}
-     */
-    _unlock = null;
+    #password = null;
+    #sessionKey = null;
 
     /**
      * @param {readonly Object[]} [entries]
@@ -56,27 +53,20 @@ export class PasswordVault {
         });
         this.isUnlocked = isUnlocked;
 
-        // Credentials are held in a non-enumerable slot so they never leak
-        // through serialization or key enumeration.
-        const unlock = (isUnlocked && (masterPassword || sessionKey))
-            ? Object.freeze({ password: masterPassword, sessionKey })
-            : null;
-        Object.defineProperty(this, '_unlock', {
-            value: unlock,
-            enumerable: false,
-            writable: false,
-            configurable: false
-        });
+        // Credentials are held in private class fields so they are syntactically
+        // inaccessible from outside the class instance (defense against DOM/extension inspection).
+        this.#password = isUnlocked ? masterPassword : null;
+        this.#sessionKey = isUnlocked ? sessionKey : null;
 
         Object.freeze(this);
     }
 
     _password() {
-        return this._unlock ? this._unlock.password : null;
+        return this.#password;
     }
 
     _sessionKey() {
-        return this._unlock ? this._unlock.sessionKey : null;
+        return this.#sessionKey;
     }
 
     /**

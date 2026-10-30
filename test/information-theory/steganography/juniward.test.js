@@ -51,16 +51,66 @@ describe('Factored J-UNIWARD Spatial Wavelet Distortion Engine', () => {
         expect(Array.from(c1)).not.toEqual(Array.from(c2));
     });
 
-    it('imposes strong 10x cost penalty on zero-valued AC coefficients', () => {
+    it('locks zero coefficients and ±1 -> 0 shrinkage with WET_COST', () => {
         const block = new Int32Array(64).fill(0);
-        block[1] = 5; // non-zero AC (index 1 in block, flat index 0)
-        block[2] = 0; // zero AC (index 2 in block, flat index 1)
-        // Use identical quantization step for both coefficients
-        const qTable = new Float32Array(64).fill(16);
-        const { rhoPlus } = calculateJUniwardCosts([block], qTable);
+        block[1] = 0;  // zero AC
+        block[2] = 1;  // +1 AC
+        block[3] = -1; // -1 AC
+        block[4] = 3;  // +3 AC
+        block[5] = -3; // -3 AC
 
-        // Coefficient 2 (val === 0) should be 10x more expensive than coefficient 1 (val !== 0)
-        const ratio = rhoPlus[1] / rhoPlus[0];
-        expect(Math.abs(ratio - 10.0) < 0.01).toBe(true);
+        const WET = 1e12;
+        const { rhoPlus, rhoMinus } = calculateJUniwardCosts([block]);
+
+        // 1. Zero coefficient (index 1 in block, flat index 0): both wet
+        expect(rhoPlus[0]).toBe(WET);
+        expect(rhoMinus[0]).toBe(WET);
+
+        // 2. +1 coefficient (index 2 in block, flat index 1): -1 shrinkage to zero is wet, +1 expansion is normal
+        expect(rhoMinus[1]).toBe(WET);
+        expect(rhoPlus[1] < WET).toBe(true);
+
+        // 3. -1 coefficient (index 3 in block, flat index 2): +1 shrinkage to zero is wet, -1 expansion is normal
+        expect(rhoPlus[2]).toBe(WET);
+        expect(rhoMinus[2] < WET).toBe(true);
+
+        // 4. |val| >= 2 (index 4 and 5 in block, flat index 3 and 4): favors moving toward zero (0.9x vs 1.1x)
+        expect(rhoMinus[3] < rhoPlus[3]).toBe(true); // +3: -1 is toward zero (cheaper)
+        expect(rhoPlus[4] < rhoMinus[4]).toBe(true); // -3: +1 is toward zero (cheaper)
+    });
+
+    it('heavily penalizes high-frequency AC modes via Q_u,v and basis wavelet response norms', () => {
+        const block = new Int32Array(64).fill(2); // all ACs set to 2 so value is identical
+        const { rhoPlus } = calculateJUniwardCosts([block]);
+
+        // Compare low frequency mode (zigzag index 1) vs high frequency mode (zigzag index 63)
+        const lowFreqCost = rhoPlus[0];  // coeffIdx 1
+        const highFreqCost = rhoPlus[62]; // coeffIdx 63
+
+        // High frequency AC mode has larger basis norm and larger Q step, yielding much higher cost
+        expect(highFreqCost > lowFreqCost * 50).toBe(true);
+    });
+
+    it('enforces chrominance penalty and luminance-only options', () => {
+        const yBlock = new Int32Array(64).fill(2);
+        const chromaBlock = new Int32Array(64).fill(2);
+
+        // With 4x chroma penalty
+        const { rhoPlus: costsChroma } = calculateJUniwardCosts([yBlock, chromaBlock], undefined, {
+            yBlockCount: 1,
+            chromaPenalty: 4.0
+        });
+        const yCost = costsChroma[0];
+        const cbCost = costsChroma[63];
+        expect(cbCost >= yCost * 3.9).toBe(true);
+
+        // With luminanceOnly
+        const WET = 1e12;
+        const { rhoPlus: costsLumOnly } = calculateJUniwardCosts([yBlock, chromaBlock], undefined, {
+            yBlockCount: 1,
+            luminanceOnly: true
+        });
+        expect(costsLumOnly[0] < WET).toBe(true);
+        expect(costsLumOnly[63]).toBe(WET);
     });
 });

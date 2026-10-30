@@ -48,17 +48,18 @@ Ollie/
 │   │   └── parsers/              # marker/dht/dqt/sof/sos/spiff automata
 │   ├── codec/                    # High-level orchestrators
 │   │   ├── encoder.js  decoder.js  transcoder.js
-│   │   ├── capacity-scanner.js  file-scanner.js
+│   │   ├── capacity-scanner.js  carrier-pool.js  carrier.worker.js  file-scanner.js
 │   │   └── qr-encoder.js     qr-decoder.js
 │   ├── information-theory/
-│   │   ├── cryptography/         # kdf-chain (Argon2id + HKDF), pbkdf2, aes-gcm, hmac, totp, crypto-provider
+│   │   ├── cryptography/         # kdf-chain (Argon2id + HKDF), kdf.worker.js, pbkdf2, aes-gcm, hmac, totp, crypto-provider
 │   │   ├── error-correction/     # galois-field, reed-solomon-codec, rs-interleaver
 │   │   ├── secret-sharing/       # gf-shamir (k-of-n), css-envelope, cauchy-ec
 │   │   └── steganography/        # stego-engine, opaque-container, stc-matrix, juniward,
 │   │                             # chunk-manager, carrier-manifest, batch-embedder/-extractor
 │   ├── structures/vault/         # immutable-vault, secure-record, csv-import
 │   ├── utils/                    # crc32, encoding, compression, logger, url-safety,
-│   │                             # escape-html, atomic-writer, csv, base32, password-strength
+│   │                             # escape-html, atomic-writer, csv, base32, password-strength,
+│   │                             # concurrency (worker-pool, worker-adapter, worker-runtime, tuple-serializer)
 │   ├── vendor/argon2/            # Vendored OpenPGP.js Argon2id WASM SIMD/non-SIMD engine
 │   └── specs/                    # Normative specs and project rules
 ├── test/                         # Node runner + browser suite (see §6)
@@ -102,6 +103,7 @@ flowchart TB
         JD["JpegDecoder"]
         JT["JpegTranscoder"]
         CAP["CapacityScanner"]
+        CPOOL["CarrierPool · Workers"]
         FSC["FileScanner"]
         QRD["QRDecoder"]
     end
@@ -123,7 +125,7 @@ flowchart TB
         ARGON2["argon2id WASM<br/>OpenPGP.js core engine"]
     end
 
-    UTILS["utils<br/>crc32 · compression · encoding · logger · url-safety · base32"]
+    UTILS["utils<br/>crc32 · compression · encoding · logger · url-safety · base32 · concurrency (WorkerPool)"]
     WEBCRYPTO["WebCrypto / SubtleCrypto<br/>platform boundary"]
 
     VAULTPAGE --> VUI
@@ -324,7 +326,7 @@ sequenceDiagram
     JUNI-->>SE: { rhoPlus, rhoMinus }
 
     SE->>STC: stcEmbed(coverAC, wireBits, rhoPlus, rhoMinus, { h:8, seed:stcSeed })
-    Note over STC: Viterbi dynamic programming over H_hat parity trellis (w <= 16)
+    Note over STC: Viterbi dynamic programming over H_hat parity trellis (w <= 4, algebraic predecessor recovery, 2-bit packed transitions)
     STC-->>SE: stegoAC
     SE->>E: Write stego coefficients back to DCT blocks
     E-->>U: Stego JPEG carrier
@@ -362,50 +364,57 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    RUNNER["test/runner.js (Node.js) / app/test.html (Browser)"]
+    RUNNER["test/runner.js (Node.js Entry / Parallel Orchestrator)<br/>app/test.html (Browser Harness)"]
+    PARALLEL["test/runner-parallel.js<br/>Dynamic Work Queue & Priority Scheduling"]
+    WORKER["test/utils/worker-test-executor.js<br/>Isolated V8 Worker Isolates (node:worker_threads)"]
 
-    subgraph UNIT["1. Unit Tests"]
-        ALGT["algebraic/*"]
-        AUTT["automata/*"]
-        CODECT["codec/*"]
-        ITT["information-theory/* (argon2id, kdf-chain, opaque-container, stc-matrix, juniward, stego-engine)"]
-        STRUCTT["structures/vault/*"]
+    RUNNER --> PARALLEL
+    PARALLEL --> WORKER
+
+    subgraph SPECTRUM["Test Spectrum (155 Suites, 1,082 Tests)"]
+        subgraph UNIT["1. Unit Tests"]
+            ALGT["algebraic/*"]
+            AUTT["automata/*"]
+            CODECT["codec/*"]
+            ITT["information-theory/* (argon2id, kdf-chain, opaque-container, stc-matrix, juniward, stego-engine)"]
+            STRUCTT["structures/vault/*"]
+        end
+
+        subgraph INTEG["2. Integration Tests"]
+            ROUND["roundtrip · steganography-roundtrip"]
+            VE2E["vault-e2e · vault-e2e-crud · vault-e2e-carriers · vault-spread-save"]
+            VUIFLOW["vault-ui-redesign · vault-ui-polish · vault-capacity-ui · vault-totp-display · vault-tierb-flow"]
+        end
+
+        subgraph E2E["3. End-to-End Tests"]
+            FULLV["Full Carrier Steganography Embed/Extract Loop"]
+            CLIE2E["CLI save/load/verify · --threshold"]
+        end
+
+        subgraph PBTW["4. Property-Based Tests (PBT)"]
+            HARNESS["utils/pbt.js · Seeded PRNG + Shrinking"]
+            ROTPBT["password-rotation.test.js (Decryption identity)"]
+            WFPBT["conformance/wire-format.pbt.js (STC & Opaque Framing)"]
+            SECPBT["secure-record.test.js (Plaintext absence)"]
+        end
+
+        subgraph MT["5. Metamorphic Tests (MT)"]
+            MR1["MR1: Work factor monotonic duration"]
+            MR2["MR2: Benchmark recommendation scaling"]
+            MR3["MR3: Multistep rotation entry identity"]
+        end
+
+        subgraph FUZZ["6. Fuzz & Boundary Tests"]
+            KDFFUZZ["kdf-fuzz.test.js (Unicode / surrogates / null-bytes)"]
+            CRYPTOFUZZ["crypto-fuzz.mjs"]
+            PARSERFUZZ["parser-fuzz.mjs"]
+        end
     end
 
-    subgraph INTEG["2. Integration Tests"]
-        ROUND["roundtrip · steganography-roundtrip"]
-        VE2E["vault-e2e · vault-e2e-crud · vault-e2e-carriers · vault-spread-save"]
-        VUIFLOW["vault-ui-redesign · vault-ui-polish · vault-capacity-ui · vault-totp-display · vault-tierb-flow"]
-    end
-
-    subgraph E2E["3. End-to-End Tests"]
-        FULLV["Full Carrier Steganography Embed/Extract Loop"]
-        CLIE2E["CLI save/load/verify · --threshold"]
-    end
-
-    subgraph PBTW["4. Property-Based Tests (PBT)"]
-        HARNESS["utils/pbt.js · Seeded PRNG + Shrinking"]
-        ROTPBT["password-rotation.test.js (Decryption identity)"]
-        WFPBT["conformance/wire-format.pbt.js (STC & Opaque Framing)"]
-        SECPBT["secure-record.test.js (Plaintext absence)"]
-    end
-
-    subgraph MT["5. Metamorphic Tests (MT)"]
-        MR1["MR1: Work factor monotonic duration"]
-        MR2["MR2: Benchmark recommendation scaling"]
-        MR3["MR3: Multistep rotation entry identity"]
-    end
-
-    subgraph FUZZ["6. Fuzz & Boundary Tests"]
-        KDFFUZZ["kdf-fuzz.test.js (Unicode / surrogates / null-bytes)"]
-        CRYPTOFUZZ["crypto-fuzz.mjs"]
-        PARSERFUZZ["parser-fuzz.mjs"]
-    end
-
-    RUNNER --> UNIT
-    RUNNER --> INTEG
-    RUNNER --> E2E
-    RUNNER --> PBTW
-    RUNNER --> MT
-    RUNNER --> FUZZ
+    WORKER --> UNIT
+    WORKER --> INTEG
+    WORKER --> E2E
+    WORKER --> PBTW
+    WORKER --> MT
+    WORKER --> FUZZ
 ```

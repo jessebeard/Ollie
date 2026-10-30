@@ -1,8 +1,10 @@
 import { ChunkManager } from './chunk-manager.js';
-import { verifyManifest } from './carrier-manifest.js';
+import { verifyManifest, deriveMacKey, bindChunkRecords } from './carrier-manifest.js';
 import { openEnvelope } from '../secret-sharing/css-envelope.js';
 import { base64ToBytes } from '../../utils/encoding.js';
-import { JpegDecoder } from '../../codec/decoder.js';
+import { getCarrierPool } from '../../codec/carrier-pool.js';
+import { StegoEngine } from './stego-engine.js';
+import { unsealOpaque } from './opaque-container.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -15,82 +17,140 @@ export class BatchExtractor {
      * @param {Array<File>} imageFiles - List of image files
      * @param {string} [password] - Password for decryption
      * @param {Function} [onProgress] - Callback (current, total, status)
+     * @param {Object} [options] - Options ({ multithreaded?: boolean, ... })
      * @returns {Promise<[Object|null, Error|null]>} Result tuple of [{data, filename, metadata}, error]
      */
-    async extract(imageFiles, password, onProgress = null) {
+    async extract(imageFiles, password, onProgress = null, options = {}) {
         const chunks = [];
         const manifests = [];
         const shares = [];
         const total = imageFiles.length;
         let firstMetadata = null;
+        let completed = 0;
 
-        for (let i = 0; i < imageFiles.length; i++) {
-            const file = imageFiles[i];
+        const pool = getCarrierPool();
+        const decodeTasks = imageFiles.map(async (file, _i) => {
             if (onProgress) {
-                onProgress(i, total, `Extracting from ${file.name}...`);
+                onProgress(completed, total, `Extracting from ${file.name}...`);
             }
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const jpegBytes = new Uint8Array(arrayBuffer);
-                const decoder = new JpegDecoder();
+                const jpegBuffer = /** @type {ArrayBuffer} */ (arrayBuffer.slice(0));
+                const jpegBytes = new Uint8Array(jpegBuffer);
 
-                const [result, err] = await decoder.decode(jpegBytes, { password });
-                if (err) throw err;
+                const stcSeed = await StegoEngine.resolveSTCSeed(password);
 
-                if (result.secretData) {
-                    logger.debug(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
-                    if (result.secretMetadata && result.secretMetadata.chunk) {
-                        const chunkMeta = result.secretMetadata.chunk;
-                        logger.debug(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
-
-                        if (chunkMeta.count && chunkMeta.count > 1 && chunkMeta.stripeSize) {
-                            const stripeSize = chunkMeta.stripeSize;
-                            for (let b = 0; b < chunkMeta.count; b++) {
-                                const blockData = result.secretData.slice(b * stripeSize, (b + 1) * stripeSize);
-                                chunks.push({
-                                    chunkId: chunkMeta.id,
-                                    index: (chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : 0) + b,
-                                    total: chunkMeta.total,
-                                    data: blockData,
-                                    checksum: ChunkManager.calculateChecksum(blockData)
-                                });
-                            }
-                        } else {
-                            chunks.push({
-                                chunkId: chunkMeta.id,
-                                index: chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : chunkMeta.index,
-                                total: chunkMeta.total,
-                                data: result.secretData,
-                                checksum: result.secretMetadata.checksum
-                            });
-                        }
-
-                        if (result.secretMetadata.manifest) {
-                            manifests.push(result.secretMetadata.manifest);
-                            if (result.secretMetadata.manifest.shares) {
-                                for (const s of result.secretMetadata.manifest.shares) {
-                                    shares.push(s);
-                                }
-                            } else if (result.secretMetadata.manifest.share) {
-                                shares.push(result.secretMetadata.manifest.share);
-                            }
-                        }
-
-                        if (!firstMetadata) {
-                            firstMetadata = result.secretMetadata;
-                        }
-                    } else {
-                        logger.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
-                    }
+                let outcome;
+                if (options && options.multithreaded === false) {
+                    outcome = await pool.fallbackHandler('extract-payload', {
+                        jpegBytes,
+                        stcSeed,
+                        options
+                    });
                 } else {
-                    logger.debug(`File ${file.name}: No secret data found.`);
+                    outcome = await pool.dispatch(
+                        'extract-payload',
+                        { jpegBytes, stcSeed, options },
+                        [jpegBuffer]
+                    );
                 }
+
+                completed++;
+                if (onProgress) {
+                    onProgress(completed, total, `Extracted from ${file.name}`);
+                }
+
+                const [result, err] = outcome;
+                if (err) return { file, result: null, error: err };
+
+                if (result && result.candidateWires && result.candidateWires.length > 0) {
+                    for (const wire of result.candidateWires) {
+                        const [payload, unsealErr] = await unsealOpaque(wire, password, options.kdfOpts);
+                        if (!unsealErr && payload) {
+                            try {
+                                const parsed = JSON.parse(new TextDecoder().decode(payload));
+                                if (parsed && parsed.data) {
+                                    const [rawBytes] = base64ToBytes(parsed.data);
+                                    result.secretData = rawBytes;
+                                    result.secretMetadata = parsed.metadata || null;
+                                } else {
+                                    result.secretData = payload;
+                                }
+                            } catch {
+                                result.secretData = payload;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                return { file, result, error: null };
             } catch (error) {
+                completed++;
+                return { file, result: null, error };
+            }
+        });
+
+        const decodedOutcomes = await Promise.all(decodeTasks);
+
+        for (let i = 0; i < decodedOutcomes.length; i++) {
+            const { file, result, error } = decodedOutcomes[i];
+            if (error) {
                 logger.error(`Failed to extract from ${file.name}:`, error);
                 if (onProgress) {
                     onProgress(i + 1, total, `Error extracting from ${file.name}`);
                 }
+                continue;
+            }
+
+            if (result && result.secretData) {
+                logger.debug(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
+                if (result.secretMetadata && result.secretMetadata.chunk) {
+                    const chunkMeta = result.secretMetadata.chunk;
+                    logger.debug(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
+
+                    if (chunkMeta.count && chunkMeta.count > 1 && chunkMeta.stripeSize) {
+                        const stripeSize = chunkMeta.stripeSize;
+                        for (let b = 0; b < chunkMeta.count; b++) {
+                            const blockData = result.secretData.slice(b * stripeSize, (b + 1) * stripeSize);
+                            chunks.push({
+                                chunkId: chunkMeta.id,
+                                index: (chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : 0) + b,
+                                total: chunkMeta.total,
+                                data: blockData,
+                                checksum: ChunkManager.calculateChecksum(blockData)
+                            });
+                        }
+                    } else {
+                        chunks.push({
+                            chunkId: chunkMeta.id,
+                            index: chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : chunkMeta.index,
+                            total: chunkMeta.total,
+                            data: result.secretData,
+                            checksum: ChunkManager.calculateChecksum(result.secretData)
+                        });
+                    }
+
+                    if (result.secretMetadata.manifest) {
+                        manifests.push(result.secretMetadata.manifest);
+                        if (result.secretMetadata.manifest.shares) {
+                            for (const s of result.secretMetadata.manifest.shares) {
+                                shares.push(s);
+                            }
+                        } else if (result.secretMetadata.manifest.share) {
+                            shares.push(result.secretMetadata.manifest.share);
+                        }
+                    }
+
+                    if (!firstMetadata) {
+                        firstMetadata = result.secretMetadata;
+                    }
+                } else {
+                    logger.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
+                }
+            } else {
+                logger.debug(`File ${file.name}: No secret data found.`);
             }
         }
 
@@ -110,8 +170,24 @@ export class BatchExtractor {
         }
 
         let verifiedManifest = null;
+        let ephemeralMacKey = null;
+        let ephemeralSalt = null;
+
         for (const m of manifests) {
-            const [ok, verifyErr] = await verifyManifest(m, password);
+            let macKey = null;
+            if (ephemeralMacKey && m.kdf && m.kdf.salt === ephemeralSalt) {
+                macKey = ephemeralMacKey;
+            } else if (m.kdf && typeof m.kdf.salt === 'string') {
+                const [derived, keyErr] = await deriveMacKey(password, m.kdf);
+                if (keyErr || !derived) {
+                    return [null, new Error(`Manifest key derivation failed: ${keyErr?.message || 'unknown error'}`)];
+                }
+                ephemeralMacKey = derived;
+                ephemeralSalt = m.kdf.salt;
+                macKey = derived;
+            }
+
+            const [ok, verifyErr] = await verifyManifest(m, password, { macKey });
             if (verifyErr) return [null, new Error(`Manifest verification failed: ${verifyErr.message}`)];
             if (ok !== true) {
                 return [null, new Error('Manifest authentication failed: wrong password or tampered carriers.')];
@@ -126,6 +202,24 @@ export class BatchExtractor {
                 if (strip(verifiedManifest) !== strip(m)) {
                     return [null, new Error('Carrier manifests disagree: carrier set was mixed or rolled back.')];
                 }
+            }
+        }
+
+        // Enforce manifest chunk integrity authentication (SEC-01)
+        if (verifiedManifest.entries && verifiedManifest.entries.length > 0) {
+            const uniqueRecordsByIndex = new Map();
+            for (const c of chunks) {
+                const existing = uniqueRecordsByIndex.get(c.index);
+                if (!existing) {
+                    uniqueRecordsByIndex.set(c.index, { index: c.index, checksum: c.checksum });
+                } else if (existing.checksum !== c.checksum) {
+                    return [null, new Error(`Conflicting coded stripes detected for chunk index ${c.index}.`)];
+                }
+            }
+            const chunkRecords = Array.from(uniqueRecordsByIndex.values());
+            const [, bindErr] = bindChunkRecords(chunkRecords, verifiedManifest, { subset: true });
+            if (bindErr) {
+                return [null, new Error(`Carrier manifest chunk authentication failed: ${bindErr.message}`)];
             }
         }
 

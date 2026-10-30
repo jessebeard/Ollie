@@ -105,32 +105,15 @@ export class ModalManager {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
-            modal.innerHTML = `
-                <div class="modal-header">
-                    <h3>${this.escape(title)}</h3>
-                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>${this.escape(label)}</label>
-                        <input type="${this.escape(type)}" class="prompt-input form-control">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
-                    <button type="button" class="btn btn-primary confirm-btn">OK</button>
-                </div>
-            `;
 
-            this.show(modal);
+            let getInputValue = () => '';
 
             const cleanup = () => {
                 this.hide();
             };
 
             const confirm = () => {
-                const input = modal.querySelector('.prompt-input');
-                const val = input ? input.value : '';
+                const val = getInputValue();
                 cleanup();
                 setTimeout(() => resolve(val), 50);
             };
@@ -140,20 +123,71 @@ export class ModalManager {
                 setTimeout(() => resolve(null), 50);
             };
 
+            if (type === 'password') {
+                modal.innerHTML = `
+                    <div class="modal-header">
+                        <h3>${this.escape(title)}</h3>
+                        <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <div class="password-shadow-host"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+                        <button type="button" class="btn btn-primary confirm-btn">OK</button>
+                    </div>
+                `;
+                const host = modal.querySelector('.password-shadow-host');
+                if (host && typeof host.attachShadow === 'function') {
+                    const shadow = host.attachShadow({ mode: 'closed' });
+                    const input = document.createElement('input');
+                    input.type = 'password';
+                    input.className = 'prompt-input form-control';
+                    shadow.appendChild(input);
+                    getInputValue = () => input.value || '';
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') confirm();
+                        if (e.key === 'Escape') cancel();
+                    };
+                }
+            } else {
+                modal.innerHTML = `
+                    <div class="modal-header">
+                        <h3>${this.escape(title)}</h3>
+                        <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <input type="${this.escape(type)}" class="prompt-input form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+                        <button type="button" class="btn btn-primary confirm-btn">OK</button>
+                    </div>
+                `;
+                const input = modal.querySelector('.prompt-input');
+                if (input) {
+                    getInputValue = () => input.value || '';
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') confirm();
+                        if (e.key === 'Escape') cancel();
+                    };
+                }
+            }
+
+            this.show(modal);
+
             const confirmBtn = modal.querySelector('.confirm-btn');
             if (confirmBtn) confirmBtn.onclick = confirm;
             const cancelBtn = modal.querySelector('.cancel-btn');
             if (cancelBtn) cancelBtn.onclick = cancel;
             const closeBtn = modal.querySelector('.close-btn');
             if (closeBtn) closeBtn.onclick = cancel;
-
-            const input = modal.querySelector('.prompt-input');
-            if (input) {
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') confirm();
-                    if (e.key === 'Escape') cancel();
-                };
-            }
         });
     }
 

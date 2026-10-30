@@ -22,8 +22,8 @@ describe('Proportional Cauchy Parity Erasure Coding (Unit & PBT)', () => {
         expect(plan.counts[1] > plan.counts[2]).toBe(true);
         expect(plan.counts[2] >= plan.counts[3]).toBe(true);
 
-        // The largest carrier alone should hold at least k blocks (>= 100KB capacity)
-        expect(plan.counts[0] >= plan.k).toBe(true);
+        // Anti-SPOF & threshold privacy invariant: no single carrier alone holds >= k blocks
+        expect(plan.counts[0] < plan.k).toBe(true);
     });
 
     it('encodeErasure & decodeErasure: roundtrips with any subset of k blocks', () => {

@@ -3,6 +3,7 @@ node_modules/
 
 # Tool workspace state
 .qwen/
+.agents/
 
 # Transient run output
 test-output.txt

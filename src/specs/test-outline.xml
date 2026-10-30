@@ -63,6 +63,7 @@
             </directory>
             <file name="capacity-scanner.test.js" description="CapacityScanner unit tests." />
             <file name="capacity-scanner.pbt.js" description="CapacityScanner property-based tests." />
+            <file name="carrier-pool.test.js" description="CarrierPool worker dispatch and fallback tests." />
             <file name="decoder.test.js" description="Main decoder integration tests." />
             <file name="encoder.test.js" description="JpegEncoder integration tests." />
             <file name="transcoder.test.js" description="Lossless coefficient roundtrip validation." />
@@ -105,6 +106,7 @@
         <directory name="information-theory">
             <directory name="cryptography">
                 <file name="aes-gcm.test.js" description="AES-GCM encryption/decryption tests." />
+                <file name="feistel-permutation.test.js" description="Keyed Cycle-Walking Feistel Permutation unit, bijectivity, reversibility, cycle-walking boundary safety, quantized entropy, Pearson chi-square, full key-width/input SAC, non-involution, and 32-bit unsigned boundary tests." />
                 <file name="hmac.test.js" description="HMAC-SHA256 signing/verification tests." />
                 <file name="kdf-chain.test.js" description="Unified Argon2id + HKDF-Expand key derivation chain tests." />
                 <file name="pbkdf2.test.js" description="PBKDF2 key derivation tests including deriveRawBits." />
@@ -119,8 +121,8 @@
                 <file name="chunk-manager.test.js" description="Data chunking and reassembly tests." />
                 <file name="juniward.test.js" description="J-UNIWARD spatial Daubechies db8 wavelet distortion model and anti-SCA randomization unit tests." />
                 <file name="opaque-container.test.js" description="Format v4 zero-length opaque framing, CSPRNG bucket padding, and unsealWithKeys candidate testing." />
-                <file name="stc-matrix.test.js" description="Syndrome-Trellis Codes (STC) dual-trellis Viterbi encoder and linear extractor unit tests." />
-                <file name="stego-engine.test.js" description="StegoEngine unified Format v4 embedding, extraction, and capacity calculation unit tests." />
+                <file name="stc-matrix.test.js" description="Syndrome-Trellis Codes (STC) dual-trellis Viterbi encoder, bounded w&lt;=4 trellis, algebraic predecessor recovery, 2-bit packed decision matrix, and linear extractor unit tests." />
+                <file name="stego-engine.test.js" description="StegoEngine unified Format v4 embedding, extraction, MAX_STEGO_PAYLOAD_BYTES hard ceiling enforcement, and capacity calculation unit tests." />
             </directory>
         </directory>
         <directory name="integration">
@@ -157,7 +159,7 @@
             <file name="ecc.pbt.js" description="Dedicated ECC PBT suite: GF(256) group axioms and Reed-Solomon error correction bounds." />
             <file name="qr.pbt.js" description="Dedicated QR PBT suite: encodeQR dimension invariants, synthesize/decode roundtrip, and binarizer robustness." />
             <file name="secret-sharing.pbt.js" description="Dedicated secret sharing PBT suite: Cauchy MDS erasure recovery and threshold fail-closed enforcement." />
-            <file name="steganography.pbt.js" description="Dedicated steganography PBT suite: STC trellis coding, opaque framing, and capacity monotonicity." />
+            <file name="steganography.pbt.js" description="Dedicated steganography PBT suite: STC trellis coding distortion bounds, opaque framing, capacity monotonicity, and MAX_STEGO_PAYLOAD_BYTES hard cap rejection." />
             <file name="utils.pbt.js" description="Dedicated utils PBT suite: Base32, Deflate/Inflate, Base64, CRC32 bit-flip sensitivity, and URL safety." />
             <file name="vault.pbt.js" description="Dedicated vault PBT suite: serialization roundtrip, monotonic revision bumps, and deterministic locking." />
         </directory>
@@ -170,8 +172,8 @@
             <file name="bitreader-differential.test.js" description="BitReader differential properties across read strategies." />
             <file name="capacity-consistency.test.js" description="Scanner-vs-embedder capacity parity assertions for Format v4." />
             <file name="carrier-manifest.test.js" description="Carrier manifest structure, canonical serialization, verification, chunk binding." />
-            <file name="cauchy-ec.test.js" description="Cauchy erasure codec: MDS roundtrip, fail-closed, allocation planning." />
-            <file name="proportional-cauchy-ec.test.js" description="Proportional Cauchy parity erasure coding: granular multi-block proportional allocation, k-subset roundtrips, PBT over heterogeneous capacities, metamorphic subset invariance, sub-threshold fail-closed." />
+            <file name="cauchy-ec.test.js" description="Cauchy erasure codec: MDS roundtrip, fail-closed, allocation planning, and No-SPOF bounded carrier allocation." />
+            <file name="proportional-cauchy-ec.test.js" description="Proportional Cauchy parity erasure coding: granular multi-block proportional allocation, No-SPOF carrier block caps (&lt; k), k-subset roundtrips, PBT over heterogeneous capacities, metamorphic subset invariance, sub-threshold fail-closed." />
             <file name="chunk-integrity.test.js" description="Chunk integrity checksum enforcement." />
             <file name="css-envelope.test.js" description="CSS envelope sealing/opening, DEK zeroization, foreign-share rejection." />
             <file name="decoder-hardening.test.js" description="Decoder fail-loud hardening against malformed streams." />
@@ -211,6 +213,10 @@
             </directory>
         </directory>
         <directory name="utils">
+            <directory name="concurrency">
+                <file name="tuple-serializer.test.js" description="Result tuple serialization and Error restoration tests." />
+                <file name="worker-pool.test.js" description="Universal WorkerPool lifecycle, queueing, timeout, and fallback tests." />
+            </directory>
             <file name="atomic-writer.test.js" description="Atomic multi-file write rollback on partial failure." />
             <file name="base32.test.js" description="RFC 4648 Base32 encode/decode tests." />
             <file name="bit-reader.test.js" description="BitReader wrapper unit tests." />
@@ -223,14 +229,18 @@
             <file name="encoding.test.js" description="Shared Base64 and UTF-8 codecs and error handling tests." />
             <file name="jpeg-fixtures.js" description="JPEG test fixture generator and loader utility." />
             <file name="marker-parser.test.js" description="MarkerParser utility unit tests." />
+            <file name="mock-env.js" description="DOM, localStorage, and window isolation stubs for test environments." />
             <file name="pbt.js" description="Property-based testing harness with seeded PRNG and shrinking." />
+            <file name="test-files.js" description="Canonical manifest of all test files across the repository." />
             <file name="test-runner.js" description="Bespoke test runner with structured reporting." />
             <file name="test-runner.pbt.js" description="Property-based testing of test runner assertions." />
             <file name="test-runner.test.js" description="Test runner unit tests." />
+            <file name="worker-test-executor.js" description="Worker thread test execution harness running in isolated V8 isolates." />
         </directory>
         <directory name="vendor">
             <file name="argon2id.test.js" description="RFC 9106 test vectors and unit tests for vendored OpenPGP.js Argon2id WebAssembly engine." />
         </directory>
-        <file name="runner.js" description="Node.js test runner with PBT seeding and suite registration." />
+        <file name="runner.js" description="Unified Node.js test runner entry point supporting parallel worker threads and sequential fallback." />
+        <file name="runner-parallel.js" description="Multithreaded test runner orchestrator with work-stealing priority scheduling and live reporting." />
     </structure>
 </project>

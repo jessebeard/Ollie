@@ -23,8 +23,8 @@ export async function runJuniwardMrFuzz(scale = 1) {
             textBlock[0] = dcLevel;
             for (let i = 1; i < 30; i++) textBlock[i] = ((i % 7) + 1) * 10 * textureScale;
 
-            const flatCosts = calculateJUniwardCosts([flatBlock], undefined, { lambda: 0 });
-            const textCosts = calculateJUniwardCosts([textBlock], undefined, { lambda: 0 });
+            const flatCosts = calculateJUniwardCosts([flatBlock], undefined, { lambda: 0, asymmetric: false });
+            const textCosts = calculateJUniwardCosts([textBlock], undefined, { lambda: 0, asymmetric: false });
 
             // Normalize out the 10x zero-coefficient penalty so we compare pure wavelet sensitivity:
             // For coefficients where flatBlock[c] is 0 and textBlock[c] is non-zero,
@@ -65,18 +65,48 @@ export async function runJuniwardMrFuzz(scale = 1) {
         iters
     );
 
-    // MR-juniward-3: Cost positivity & symmetry
-    // rhoPlus === rhoMinus >= 0.01 for all coefficients
+    // MR-juniward-3: Cost positivity & Hardened Asymmetric Model Invariants
     await assertProperty(
         [Arbitrary.dctBlock()],
         (block) => {
-            const costs = calculateJUniwardCosts([block], undefined, { lambda: 0.3, costSeed: 'test-seed' });
+            const costs = calculateJUniwardCosts([block], undefined, { lambda: 0.01, costSeed: 'test-seed' });
+            const WET = 1e12;
             for (let i = 0; i < 63; i++) {
+                const c = i + 1; // coeff index 1..63
+                const val = block[c];
+
                 if (costs.rhoPlus[i] < 0.01 || costs.rhoMinus[i] < 0.01) {
                     throw new Error(`Cost positivity violated at ${i}`);
                 }
-                if (costs.rhoPlus[i] !== costs.rhoMinus[i]) {
-                    throw new Error(`Cost symmetry violated at ${i}`);
+
+                if (val === 0) {
+                    if (costs.rhoPlus[i] !== WET || costs.rhoMinus[i] !== WET) {
+                        throw new Error(`Zero-coefficient wet lock violated at ${i}`);
+                    }
+                } else if (val === 1) {
+                    if (costs.rhoMinus[i] !== WET || costs.rhoPlus[i] >= WET) {
+                        throw new Error(`+1 -> 0 shrinkage lock violated at ${i}`);
+                    }
+                } else if (val === -1) {
+                    if (costs.rhoPlus[i] !== WET || costs.rhoMinus[i] >= WET) {
+                        throw new Error(`-1 -> 0 shrinkage lock violated at ${i}`);
+                    }
+                } else if (val >= 2) {
+                    if (costs.rhoMinus[i] >= costs.rhoPlus[i]) {
+                        throw new Error(`Histogram-conscious asymmetry toward zero violated for positive at ${i}`);
+                    }
+                } else if (val <= -2) {
+                    if (costs.rhoPlus[i] >= costs.rhoMinus[i]) {
+                        throw new Error(`Histogram-conscious asymmetry toward zero violated for negative at ${i}`);
+                    }
+                }
+            }
+
+            // Also verify symmetric fallback mode
+            const symCosts = calculateJUniwardCosts([block], undefined, { asymmetric: false, lambda: 0 });
+            for (let i = 0; i < 63; i++) {
+                if (symCosts.rhoPlus[i] !== symCosts.rhoMinus[i]) {
+                    throw new Error(`Symmetric fallback cost symmetry violated at ${i}`);
                 }
             }
         },
@@ -110,7 +140,7 @@ export async function runJuniwardMrFuzz(scale = 1) {
             }
 
             // At least one non-clamped AC coefficient must experience genuine perturbation
-            const hasNonClamped = Array.from(unperturbed.rhoPlus).some(c => c > 0.02);
+            const hasNonClamped = Array.from(unperturbed.rhoPlus).some(c => c > 0.02 && c < 1e11);
             if (hasNonClamped && !hasPerturbation) {
                 throw new Error(`Anti-SCA perturbation was completely inactive across all 63 AC coefficients`);
             }

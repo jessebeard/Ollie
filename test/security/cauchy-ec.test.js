@@ -205,4 +205,21 @@ describe('planErasureAllocation (spread-first)', () => {
         );
         expect(err).toBeInstanceOf(Error);
     });
+
+    it('enforces No-SPOF cap and bounds dominant carrier share in proportional mode', () => {
+        // Skewed set like sample vault: 1 giant carrier (80KB) and smaller carriers (4KB-15KB)
+        const caps = [4745, 81499, 7651, 9709, 1161, 5083, 6387, 4222, 15781];
+        const [plan, err] = planErasureAllocation(caps, {
+            payloadSize: 23000,
+            proportional: true,
+            margin: 64
+        });
+        expect(err).toBe(null);
+        expect(plan.k).toBeGreaterThan(0);
+        // Dominant carrier (index 1) must be strictly capped
+        expect(plan.counts[1]).toBeLessThanOrEqual(Math.ceil(plan.k * 0.4));
+        // Dominant carrier alone cannot exceed system redundancy (No-SPOF)
+        const redundancy = plan.n - plan.k;
+        expect(plan.counts[1]).toBeLessThanOrEqual(redundancy);
+    });
 });

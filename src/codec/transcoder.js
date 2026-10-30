@@ -37,7 +37,9 @@ export class JpegTranscoder {
         const encoder = new JpegEncoder(90, {
             secretData: newSecretData,
             metadata: options.metadata,
-            password: options.password
+            password: options.password,
+            sealedWire: options.sealedWire,
+            stcSeed: options.stcSeed
         });
 
         try {

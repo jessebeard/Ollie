@@ -20,6 +20,23 @@ export class DropZone {
             }, false);
         });
 
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('drop', (e) => {
+                if (e.target === this.element || (this.element.contains && this.element.contains(e.target))) {
+                    if (typeof e.stopImmediatePropagation === 'function') {
+                        e.stopImmediatePropagation();
+                    }
+                    if (typeof e.stopPropagation === 'function') {
+                        e.stopPropagation();
+                    }
+                    if (typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    this.handleDrop(e);
+                }
+            }, true);
+        }
+
         this.element.addEventListener('dragenter', () => this.highlight());
         this.element.addEventListener('dragover', () => this.highlight());
         this.element.addEventListener('dragleave', () => this.unhighlight());
