@@ -145,6 +145,7 @@ export const TEST_FILES = [
     "test/integration/vault/vault-ui-redesign.test.js",
     "test/integration/vault/vault-ui-polish.test.js",
     "test/integration/vault/card-flow-automata.test.js",
+    "test/integration/vault/pinned-grid.test.js",
     "test/ui-xss.test.js",
     "test/security/xss.test.js",
     "test/security/extension-threat-audit.test.js",

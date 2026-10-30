@@ -211,6 +211,7 @@ export async function runParallelTests(options = {}) {
 
 // Direct CLI invocation
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+    (async () => {
     const args = process.argv.slice(2);
     const workerArg = args.find(a => a.startsWith('--workers='));
     const workers = workerArg ? parseInt(workerArg.split('=')[1], 10) : undefined;
@@ -234,6 +235,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
         workers,
         verbose
     });
-
-    process.exit(err ? 1 : 0);
+        process.exit(err ? 1 : 0);
+    })();
 }

@@ -34,6 +34,7 @@ function createMockElement(tag, id = null) {
         title: '',
         textContent: '',
         disabled: false,
+        _handlers: handlers,
         classList: {
             add: (...c) => c.forEach(x => classes.add(x)),
             remove: (...c) => c.forEach(x => classes.delete(x)),
@@ -55,9 +56,42 @@ function createMockElement(tag, id = null) {
         removeEventListener: (evt, h) => {
             if (handlers[evt]) handlers[evt] = handlers[evt].filter(f => f !== h);
         },
+        matches: function (sel) {
+            const selectors = sel.split(',').map(s => s.trim()).filter(Boolean);
+            for (const s of selectors) {
+                if (s.startsWith('.')) {
+                    if (el.classList && el.classList.contains(s.slice(1))) return true;
+                } else if (s.startsWith('#')) {
+                    if (el.getAttribute && el.getAttribute('id') === s.slice(1)) return true;
+                } else if (s.startsWith('[') && s.includes('=')) {
+                    const m = s.match(/\[([a-zA-Z0-9-]+)="([^"]+)"\]/);
+                    if (m && el.getAttribute && el.getAttribute(m[1]) === m[2]) return true;
+                } else if (el.tagName && el.tagName.toLowerCase() === s.toLowerCase()) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        closest: function (sel) {
+            let cur = el;
+            while (cur) {
+                if (cur.matches && cur.matches(sel)) return cur;
+                cur = cur.parentNode;
+            }
+            return null;
+        },
         dispatchEvent: (evt) => {
-            const list = handlers[evt.type] || [];
-            list.forEach(h => h(evt));
+            if (!evt.target) evt.target = el;
+            let cur = el;
+            while (cur) {
+                const list = cur._handlers ? (cur._handlers[evt.type] || []) : (cur.addEventListener ? [] : []);
+                list.forEach(h => h(evt));
+                if (evt.bubbles && cur.parentNode) {
+                    cur = cur.parentNode;
+                } else {
+                    break;
+                }
+            }
         },
         click: () => {
             el.dispatchEvent({ type: 'click', target: el, stopPropagation: () => {} });
