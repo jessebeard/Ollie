@@ -348,7 +348,7 @@ export function planErasureAllocation(capacities, options = {}) {
 
     // Compute target source blocks k (between ceil(carriers/2) and 64)
     const minK = capacities.length >= 2 ? Math.ceil(capacities.length / 2) : 1;
-    let k = Math.min(64, Math.max(minK, Math.ceil(effPayload / 2048)));
+    let k = threshold !== undefined ? threshold : Math.min(64, Math.max(minK, Math.ceil(effPayload / 2048)));
     let stripeSize = Math.ceil(effPayload / k);
 
     // Compute target total parity blocks (providing ~1.2x to 1.5x redundancy)
@@ -418,6 +418,45 @@ export function planErasureAllocation(capacities, options = {}) {
                 totalBlocks++;
             }
             ptr++;
+        }
+    }
+
+    // Enforce Cauchy MDS Quorum Invariant: Any k carriers must supply >= k blocks.
+    // The worst-case k-carrier subset is the k smallest counts.
+    const sortedCounts = [...counts].sort((a, b) => a - b);
+    const sumSmallestK = sortedCounts.slice(0, k).reduce((a, b) => a + b, 0);
+    if (sumSmallestK < k) {
+        const sortedIndices = counts
+            .map((c, i) => ({ i, c, usable: usable[i] }))
+            .sort((a, b) => a.c - b.c);
+
+        let deficit = k - sumSmallestK;
+        for (const item of sortedIndices) {
+            const i = item.i;
+            const maxForThis = Math.min(
+                Math.floor((usable[i] * 0.75) / stripeSize),
+                maxCarrierBytes ? Math.floor(maxCarrierBytes / stripeSize) : Infinity
+            );
+            const canAdd = Math.max(0, maxForThis - counts[i]);
+            if (canAdd > 0) {
+                const add = Math.min(canAdd, deficit);
+                counts[i] += add;
+                totalBlocks += add;
+                deficit -= add;
+                if (deficit <= 0) break;
+            }
+        }
+
+        const recheck = [...counts].sort((a, b) => a - b).slice(0, k).reduce((a, b) => a + b, 0);
+        if (recheck < k) {
+            const minStripe = Math.ceil(effPayload / k);
+            const eligible = usable.map((u) => u >= minStripe);
+            const eligibleCount = eligible.filter(Boolean).length;
+            if (eligibleCount >= k) {
+                stripeSize = minStripe;
+                counts = usable.map((u) => (u >= minStripe ? 1 : 0));
+                totalBlocks = eligibleCount;
+            }
         }
     }
 

@@ -1,6 +1,13 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import { hkdfExpand, deriveStegoKeys } from '../../../src/information-theory/cryptography/kdf-chain.js';
+import {
+    hkdfExpand,
+    hkdfExtract,
+    deriveStegoKeys,
+    deriveCarrierMasterKey,
+    deriveEnvelopeKeysV41,
+    deriveStegoKeysV41
+} from '../../../src/information-theory/cryptography/kdf-chain.js';
 
 describe('Format v4 KDF Chain & HKDF-Expand', () => {
     it('hkdfExpand expands PRK to arbitrary requested lengths deterministically', async () => {
@@ -97,5 +104,67 @@ describe('Format v4 KDF Chain & HKDF-Expand', () => {
         const [keys2, err2] = await deriveStegoKeys('password', new Uint8Array(4)); // too short salt
         expect(keys2).toBe(null);
         expect(err2 instanceof Error).toBe(true);
+    });
+
+    it('Format v4.1: hkdfExtract extracts uniformly distributed PRK from salt and IKM', async () => {
+        const salt = new Uint8Array(16).fill(0x11);
+        const ikm = new Uint8Array(32).fill(0x22);
+
+        const [prk, err] = await hkdfExtract(salt, ikm);
+        expect(err).toBe(null);
+        expect(prk instanceof Uint8Array).toBe(true);
+        expect(prk.length).toBe(32);
+
+        // Determinism check
+        const [prk2] = await hkdfExtract(salt, ikm);
+        expect(Array.from(prk)).toEqual(Array.from(prk2));
+
+        // Sensitivity check
+        const [prkDiff] = await hkdfExtract(new Uint8Array(16).fill(0x33), ikm);
+        expect(Array.from(prk)).not.toEqual(Array.from(prkDiff));
+    });
+
+    it('Format v4.1: deriveStegoKeysV41 decouples carrier master keys from envelope keys', async () => {
+        const password = 'vault-decoupled-password';
+        const carrierSalt = new Uint8Array(32).fill(0xAA);
+        const envelopeSalt1 = new Uint8Array(16).fill(0x01);
+        const envelopeSalt2 = new Uint8Array(16).fill(0x02);
+
+        // Derive keys for embedding 1
+        const [keys1, err1] = await deriveStegoKeysV41(password, carrierSalt, envelopeSalt1, { memorySize: 64, passes: 1 });
+        expect(err1).toBe(null);
+
+        // Derive keys for embedding 2 on SAME image (same carrierSalt, fresh envelopeSalt)
+        const [keys2, err2] = await deriveStegoKeysV41(password, carrierSalt, envelopeSalt2, { memorySize: 64, passes: 1 });
+        expect(err2).toBe(null);
+
+        // MasterKey and Stego Seeds MUST be invariant for the same image and password
+        expect(Array.from(keys1.masterKey)).toEqual(Array.from(keys2.masterKey));
+        expect(Array.from(keys1.stcSeed)).toEqual(Array.from(keys2.stcSeed));
+        expect(Array.from(keys1.costSeed)).toEqual(Array.from(keys2.costSeed));
+
+        // Envelope encryption keys MUST be unique (Zero Nonce Reuse Invariant)
+        expect(Array.from(keys1.aesKey)).not.toEqual(Array.from(keys2.aesKey));
+        expect(Array.from(keys1.aesIV)).not.toEqual(Array.from(keys2.aesIV));
+        expect(Array.from(keys1.prkEnv)).not.toEqual(Array.from(keys2.prkEnv));
+    });
+
+    it('Format v4.1: deriveCarrierMasterKey derives carrier stego keys without envelope salt', async () => {
+        const password = 'carrier-only-password';
+        const carrierSalt = new Uint8Array(32).fill(0xBB);
+
+        const [carrierKeys, err] = await deriveCarrierMasterKey(password, carrierSalt, { memorySize: 64, passes: 1 });
+        expect(err).toBe(null);
+        expect(carrierKeys.masterKey.length).toBe(32);
+        expect(carrierKeys.stcSeed.length).toBe(32);
+        expect(carrierKeys.costSeed.length).toBe(32);
+
+        // Derive envelope keys later from extracted envelopeSalt
+        const envelopeSalt = new Uint8Array(16).fill(0xCC);
+        const [envKeys, envErr] = await deriveEnvelopeKeysV41(carrierKeys.masterKey, envelopeSalt);
+        expect(envErr).toBe(null);
+        expect(envKeys.aesKey.length).toBe(32);
+        expect(envKeys.aesIV.length).toBe(12);
+        expect(envKeys.prkEnv.length).toBe(32);
     });
 });

@@ -158,5 +158,12 @@ export const TEST_FILES = [
     "test/pbt/steganography.pbt.js",
     "test/pbt/qr.pbt.js",
     "test/pbt/vault.pbt.js",
-    "test/pbt/utils.pbt.js"
+    "test/pbt/utils.pbt.js",
+    "test/information-theory/steganography/carrier-salt.test.js",
+    "test/information-theory/steganography/stego-payload-v41.test.js",
+    "test/information-theory/steganography/opaque-container-expansion.test.js",
+    "test/information-theory/secret-sharing/cauchy-ec-invariant.test.js",
+    "test/information-theory/steganography/histogram-balance.test.js",
+    "test/pbt/stego-payload-v41.pbt.js",
+    "test/fuzz/stego-payload-fuzz.test.js",
 ];

@@ -9,7 +9,7 @@ import { JpegDecoder } from './decoder.js';
 import { JpegTranscoder } from './transcoder.js';
 import { BatchEmbedder } from '../information-theory/steganography/batch-embedder.js';
 import { StegoEngine } from '../information-theory/steganography/stego-engine.js';
-import { base64ToBytes } from '../utils/encoding.js';
+import { parseStegoPayload } from '../information-theory/steganography/stego-payload.js';
 
 initializeWorkerRuntime(async (action, payload) => {
     switch (action) {
@@ -110,19 +110,12 @@ initializeWorkerRuntime(async (action, payload) => {
                 return [{ secretData: null, secretMetadata: null }, null];
             }
 
-            let secretData = null;
+            let secretData = extractedPayload;
             let secretMetadata = null;
-            try {
-                const parsed = JSON.parse(new TextDecoder().decode(extractedPayload));
-                if (parsed && parsed.data) {
-                    const [rawBytes] = base64ToBytes(parsed.data);
-                    secretData = rawBytes;
-                    secretMetadata = parsed.metadata || null;
-                } else {
-                    secretData = extractedPayload;
-                }
-            } catch {
-                secretData = extractedPayload;
+            const [parsedPayload, parseErr] = parseStegoPayload(extractedPayload);
+            if (!parseErr && parsedPayload) {
+                secretData = parsedPayload.secretData;
+                secretMetadata = parsedPayload.secretMetadata;
             }
 
             const transferables = [];

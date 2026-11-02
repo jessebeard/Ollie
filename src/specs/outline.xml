@@ -84,7 +84,6 @@
                 <file name="batch-extractor.js" description="BatchExtractor: manifest verification, multi-block bundle unpacking, threshold reconstruction, chunk reassembly." />
                 <file name="carrier-manifest.js" description="HMAC-authenticated carrier manifests: create/verify/bind with canonical serialization." />
                 <file name="chunk-manager.js" description="ChunkManager: CRC32-checked data splitting and reassembly." />
-                <file name="encrypted-container.js" description="EncryptedContainer: Format v4 seal/unseal wrapper with backward-compatible API." />
                 <file name="juniward.js" description="J-UNIWARD spatial wavelet distortion engine: 2D IDCT, 8-tap Daubechies (db8) directional wavelets, spatial sensitivity map, anti-SCA key randomization." />
                 <file name="opaque-container.js" description="Format v4 zero-length opaque framing: Deflate/Inflate, CRC-32, CSPRNG bucket padding (256B-128KB), unsealWithKeys candidate bucket fast testing." />
                 <file name="stc-matrix.js" description="Syndrome-Trellis Codes (STC): dual-trellis Viterbi encoder, submatrix generator, maxW=4 bounded trellis, algebraic predecessor recovery, 2-bit packed decision matrix, linear parity extractor." />

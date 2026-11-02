@@ -140,10 +140,16 @@ function convolveBlock2DInto(block, hFilter, vFilter, out, temp) {
  * Calculates J-UNIWARD distortion costs for a list of quantized DCT blocks.
  *
  * @param {Array<Int32Array>} blocks - List of 64-element quantized DCT blocks
- * @param {Float32Array|Array<number>} [qTable] - 64-element Quantization Table
+ * @param {Float32Array|Int32Array|Array<number>} [qTable] - 64-element Quantization Table
  * @param {Object} [options]
  * @param {Uint8Array|string} [options.costSeed] - Seed for anti-SCA cost perturbation
  * @param {number} [options.lambda=0.3] - Anti-SCA perturbation strength
+ * @param {boolean} [options.includeIndices] - Include flat AC index mappings
+ * @param {number} [options.yBlockCount] - Total luminance (Y) blocks before chroma blocks
+ * @param {number} [options.chromaPenalty] - Cost multiplier for chroma channels
+ * @param {boolean} [options.luminanceOnly] - Restrict cost modeling to luminance blocks
+ * @param {boolean} [options.asymmetric] - Apply asymmetric positive/negative distortion penalty
+ * @param {boolean} [options.directionalWavelet] - Use directional wavelet subband filters
  * @returns {{rhoPlus: Float64Array, rhoMinus: Float64Array, flatACIndices: Array<{blockIdx: number, coeffIdx: number}>}}
  */
 export function calculateJUniwardCosts(blocks, qTable = DEFAULT_Q_TABLE, options = {}) {
@@ -256,25 +262,33 @@ export function calculateJUniwardCosts(blocks, qTable = DEFAULT_Q_TABLE, options
                     rhoPlus[flatIdx] = WET_COST;
                     rhoMinus[flatIdx] = WET_COST;
                 }
-                // Rule 2: Lock +1 -> 0 shrinkage (cannot decrement +1 to 0)
+                // Rule 2: Lock +1 -> 0 shrinkage (cannot decrement +1 to 0), penalize outward +1 -> +2
                 else if (val === 1) {
                     rhoMinus[flatIdx] = WET_COST;
-                    rhoPlus[flatIdx] = baseCost;
+                    rhoPlus[flatIdx] = Math.max(0.01, 2.5 * baseCost);
                 }
-                // Rule 3: Lock -1 -> 0 shrinkage (cannot increment -1 to 0)
+                // Rule 3: Lock -1 -> 0 shrinkage (cannot increment -1 to 0), penalize outward -1 -> -2
                 else if (val === -1) {
                     rhoPlus[flatIdx] = WET_COST;
-                    rhoMinus[flatIdx] = baseCost;
+                    rhoMinus[flatIdx] = Math.max(0.01, 2.5 * baseCost);
                 }
-                // Rule 4: Histogram-conscious asymmetry for |val| >= 2
-                // Slightly favor moving toward zero (0.9x) vs away from zero (1.1x) to preserve Laplacian decay
-                else if (val >= 2) {
-                    rhoMinus[flatIdx] = Math.max(0.01, 0.9 * baseCost);
-                    rhoPlus[flatIdx] = val >= 1023 ? WET_COST : Math.max(0.01, 1.1 * baseCost);
+                // Rule 4: Detailed Balance for |val| = 2 (strongly favor inward |2| -> |1| to replenish +/-1 bin)
+                else if (val === 2) {
+                    rhoMinus[flatIdx] = Math.max(0.01, 0.65 * baseCost);
+                    rhoPlus[flatIdx] = Math.max(0.01, 1.25 * baseCost);
                 }
-                else { // val <= -2
-                    rhoPlus[flatIdx] = Math.max(0.01, 0.9 * baseCost);
-                    rhoMinus[flatIdx] = val <= -1024 ? WET_COST : Math.max(0.01, 1.1 * baseCost);
+                else if (val === -2) {
+                    rhoPlus[flatIdx] = Math.max(0.01, 0.65 * baseCost);
+                    rhoMinus[flatIdx] = Math.max(0.01, 1.25 * baseCost);
+                }
+                // Rule 5: Laplacian preservation for |val| >= 3 with boundary overflow protection
+                else if (val >= 3) {
+                    rhoMinus[flatIdx] = Math.max(0.01, 0.85 * baseCost);
+                    rhoPlus[flatIdx] = val >= 1023 ? WET_COST : Math.max(0.01, 1.15 * baseCost);
+                }
+                else { // val <= -3
+                    rhoPlus[flatIdx] = Math.max(0.01, 0.85 * baseCost);
+                    rhoMinus[flatIdx] = val <= -1023 ? WET_COST : Math.max(0.01, 1.15 * baseCost);
                 }
             }
 

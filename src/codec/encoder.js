@@ -6,7 +6,7 @@ import { zigZag } from '../algebraic/mappings/forward-zigzag.js';
 import { encodeBlock, DC_LUMA_TABLE, AC_LUMA_TABLE } from '../automata/entropy-coding/huffman-encoder-fsm.js';
 import { BitWriter } from '../automata/bit-streams/bit-writer.js';
 import { StegoEngine } from '../information-theory/steganography/stego-engine.js';
-import { bytesToBase64 } from '../utils/encoding.js';
+import { serializePayloadV41 } from '../information-theory/steganography/stego-payload.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -43,7 +43,14 @@ export class JpegEncoder {
     }
 
     /**
-     * Embeds secret data into blocks using Format v4 StegoEngine.
+     * Embeds secret data into blocks using Format v4.1 StegoEngine.
+     *
+     * @param {Array<Int32Array>} allBlocks
+     * @param {Object} [embedOpts]
+     * @param {number} [embedOpts.yBlockCount]
+     * @param {Float32Array|Int32Array|Array<number>} [embedOpts.qTable]
+     * @param {any} [embedOpts.quantizationTables]
+     * @returns {Promise<[boolean|null, Error|null]>}
      */
     async embedSecretData(allBlocks, embedOpts = {}) {
         const metadata = this.options.metadata || {};
@@ -70,10 +77,10 @@ export class JpegEncoder {
                 chromaPenalty: 4.0
             });
         } else {
-            const carrierPayload = new TextEncoder().encode(JSON.stringify({
-                data: bytesToBase64(this.options.secretData),
-                metadata: metadata
-            }));
+            const [carrierPayload, serErr] = serializePayloadV41(this.options.secretData, metadata);
+            if (serErr) {
+                return [null, new Error(`Failed to serialize secret data: ${serErr.message}`)];
+            }
 
             [ok, embedErr] = await StegoEngine.embed(allBlocks, carrierPayload, this.options.password, {
                 qTable,

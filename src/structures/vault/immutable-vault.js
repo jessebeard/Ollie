@@ -8,11 +8,122 @@ import { encodeBase32, decodeBase32 } from '../../utils/base32.js';
 import { randomUUID, getCrypto } from '../../information-theory/cryptography/crypto-provider.js';
 import { utf8ToBytes, bytesToBase64, base64ToBytes } from '../../utils/encoding.js';
 
-const EXPORT_FORMAT = 'ollie-export';
-const EXPORT_VERSION = 1;
+export const EXPORT_FORMAT = 'ollie-export';
+export const EXPORT_VERSION = 2;
+export const EXPORT_TUPLE_LENGTH = 4;
 
-const KDF_ALGO = 'PBKDF2-SHA256';
+export const KDF_ALGO = 'PBKDF2-SHA256';
 const SESSION_KEY_BYTES = 32;
+
+/**
+ * Packs export envelope fields into a compact positional tuple per Rule 16:
+ * [format, version, [algo, iterations, salt, iv], ciphertext]
+ *
+ * @param {Object} spec
+ * @returns {[Array|null, Error|null]}
+ */
+export function packExportEnvelope(spec) {
+    if (!spec || typeof spec !== 'object') {
+        return [null, new Error('export-envelope: spec object required')];
+    }
+    const format = spec.format || EXPORT_FORMAT;
+    const version = Number.isInteger(spec.version) ? spec.version : EXPORT_VERSION;
+    const k = spec.kdf;
+    if (!k || typeof k !== 'object') {
+        return [null, new Error('export-envelope: kdf spec required')];
+    }
+    const algo = k.algo || KDF_ALGO;
+    const iterations = k.iterations || KeyDerivation.ITERATIONS;
+    if (!Number.isInteger(iterations) || iterations < 1) {
+        return [null, new Error('export-envelope: iterations must be an integer >= 1')];
+    }
+    if (typeof k.salt !== 'string' || typeof k.iv !== 'string') {
+        return [null, new Error('export-envelope: salt and iv must be base64 strings')];
+    }
+    const ciphertext = spec.ciphertext || k.ciphertext;
+    if (typeof ciphertext !== 'string' || ciphertext.length === 0) {
+        return [null, new Error('export-envelope: ciphertext must be a non-empty base64 string')];
+    }
+
+    const kdfTuple = [algo, iterations, k.salt, k.iv];
+    return [[format, version, kdfTuple, ciphertext], null];
+}
+
+/**
+ * Unpacks and strictly validates an export envelope per Rule 16.
+ * Accepts canonical positional tuples and legacy dictionary objects.
+ *
+ * @param {string|Array|Object} input
+ * @returns {[{format: string, version: number, kdf: {algo: string, iterations: number, salt: string, iv: string, ciphertext: string}, ciphertext: string}|null, Error|null]}
+ */
+export function unpackExportEnvelope(input) {
+    if (!input) {
+        return [null, new Error('Invalid export envelope: empty input')];
+    }
+    let parsed = input;
+    if (typeof input === 'string') {
+        try {
+            parsed = JSON.parse(input);
+        } catch (e) {
+            return [null, new Error('Invalid export envelope: not valid JSON')];
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        if (parsed.length !== EXPORT_TUPLE_LENGTH) {
+            return [null, new Error(`Invalid export envelope: tuple length ${parsed.length}, expected ${EXPORT_TUPLE_LENGTH}`)];
+        }
+        const [format, version, kdfRaw, ciphertext] = parsed;
+        if (format !== EXPORT_FORMAT) {
+            return [null, new Error(`Invalid export envelope: expected ${EXPORT_FORMAT}, got ${format}`)];
+        }
+        if (version !== 1 && version !== 2) {
+            return [null, new Error(`Invalid export envelope: unsupported version ${version}`)];
+        }
+        if (!Array.isArray(kdfRaw) || kdfRaw.length !== 4) {
+            return [null, new Error('Invalid export envelope: malformed KDF tuple')];
+        }
+        const [algo, iterations, salt, iv] = kdfRaw;
+        if (algo !== KDF_ALGO || !Number.isInteger(iterations) || typeof salt !== 'string' || typeof iv !== 'string') {
+            return [null, new Error('Invalid export envelope: malformed KDF block')];
+        }
+        if (typeof ciphertext !== 'string' || ciphertext.length === 0) {
+            return [null, new Error('Invalid export envelope: missing ciphertext')];
+        }
+        return [{
+            format,
+            version,
+            kdf: { algo, iterations, salt, iv, ciphertext },
+            ciphertext
+        }, null];
+    }
+
+    if (parsed && typeof parsed === 'object') {
+        if (parsed.format !== EXPORT_FORMAT) {
+            return [null, new Error(`Invalid export envelope: expected ${EXPORT_FORMAT}`)];
+        }
+        if (parsed.version !== 1 && parsed.version !== 2) {
+            return [null, new Error(`Invalid export envelope: unsupported version ${parsed.version}`)];
+        }
+        const k = parsed.kdf;
+        if (!k || typeof k !== 'object' || k.algo !== KDF_ALGO || !Number.isInteger(k.iterations) ||
+            typeof k.salt !== 'string' || typeof k.iv !== 'string') {
+            return [null, new Error('Invalid export envelope: malformed KDF block')];
+        }
+        const ciphertext = typeof k.ciphertext === 'string' ? k.ciphertext : parsed.ciphertext;
+        if (typeof ciphertext !== 'string' || ciphertext.length === 0) {
+            return [null, new Error('Invalid export envelope: missing ciphertext')];
+        }
+        return [{
+            format: parsed.format,
+            version: parsed.version,
+            kdf: { algo: k.algo, iterations: k.iterations, salt: k.salt, iv: k.iv, ciphertext },
+            ciphertext
+        }, null];
+    }
+
+    return [null, new Error('Invalid export envelope: expected array tuple or object')];
+}
 
 async function importSessionKey(rawBytes) {
     try {
@@ -742,6 +853,14 @@ export class PasswordVault {
      * @param {string} [password] - Defaults to the vault's own credential
      * @returns {Promise<[string|null, Error|null]>} Tuple of [envelopeJson, error]
      */
+    /**
+     * Serializes the vault into a password-encrypted, self-contained
+     * envelope. Format adheres to Rule 16 as a compact positional tuple:
+     * [format, version, [algo, iterations, salt, iv], ciphertext]
+     *
+     * @param {string} [password] - Defaults to the vault's own credential
+     * @returns {Promise<[string|null, Error|null]>} Tuple of [envelopeJson, error]
+     */
     async exportEncrypted(password = null) {
         const masterPassword = password || this._password();
         if (!masterPassword) return [null, new Error('Vault is locked')];
@@ -761,64 +880,54 @@ export class PasswordVault {
         const [key, deriveErr] = await KeyDerivation.deriveKey(masterPassword, salt);
         if (deriveErr) return [null, deriveErr];
 
-        const bindingData = utf8ToBytes(`${EXPORT_FORMAT}/v${EXPORT_VERSION}`);
+        const version = EXPORT_VERSION;
+        const bindingData = utf8ToBytes(`${EXPORT_FORMAT}/v${version}`);
         const [enc, encErr] = await Encryption.encrypt(docBytes, key, { additionalData: bindingData });
         if (encErr) return [null, encErr];
 
-        const envelope = {
+        const [tuple, packErr] = packExportEnvelope({
             format: EXPORT_FORMAT,
-            version: EXPORT_VERSION,
+            version,
             kdf: {
                 algo: KDF_ALGO,
                 iterations: KeyDerivation.ITERATIONS,
                 salt: bytesToBase64(salt),
-                iv: bytesToBase64(enc.iv),
-                ciphertext: bytesToBase64(new Uint8Array(enc.ciphertext))
-            }
-        };
-        return [JSON.stringify(envelope), null];
+                iv: bytesToBase64(enc.iv)
+            },
+            ciphertext: bytesToBase64(new Uint8Array(enc.ciphertext))
+        });
+        if (packErr) return [null, packErr];
+
+        return [JSON.stringify(tuple), null];
     }
 
     /**
      * Rehydrates a vault from an encrypted export envelope.
+     * Accepts Rule 16 positional tuples and legacy dictionary envelopes.
      *
-     * @param {string} envelopeJson
+     * @param {string|Array|Object} envelopeJson
      * @param {string} password
      * @returns {Promise<[PasswordVault|null, Error|null]>}
      */
     static async importEncrypted(envelopeJson, password) {
-        if (typeof envelopeJson !== 'string') {
+        if (typeof envelopeJson !== 'string' && !Array.isArray(envelopeJson) && (typeof envelopeJson !== 'object' || envelopeJson === null)) {
             return [null, new Error('Invalid export envelope: expected a JSON string')];
         }
 
-        let envelope;
-        try {
-            envelope = JSON.parse(envelopeJson);
-        } catch (e) {
-            return [null, new Error('Invalid export envelope: not valid JSON')];
-        }
+        const [envelope, unpackErr] = unpackExportEnvelope(envelopeJson);
+        if (unpackErr) return [null, unpackErr];
 
-        if (!envelope || envelope.format !== EXPORT_FORMAT || envelope.version !== EXPORT_VERSION) {
-            return [null, new Error(`Invalid export envelope: expected ${EXPORT_FORMAT} v${EXPORT_VERSION}`)];
-        }
-
-        const k = envelope.kdf;
-        if (!k || typeof k !== 'object' || k.algo !== KDF_ALGO || !Number.isInteger(k.iterations) ||
-            typeof k.salt !== 'string' || typeof k.iv !== 'string' || typeof k.ciphertext !== 'string') {
-            return [null, new Error('Invalid export envelope: malformed KDF block')];
-        }
-
-        const [saltBytes, saltErr] = base64ToBytes(k.salt);
+        const [saltBytes, saltErr] = base64ToBytes(envelope.kdf.salt);
         if (saltErr) return [null, saltErr];
-        const [ivBytes, ivErr] = base64ToBytes(k.iv);
+        const [ivBytes, ivErr] = base64ToBytes(envelope.kdf.iv);
         if (ivErr) return [null, ivErr];
-        const [cipherBytes, cipherErr] = base64ToBytes(k.ciphertext);
+        const [cipherBytes, cipherErr] = base64ToBytes(envelope.ciphertext);
         if (cipherErr) return [null, cipherErr];
 
-        const [key, deriveErr] = await KeyDerivation.deriveKey(password, saltBytes, { iterations: k.iterations });
+        const [key, deriveErr] = await KeyDerivation.deriveKey(password, saltBytes, { iterations: envelope.kdf.iterations });
         if (deriveErr) return [null, deriveErr];
 
-        const bindingData = utf8ToBytes(`${EXPORT_FORMAT}/v${EXPORT_VERSION}`);
+        const bindingData = utf8ToBytes(`${envelope.format}/v${envelope.version}`);
         const [docBytes, decErr] = await Encryption.decrypt(cipherBytes, key, ivBytes, { additionalData: bindingData });
         if (decErr) {
             return [null, new Error('Import failed: wrong password or corrupted envelope')];
@@ -848,3 +957,6 @@ export class PasswordVault {
         return new PasswordVault([], this.metadata, false, null, null);
     }
 }
+
+PasswordVault.packExportEnvelope = packExportEnvelope;
+PasswordVault.unpackExportEnvelope = unpackExportEnvelope;

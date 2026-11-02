@@ -5,6 +5,7 @@ import { base64ToBytes } from '../../utils/encoding.js';
 import { getCarrierPool } from '../../codec/carrier-pool.js';
 import { StegoEngine } from './stego-engine.js';
 import { unsealOpaque } from './opaque-container.js';
+import { parseStegoPayload } from './stego-payload.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -68,16 +69,11 @@ export class BatchExtractor {
                     for (const wire of result.candidateWires) {
                         const [payload, unsealErr] = await unsealOpaque(wire, password, options.kdfOpts);
                         if (!unsealErr && payload) {
-                            try {
-                                const parsed = JSON.parse(new TextDecoder().decode(payload));
-                                if (parsed && parsed.data) {
-                                    const [rawBytes] = base64ToBytes(parsed.data);
-                                    result.secretData = rawBytes;
-                                    result.secretMetadata = parsed.metadata || null;
-                                } else {
-                                    result.secretData = payload;
-                                }
-                            } catch {
+                            const [parsed, parseErr] = parseStegoPayload(payload);
+                            if (!parseErr && parsed) {
+                                result.secretData = parsed.secretData;
+                                result.secretMetadata = parsed.secretMetadata;
+                            } else {
                                 result.secretData = payload;
                             }
                             break;

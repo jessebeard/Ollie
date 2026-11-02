@@ -20,7 +20,8 @@ import {
 import { calculateJUniwardCosts } from './juniward.js';
 import { stcEmbed, stcExtract, bytesToBits, bitsToBytes } from './stc-matrix.js';
 import { sha256 } from '../cryptography/crypto-provider.js';
-import { deriveStegoKeys } from '../cryptography/kdf-chain.js';
+import { deriveStegoKeys, deriveCarrierMasterKey, deriveEnvelopeKeysV41 } from '../cryptography/kdf-chain.js';
+import { calculateCarrierSalt } from './carrier-salt.js';
 
 export const STC_MATRIX_CONTEXT = 'ollie/v4/stc-matrix/';
 export const MAX_STEGO_PAYLOAD_BYTES = 131072; // 128 KB safety ceiling per carrier to prevent excessive memory/trellis growth
@@ -49,6 +50,8 @@ export class StegoEngine {
      * @param {Array<Int32Array>} blocks - Quantized DCT blocks
      * @param {Object} [options]
      * @param {number} [options.targetBpnzAC=0.05] - Target bits per non-zero AC (default safe 0.05)
+     * @param {boolean} [options.luminanceOnly] - Restrict capacity scan to luminance blocks
+     * @param {number} [options.yBlockCount] - Count of luminance blocks
      * @returns {number} Available capacity in bytes for user payload
      */
     static calculateCapacity(blocks, options = {}) {
@@ -80,6 +83,8 @@ export class StegoEngine {
      *
      * @param {Array<Int32Array>} blocks
      * @param {Object} [options]
+     * @param {boolean} [options.luminanceOnly] - Restrict scan to luminance blocks
+     * @param {number} [options.yBlockCount] - Count of luminance blocks
      * @returns {{ values: Int32Array, locations: Uint32Array }}
      */
     static getNonZeroAC(blocks, options = {}) {
@@ -167,10 +172,22 @@ export class StegoEngine {
      * @param {Uint8Array} payload - Secret payload bytes
      * @param {string|Uint8Array} password - Master password
      * @param {Object} [options]
-     * @param {Float32Array} [options.qTable] - Quantization table for spatial IDCT
+     * @param {Float32Array|Int32Array|Array<number>} [options.qTable] - Quantization table for spatial IDCT
+     * @param {Array<Float32Array>} [options.qTables] - Array of quantization tables
      * @param {number} [options.bucketSize] - Explicit bucket size
      * @param {Object} [options.kdfOpts] - Custom KDF options
      * @param {number} [options.targetBpnzAC] - Target bits per non-zero AC
+     * @param {Uint8Array} [options.sealedWire] - Pre-sealed wire container
+     * @param {string} [options.stcSeed] - Pre-derived STC seed hash
+     * @param {string|Uint8Array} [options.costSeed] - Pre-derived cost seed
+     * @param {number} [options.yBlockCount] - Total luminance blocks
+     * @param {number} [options.chromaPenalty] - Chroma distortion penalty
+     * @param {boolean} [options.asymmetric] - Asymmetric cost scaling
+     * @param {boolean} [options.directionalWavelet] - Directional wavelets
+     * @param {boolean} [options.luminanceOnly] - Restrict to luminance
+     * @param {Uint8Array} [options.carrierSalt] - Explicit carrier salt
+     * @param {boolean} [options.useCarrierSalt] - Use carrier-derived salt
+     * @param {number} [options.maxW] - STC maximum submatrix width
      * @returns {Promise<[boolean|null, Error|null]>}
      */
     static async embed(blocks, payload, password, options = {}) {
@@ -179,6 +196,9 @@ export class StegoEngine {
         }
 
         let wire;
+        let stcSeed = options.stcSeed;
+        let costSeed = options.costSeed;
+
         if (options.sealedWire) {
             wire = options.sealedWire;
         } else {
@@ -191,9 +211,34 @@ export class StegoEngine {
 
             const effectivePassword = password || 'OL4S:v4:public';
             const bucketSize = options.bucketSize || selectBucketSize(payload.length);
-            const [sealed, sealErr] = await sealOpaque(payload, effectivePassword, { bucketSize, kdfOpts: options.kdfOpts });
-            if (sealErr) return [null, sealErr];
-            wire = sealed;
+
+            // 1. Format v4.1 Decoupled Carrier Salt Derivation
+            if (options.useCarrierSalt || options.carrierSalt) {
+                const [carrierSalt, saltErr] = options.carrierSalt
+                    ? [options.carrierSalt, null]
+                    : await calculateCarrierSalt(blocks, options.qTables || (options.qTable ? [options.qTable] : null));
+                if (!saltErr && carrierSalt) {
+                    const [carrierKeys, kdfErr] = await deriveCarrierMasterKey(effectivePassword, carrierSalt, options.kdfOpts);
+                    if (!kdfErr && carrierKeys) {
+                        stcSeed = options.stcSeed || Array.from(carrierKeys.stcSeed, b => b.toString(16).padStart(2, '0')).join('');
+                        costSeed = options.costSeed || carrierKeys.costSeed;
+                        const [sealed, sealErr] = await sealOpaque(payload, effectivePassword, {
+                            bucketSize,
+                            masterKey: carrierKeys.masterKey,
+                            kdfOpts: options.kdfOpts
+                        });
+                        if (sealErr) return [null, sealErr];
+                        wire = sealed;
+                    }
+                }
+            }
+
+            // 2. Standard / v4.0 fallback
+            if (!wire) {
+                const [sealed, sealErr] = await sealOpaque(payload, effectivePassword, { bucketSize, kdfOpts: options.kdfOpts });
+                if (sealErr) return [null, sealErr];
+                wire = sealed;
+            }
         }
 
         const messageBits = bytesToBits(wire);
@@ -207,10 +252,12 @@ export class StegoEngine {
             )];
         }
 
-        const stcSeed = options.stcSeed || await this.resolveSTCSeed(password || 'OL4S:v4:public', options);
+        if (!stcSeed) {
+            stcSeed = options.stcSeed || await this.resolveSTCSeed(password || 'OL4S:v4:public', options);
+        }
 
         const { rhoPlus: fullRhoPlus, rhoMinus: fullRhoMinus } = calculateJUniwardCosts(blocks, options.qTable, {
-            costSeed: stcSeed,
+            costSeed: costSeed || stcSeed,
             includeIndices: false,
             yBlockCount: options.yBlockCount,
             chromaPenalty: options.chromaPenalty !== undefined ? options.chromaPenalty : 4.0,
@@ -249,6 +296,10 @@ export class StegoEngine {
      * @param {Array<Int32Array>} blocks - Quantized DCT blocks
      * @param {Object} [options]
      * @param {string} [options.stcSeed] - Pre-derived STC seed hash
+     * @param {number} [options.targetBpnzAC] - Target bits per non-zero AC
+     * @param {boolean} [options.luminanceOnly] - Restrict to luminance
+     * @param {number} [options.yBlockCount] - Total luminance blocks
+     * @param {number} [options.maxW] - STC maximum submatrix width
      * @returns {Array<Uint8Array>} Array of candidate wire byte buffers
      */
     static extractCandidateWires(blocks, options = {}) {
@@ -291,13 +342,21 @@ export class StegoEngine {
     }
 
     /**
-     * Extracts secret payload from JPEG DCT blocks using Format v4.
+     * Extracts secret payload from JPEG DCT blocks using Format v4.1 or v4.0.
      *
      * @param {Array<Int32Array>} blocks - Quantized DCT blocks
      * @param {string|Uint8Array} [password] - Master password
      * @param {Object} [options]
      * @param {Object} [options.kdfOpts] - Custom KDF options
      * @param {number} [options.targetBpnzAC] - Target bits per non-zero AC
+     * @param {boolean} [options.luminanceOnly] - Restrict to luminance
+     * @param {number} [options.yBlockCount] - Total luminance blocks
+     * @param {boolean} [options.useCarrierSalt] - Extract using carrier-derived salt
+     * @param {Uint8Array} [options.carrierSalt] - Explicit carrier salt
+     * @param {Float32Array|Int32Array|Array<number>} [options.qTable] - Quantization table
+     * @param {Array<Float32Array>} [options.qTables] - Quantization tables
+     * @param {number} [options.maxW] - STC maximum submatrix width
+     * @param {string} [options.stcSeed] - Pre-derived STC seed hash
      * @returns {Promise<[Uint8Array|null, Error|null]>}
      */
     static async extract(blocks, password, options = {}) {
@@ -308,7 +367,6 @@ export class StegoEngine {
         const effectivePassword = password || 'OL4S:v4:public';
         const { values: stegoValues } = this.getNonZeroAC(blocks, options);
         const totalNZ = stegoValues.length;
-        const stcSeed = await this.resolveSTCSeed(effectivePassword, options);
 
         // Try candidate bucket sizes from smallest fitting up to largest
         const candidateBuckets = STANDARD_BUCKETS.filter(b => {
@@ -326,13 +384,48 @@ export class StegoEngine {
             yBlockCount: options.yBlockCount
         });
 
-        // Sort candidate buckets so the most probable bucket based on carrier capacity is tried first.
         candidateBuckets.sort((a, b) => {
             const diffA = Math.abs(a - perceivedCapacity);
             const diffB = Math.abs(b - perceivedCapacity);
             return diffA - diffB;
         });
 
+        // 1. Format v4.1 Carrier Salt Extraction Path
+        if (options.useCarrierSalt || options.carrierSalt) {
+            const [carrierSalt, saltErr] = options.carrierSalt
+                ? [options.carrierSalt, null]
+                : await calculateCarrierSalt(blocks, options.qTables || (options.qTable ? [options.qTable] : null));
+            if (!saltErr && carrierSalt) {
+                const [carrierKeys, cErr] = await deriveCarrierMasterKey(effectivePassword, carrierSalt, options.kdfOpts);
+                if (!cErr && carrierKeys) {
+                    const stcSeedV41 = Array.from(carrierKeys.stcSeed, b => b.toString(16).padStart(2, '0')).join('');
+                    for (const bucket of candidateBuckets) {
+                        const wireLen = SALT_BYTES + bucket + TAG_BYTES;
+                        const messageBitLength = wireLen * 8;
+
+                        const extractedBits = stcExtract(stegoValues, messageBitLength, {
+                            h: 8,
+                            maxW: options.maxW,
+                            seed: stcSeedV41
+                        });
+                        const extractedWire = bitsToBytes(extractedBits);
+                        const envelopeSalt = extractedWire.subarray(0, SALT_BYTES);
+                        const ciphertext = extractedWire.subarray(SALT_BYTES);
+
+                        const [envKeys, envErr] = await deriveEnvelopeKeysV41(carrierKeys.masterKey, envelopeSalt);
+                        if (envErr || !envKeys) continue;
+
+                        const [payload, unsealErr] = await unsealWithKeys(ciphertext, envKeys);
+                        if (!unsealErr && payload) {
+                            return [payload, null];
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Format v4.0 Legacy Extraction Path Fallback
+        const stcSeedV40 = options.stcSeed || await this.resolveSTCSeed(effectivePassword, options);
         const keyCache = new Map();
 
         for (const bucket of candidateBuckets) {
@@ -342,7 +435,7 @@ export class StegoEngine {
             const extractedBits = stcExtract(stegoValues, messageBitLength, {
                 h: 8,
                 maxW: options.maxW,
-                seed: stcSeed
+                seed: stcSeedV40
             });
             const extractedWire = bitsToBytes(extractedBits);
             const salt = extractedWire.subarray(0, SALT_BYTES);

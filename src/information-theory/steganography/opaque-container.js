@@ -7,7 +7,7 @@
  * - Real payload length, deflated content, and CSPRNG padding are sealed inside the ciphertext.
  * - Unencrypted bits in the carrier are mathematically indistinguishable from random noise.
  */
-import { deriveStegoKeys } from '../cryptography/kdf-chain.js';
+import { deriveStegoKeys, deriveEnvelopeKeysV41, deriveStegoKeysV41 } from '../cryptography/kdf-chain.js';
 import { deflate, inflate } from '../../utils/compression.js';
 import { getCrypto } from '../cryptography/crypto-provider.js';
 
@@ -18,6 +18,7 @@ export const STANDARD_BUCKETS = [
 export const SALT_BYTES = 16;
 export const TAG_BYTES = 16;
 export const LENGTH_HEADER_BYTES = 4;
+export const COMPRESSED_FLAG = 0x80000000 >>> 0;
 
 /**
  * Finds the smallest standard capacity bucket that fits the given payload.
@@ -51,20 +52,34 @@ export async function packFramedPayload(payload, bucketSize) {
     }
 
     const [compressed, compErr] = await deflate(payload);
-    if (compErr) return [null, compErr];
+    let storeData;
+    let isCompressed = false;
+    let storedLen = payload.length;
 
-    if (compressed.length + LENGTH_HEADER_BYTES > bucketSize) {
+    // Only compress if it genuinely saves space; otherwise store uncompressed to avoid 5-byte Deflate expansion
+    if (!compErr && compressed && compressed.length < payload.length) {
+        storeData = compressed;
+        isCompressed = true;
+        storedLen = compressed.length;
+    } else {
+        storeData = payload;
+        isCompressed = false;
+        storedLen = payload.length;
+    }
+
+    if (storedLen + LENGTH_HEADER_BYTES > bucketSize) {
         return [null, new Error(
-            `opaque-container: payload (${compressed.length + LENGTH_HEADER_BYTES}B compressed) exceeds bucket size (${bucketSize}B)`
+            `opaque-container: payload (${storedLen + LENGTH_HEADER_BYTES}B) exceeds bucket size (${bucketSize}B)`
         )];
     }
 
     const frame = new Uint8Array(bucketSize);
-    new DataView(frame.buffer, frame.byteOffset, frame.byteLength).setUint32(0, compressed.length, false);
-    frame.set(compressed, LENGTH_HEADER_BYTES);
+    const headerVal = ((isCompressed ? COMPRESSED_FLAG : 0) | storedLen) >>> 0;
+    new DataView(frame.buffer, frame.byteOffset, frame.byteLength).setUint32(0, headerVal, false);
+    frame.set(storeData, LENGTH_HEADER_BYTES);
 
     // Fill remaining padding with CSPRNG bytes so padding is indistinguishable from random data
-    const padStart = LENGTH_HEADER_BYTES + compressed.length;
+    const padStart = LENGTH_HEADER_BYTES + storedLen;
     const padLen = bucketSize - padStart;
     if (padLen > 0) {
         const [cryptoObj, cryptoErr] = getCrypto();
@@ -93,14 +108,20 @@ export async function unpackFramedPayload(plaintext) {
     }
 
     const view = new DataView(plaintext.buffer, plaintext.byteOffset, plaintext.byteLength);
-    const compressedLen = view.getUint32(0, false);
+    const headerVal = view.getUint32(0, false);
+    const isCompressed = (headerVal & COMPRESSED_FLAG) !== 0;
+    const payloadLen = headerVal & 0x7FFFFFFF;
 
-    if (compressedLen > plaintext.length - LENGTH_HEADER_BYTES) {
+    if (payloadLen > plaintext.length - LENGTH_HEADER_BYTES) {
         return [null, new Error('opaque-container: corrupted length framing')];
     }
 
-    const compressed = plaintext.subarray(LENGTH_HEADER_BYTES, LENGTH_HEADER_BYTES + compressedLen);
-    return inflate(compressed);
+    const payloadSlice = plaintext.subarray(LENGTH_HEADER_BYTES, LENGTH_HEADER_BYTES + payloadLen);
+    if (isCompressed) {
+        return inflate(payloadSlice);
+    } else {
+        return [payloadSlice, null];
+    }
 }
 
 /**
@@ -119,8 +140,20 @@ export async function sealOpaque(payload, password, options = {}) {
     const salt = new Uint8Array(SALT_BYTES);
     cryptoObj.getRandomValues(salt);
 
-    const [keys, kdfErr] = await deriveStegoKeys(password, salt, options.kdfOpts);
-    if (kdfErr) return [null, kdfErr];
+    let keys;
+    if (options.masterKey) {
+        const [envKeys, envErr] = await deriveEnvelopeKeysV41(options.masterKey, salt);
+        if (envErr) return [null, envErr];
+        keys = envKeys;
+    } else if (options.carrierSalt) {
+        const [stegoKeys, kdfErr] = await deriveStegoKeysV41(password, options.carrierSalt, salt, options.kdfOpts);
+        if (kdfErr) return [null, kdfErr];
+        keys = stegoKeys;
+    } else {
+        const [stegoKeys, kdfErr] = await deriveStegoKeys(password, salt, options.kdfOpts);
+        if (kdfErr) return [null, kdfErr];
+        keys = stegoKeys;
+    }
 
     const bucketSize = options.bucketSize || selectBucketSize(payload.length);
     const [framed, packErr] = await packFramedPayload(payload, bucketSize);
@@ -201,8 +234,20 @@ export async function unsealOpaque(wire, password, options = {}) {
     const salt = wire.subarray(0, SALT_BYTES);
     const ciphertext = wire.subarray(SALT_BYTES);
 
-    const [keys, kdfErr] = await deriveStegoKeys(password, salt, options.kdfOpts);
-    if (kdfErr) return [null, kdfErr];
+    let keys;
+    if (options.masterKey) {
+        const [envKeys, envErr] = await deriveEnvelopeKeysV41(options.masterKey, salt);
+        if (envErr) return [null, envErr];
+        keys = envKeys;
+    } else if (options.carrierSalt) {
+        const [stegoKeys, kdfErr] = await deriveStegoKeysV41(password, options.carrierSalt, salt, options.kdfOpts);
+        if (kdfErr) return [null, kdfErr];
+        keys = stegoKeys;
+    } else {
+        const [stegoKeys, kdfErr] = await deriveStegoKeys(password, salt, options.kdfOpts);
+        if (kdfErr) return [null, kdfErr];
+        keys = stegoKeys;
+    }
 
     return unsealWithKeys(ciphertext, keys);
 }

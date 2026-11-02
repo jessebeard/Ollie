@@ -90,7 +90,7 @@ flowchart TB
     end
 
     subgraph IT["information-theory"]
-        STEGO["steganography<br/>StegoEngine · OpaqueContainer · STCMatrix · JUniward"]
+        STEGO["steganography<br/>StegoEngine · OpaqueContainer · STCMatrix · JUniward · CarrierSalt · StegoPayload"]
         BATCH["batch-embedder · batch-extractor · chunk-manager"]
         MANIFEST["carrier-manifest<br/>HMAC-authenticated set summaries"]
         CSS["secret-sharing<br/>gf-shamir · css-envelope · cauchy-ec"]
@@ -195,6 +195,8 @@ flowchart LR
 
     subgraph IT_LAYER["information-theory/"]
         stego["stego-engine.js"]
+        csalt["carrier-salt.js"]
+        spayload["stego-payload.js"]
         opaque["opaque-container.js"]
         stc["stc-matrix.js"]
         juniward["juniward.js"]
@@ -262,17 +264,25 @@ flowchart LR
     bem --> cm
     bem --> trans
     bem --> stego
+    bem --> spayload
     bem --> cman
     bem --> cauchy
     bem --> env
     bex --> cm
     bex --> dec
+    bex --> spayload
     bex --> cman
     bex --> env
     bex --> cauchy
     bex --> encod
     cman --> encod
 
+    enc --> spayload
+    dec --> spayload
+    spayload --> cman
+
+    stego --> csalt
+    stego --> spayload
     stego --> opaque
     stego --> stc
     stego --> juniward
@@ -297,14 +307,16 @@ flowchart LR
 
 ---
 
-## 4. Format v4 Steganographic Embed/Extract Pipeline
+## 4. Format v4.1 Steganographic Embed/Extract Pipeline
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as User / UI / CLI
     participant E as JpegEncoder / Transcoder
+    participant SP as StegoPayload (Binary Framing)
     participant SE as StegoEngine.embed
+    participant CS as CarrierSalt (DC Nonce)
     participant OC as OpaqueContainer.sealOpaque
     participant KDF as KDFChain (Argon2id + HKDF)
     participant JUNI as J-UNIWARD (Daubechies db8)
@@ -312,21 +324,28 @@ sequenceDiagram
 
     U->>E: encode(imageData, payload, password)
     E->>E: Flatten quantized DCT blocks (AC coefficients)
-    E->>SE: embed(blocks, payload, password)
+    E->>SP: serializePayloadV41(chunkData, metadata)
+    SP-->>E: binarySliceFrame [41, checksum, metaLen, metaBytes, rawBytes]
+    E->>SE: embed(blocks, framedPayload, password)
     
-    SE->>OC: sealOpaque(payload, password, { bucketSize })
-    OC->>KDF: deriveStegoKeys(password, salt) [t=3, m=64MB, p=1]
-    KDF-->>OC: { aesKey, aesIV, stcSeed, costSeed }
-    OC->>OC: Deflate/Framing + CSPRNG noise bucket padding
-    OC->>OC: AES-256-GCM encrypt
-    OC-->>SE: wireEnvelope = [Salt:16B] || [Ciphertext:B+16B]
+    SE->>CS: calculateCarrierSalt(blocks, qTables)
+    CS-->>SE: carrierSalt (32-byte canonical DC nonce)
+    SE->>KDF: deriveCarrierMasterKey(password, carrierSalt) [t=3, m=64MB, p=1]
+    KDF-->>SE: { masterKey, stcSeed, costSeed }
+    
+    SE->>OC: sealOpaque(framedPayload, password, { bucketSize, masterKey })
+    OC->>KDF: deriveEnvelopeKeysV41(masterKey, freshEnvelopeSalt: 16B)
+    KDF-->>OC: { aesKey, aesIV, prkEnv }
+    OC->>OC: packFramedPayload (Bit-31 Deflate bypass + CSPRNG noise padding)
+    OC->>OC: AES-256-GCM encrypt under fresh (aesKey, aesIV)
+    OC-->>SE: wireEnvelope = [EnvelopeSalt:16B] || [Ciphertext:B+16B]
 
     SE->>JUNI: calculateJUniwardCosts(blocks, qTable, { costSeed })
-    Note over JUNI: 2D IDCT -> 3 directional wavelet subbands -> spatial sensitivity map -> rho AC costs
+    Note over JUNI: 2D IDCT -> 3 directional wavelet subbands -> spatial sensitivity map -> rho AC costs (detailed balance)
     JUNI-->>SE: { rhoPlus, rhoMinus }
 
     SE->>STC: stcEmbed(coverAC, wireBits, rhoPlus, rhoMinus, { h:8, seed:stcSeed })
-    Note over STC: Viterbi dynamic programming over H_hat parity trellis (w <= 4, algebraic predecessor recovery, 2-bit packed transitions)
+    Note over STC: Viterbi dynamic programming over H_hat parity trellis (w <= 4, algebraic predecessor recovery)
     STC-->>SE: stegoAC
     SE->>E: Write stego coefficients back to DCT blocks
     E-->>U: Stego JPEG carrier

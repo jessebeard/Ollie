@@ -9,6 +9,7 @@ const CHUNK_SAFETY_FACTOR = 0.8;
 import { JpegEncoder } from '../../codec/encoder.js';
 import { StegoEngine } from './stego-engine.js';
 import { sealOpaque } from './opaque-container.js';
+import { serializePayloadV41 } from './stego-payload.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -316,18 +317,15 @@ export class BatchEmbedder {
                     macKey,
                     ec: { k, n: totalBlocks, size: envelopeSize, stripeSize: plan.stripeSize }
                 };
-                if (carrierItems[i].shares && carrierItems[i].shares.length === 1) {
-                    manifestSpec.share = {
-                        index: carrierItems[i].shares[0].index,
-                        threshold: k,
-                        data: bytesToBase64(carrierItems[i].shares[0].data)
-                    };
-                } else if (carrierItems[i].shares && carrierItems[i].shares.length > 1) {
+                if (carrierItems[i].shares && carrierItems[i].shares.length > 0) {
                     manifestSpec.shares = carrierItems[i].shares.map(s => ({
                         index: s.index,
                         threshold: k,
                         data: bytesToBase64(s.data)
                     }));
+                    if (carrierItems[i].shares.length === 1) {
+                        manifestSpec.share = manifestSpec.shares[0];
+                    }
                 }
                 const [manifest, manifestErr] = await createManifest(manifestSpec);
                 if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
@@ -353,10 +351,10 @@ export class BatchEmbedder {
 
             let transcodeOpts;
             if (options.password) {
-                const carrierPayload = new TextEncoder().encode(JSON.stringify({
-                    data: bytesToBase64(chunkData),
-                    metadata
-                }));
+                const [carrierPayload, serErr] = serializePayloadV41(chunkData, metadata);
+                if (serErr) {
+                    throw new Error(`Failed to serialize payload: ${serErr.message}`);
+                }
                 const [sealedWire, sealErr] = await sealOpaque(carrierPayload, options.password);
                 if (sealErr) {
                     throw new Error(`Failed to seal payload: ${sealErr.message}`);

@@ -25,7 +25,7 @@ import { assembleBlocks, componentsToImageData, grayscaleToImageData } from '../
 
 import { parseSpiffHeader } from '../automata/parsers/spiff-parser.js';
 import { StegoEngine } from '../information-theory/steganography/stego-engine.js';
-import { base64ToBytes } from '../utils/encoding.js';
+import { parseStegoPayload } from '../information-theory/steganography/stego-payload.js';
 import { logger } from '../utils/logger.js';
 
 export class JpegDecoder {
@@ -259,18 +259,13 @@ export class JpegDecoder {
 
                 const [extractedPayload, extractErr] = await StegoEngine.extract(allBlocks, options.password, options);
                 if (!extractErr && extractedPayload) {
-                    try {
-                        const parsed = JSON.parse(new TextDecoder().decode(extractedPayload));
-                        if (parsed && parsed.data) {
-                            const [rawBytes] = base64ToBytes(parsed.data);
-                            extractedSecretData = {
-                                data: rawBytes,
-                                metadata: parsed.metadata
-                            };
-                        } else {
-                            extractedSecretData = extractedPayload;
-                        }
-                    } catch {
+                    const [parsed, parseErr] = parseStegoPayload(extractedPayload);
+                    if (!parseErr && parsed) {
+                        extractedSecretData = {
+                            data: parsed.secretData,
+                            metadata: parsed.secretMetadata
+                        };
+                    } else {
                         extractedSecretData = extractedPayload;
                     }
                     logger.debug('Successfully extracted Format v4 secret payload.');

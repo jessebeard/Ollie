@@ -20,6 +20,34 @@ import { bytesToBase64, base64ToBytes, utf8ToBytes } from '../../utils/encoding.
 export const MANIFEST_FORMAT = 'ollie-manifest';
 export const MANIFEST_VERSION = 1;
 
+/**
+ * Positional Indices for Format v4.1 Manifest Tuples (Rule 16: Positional Serialized Arrays):
+ * [0]  format      - 'ollie-manifest' (string)
+ * [1]  version     - integer version (number)
+ * [2]  chunkSetId  - UUID (string)
+ * [3]  total       - total chunk count (uint32)
+ * [4]  revision    - revision number (uint32)
+ * [5]  created     - ISO 8601 string or numeric timestamp
+ * [6]  entries     - Array of [index: number, checksum: number] tuples
+ * [7]  kdf         - [algo: string, iterations: number, salt: string] | null
+ * [8]  ec          - [k: number, n: number, size: number] | null
+ * [9]  shares      - Array of [index: number, threshold: number, data: string] | null
+ * [10] mac         - HMAC-SHA256 base64 string | null
+ */
+export const MANIFEST_TUPLE_FORMAT = 0;
+export const MANIFEST_TUPLE_VERSION = 1;
+export const MANIFEST_TUPLE_CHUNK_SET_ID = 2;
+export const MANIFEST_TUPLE_TOTAL = 3;
+export const MANIFEST_TUPLE_REVISION = 4;
+export const MANIFEST_TUPLE_CREATED = 5;
+export const MANIFEST_TUPLE_ENTRIES = 6;
+export const MANIFEST_TUPLE_KDF = 7;
+export const MANIFEST_TUPLE_EC = 8;
+export const MANIFEST_TUPLE_SHARES = 9;
+export const MANIFEST_TUPLE_MAC = 10;
+export const MANIFEST_TUPLE_LENGTH = 11;
+export const MANIFEST_CORE_TUPLE_LENGTH = 10;
+
 // Mirrors the wire-format spec section 3.2 KDF iteration bounds.
 const MIN_KDF_ITERATIONS = 50000;
 const MAX_KDF_ITERATIONS = 10000000;
@@ -30,6 +58,162 @@ function isUint32(v) {
 
 function isNonEmptyString(v, maxLen = Infinity) {
     return typeof v === 'string' && v.length > 0 && v.length <= maxLen;
+}
+
+/**
+ * Packs an internal manifest record into a compact positional array tuple.
+ * Eliminates labeled JSON string keys from storage and wire representations.
+ *
+ * @param {Object|Array} manifest
+ * @returns {[Array|null, Error|null]}
+ */
+export function packManifest(manifest) {
+    if (!manifest) return [null, new Error('manifest: manifest required')];
+    if (Array.isArray(manifest)) return [manifest, null];
+    if (typeof manifest !== 'object') return [null, new Error('manifest: expected an object')];
+
+    const entriesTuple = Array.isArray(manifest.entries)
+        ? manifest.entries.map(e => Array.isArray(e) ? e : [e.index, e.checksum])
+        : [];
+    const kdfTuple = manifest.kdf
+        ? (Array.isArray(manifest.kdf) ? manifest.kdf : [manifest.kdf.algo, manifest.kdf.iterations, manifest.kdf.salt])
+        : null;
+    const ecTuple = manifest.ec
+        ? (Array.isArray(manifest.ec) ? manifest.ec : [manifest.ec.k, manifest.ec.n, manifest.ec.size])
+        : null;
+
+    let rawShares = manifest.shares;
+    if (!rawShares && manifest.share) {
+        rawShares = [manifest.share];
+    }
+    const sharesTuple = Array.isArray(rawShares)
+        ? rawShares.map(s => (Array.isArray(s) ? s : [s.index, s.threshold, s.data]))
+        : null;
+
+    const tuple = [
+        manifest.format || MANIFEST_FORMAT,
+        Number.isInteger(manifest.version) ? manifest.version : MANIFEST_VERSION,
+        manifest.chunkSetId || '',
+        Number.isInteger(manifest.total) ? manifest.total : entriesTuple.length,
+        Number.isInteger(manifest.revision) ? manifest.revision : 0,
+        manifest.created !== undefined ? manifest.created : new Date().toISOString(),
+        entriesTuple,
+        kdfTuple,
+        ecTuple,
+        sharesTuple,
+        manifest.mac || null
+    ];
+
+    return [tuple, null];
+}
+
+/**
+ * Unpacks and strictly validates a positional manifest tuple into an internal record.
+ * Fails closed on any unexpected length, type mismatch, or invariant deviation.
+ *
+ * @param {Array|Object} input - Positional manifest tuple (or legacy manifest object)
+ * @returns {[Object|null, Error|null]}
+ */
+export function unpackManifest(input) {
+    if (!input) return [null, new Error('manifest: input required')];
+    if (typeof input === 'object' && !Array.isArray(input)) {
+        return [input, null];
+    }
+    if (!Array.isArray(input)) {
+        return [null, new Error('manifest: expected an array tuple')];
+    }
+    if (input.length !== MANIFEST_TUPLE_LENGTH && input.length !== 12) {
+        return [null, new Error(`manifest: invalid tuple length ${input.length}, expected ${MANIFEST_TUPLE_LENGTH}`)];
+    }
+
+    let format, version, chunkSetId, total, revision, created, entriesRaw, kdfRaw, ecRaw, sharesRaw, mac;
+
+    if (input.length === 12) {
+        let shareRaw;
+        [format, version, chunkSetId, total, revision, created, entriesRaw, kdfRaw, ecRaw, sharesRaw, shareRaw, mac] = input;
+        if (!sharesRaw && shareRaw) {
+            sharesRaw = [shareRaw];
+        }
+    } else {
+        [format, version, chunkSetId, total, revision, created, entriesRaw, kdfRaw, ecRaw, sharesRaw, mac] = input;
+    }
+
+    if (format !== MANIFEST_FORMAT) {
+        return [null, new Error('manifest: unknown format')];
+    }
+    if (version !== MANIFEST_VERSION) {
+        return [null, new Error('manifest: unsupported version')];
+    }
+    if (!isNonEmptyString(chunkSetId, 64)) {
+        return [null, new Error('manifest: bad chunkSetId')];
+    }
+    if (!Number.isInteger(total) || total < 1 || total > 4096) {
+        return [null, new Error('manifest: bad total')];
+    }
+    if (!Number.isInteger(revision) || revision < 0) {
+        return [null, new Error('manifest: bad revision')];
+    }
+    if (typeof created !== 'string' && !Number.isInteger(created)) {
+        return [null, new Error('manifest: bad created')];
+    }
+
+    let entries = [];
+    if (Array.isArray(entriesRaw)) {
+        entries = new Array(entriesRaw.length);
+        for (let i = 0; i < entriesRaw.length; i++) {
+            const e = entriesRaw[i];
+            if (Array.isArray(e) && e.length === 2) {
+                entries[i] = { index: e[0], checksum: e[1] };
+            } else if (e && typeof e === 'object') {
+                entries[i] = { index: e.index, checksum: e.checksum };
+            } else {
+                return [null, new Error(`manifest: entry ${i} malformed`)];
+            }
+        }
+    }
+
+    let kdf = undefined;
+    if (Array.isArray(kdfRaw) && kdfRaw.length === 3) {
+        kdf = { algo: kdfRaw[0], iterations: kdfRaw[1], salt: kdfRaw[2] };
+    } else if (kdfRaw && typeof kdfRaw === 'object' && !Array.isArray(kdfRaw)) {
+        kdf = kdfRaw;
+    }
+
+    let ec = undefined;
+    if (Array.isArray(ecRaw) && ecRaw.length === 3) {
+        ec = { k: ecRaw[0], n: ecRaw[1], size: ecRaw[2] };
+    } else if (ecRaw && typeof ecRaw === 'object' && !Array.isArray(ecRaw)) {
+        ec = ecRaw;
+    }
+
+    let shares = undefined;
+    if (Array.isArray(sharesRaw)) {
+        shares = sharesRaw.map(s => {
+            if (Array.isArray(s) && s.length === 3) {
+                return { index: s[0], threshold: s[1], data: s[2] };
+            }
+            return s;
+        });
+    }
+
+    const share = (shares && shares.length > 0) ? shares[0] : undefined;
+
+    const manifestObj = {
+        format,
+        version,
+        chunkSetId,
+        total,
+        revision,
+        created,
+        entries,
+        ...(kdf ? { kdf } : {}),
+        ...(ec ? { ec } : {}),
+        ...(shares ? { shares } : {}),
+        ...(share ? { share } : {}),
+        ...(mac ? { mac } : {})
+    };
+
+    return [manifestObj, null];
 }
 
 /**
@@ -70,7 +254,21 @@ export async function deriveMacKey(password, kdf) {
  * @returns {[Uint8Array|null, Error|null]}
  */
 export function canonicalManifestBytes(manifest) {
-    if (!manifest || typeof manifest !== 'object') {
+    if (!manifest) {
+        return [null, new Error('manifest: expected an object or array')];
+    }
+
+    if (Array.isArray(manifest)) {
+        if (manifest.length !== MANIFEST_TUPLE_LENGTH && manifest.length !== MANIFEST_CORE_TUPLE_LENGTH && manifest.length !== 12 && manifest.length !== 11) {
+            return [null, new Error(`manifest: invalid tuple length ${manifest.length}`)];
+        }
+        const coreTuple = manifest.length === MANIFEST_TUPLE_LENGTH
+            ? manifest.slice(0, MANIFEST_CORE_TUPLE_LENGTH)
+            : (manifest.length === 12 ? manifest.slice(0, 11) : manifest);
+        return [utf8ToBytes(JSON.stringify(coreTuple)), null];
+    }
+
+    if (typeof manifest !== 'object') {
         return [null, new Error('manifest: expected an object')];
     }
 
@@ -125,7 +323,12 @@ export function canonicalManifestBytes(manifest) {
  * @returns {Error|null} Typed error, or null when structurally valid
  */
 export function validateManifestStructure(m) {
-    if (!m || typeof m !== 'object') return new Error('manifest: expected an object');
+    if (!m) return new Error('manifest: expected an object');
+    if (Array.isArray(m)) {
+        const [, err] = unpackManifest(m);
+        return err;
+    }
+    if (typeof m !== 'object') return new Error('manifest: expected an object');
     if (m.format !== MANIFEST_FORMAT) return new Error('manifest: unknown format');
     if (m.version !== MANIFEST_VERSION) return new Error('manifest: unsupported version');
     if (!isNonEmptyString(m.chunkSetId, 64)) return new Error('manifest: bad chunkSetId');
@@ -291,13 +494,20 @@ export async function createManifest(spec) {
  * Verifies a manifest's structure and MAC under the given password or pre-derived CryptoKey.
  * Structural problems yield tuple errors; authentication failure yields false.
  *
- * @param {Object} manifest
+ * @param {Object|Array} manifestOrTuple
  * @param {string|CryptoKey} passwordOrKey
  * @param {Object} [options]
  * @param {CryptoKey} [options.macKey] - Optional pre-derived HMAC key (ephemeral, avoids re-deriving)
  * @returns {Promise<[boolean|null, Error|null]>}
  */
-export async function verifyManifest(manifest, passwordOrKey, options = {}) {
+export async function verifyManifest(manifestOrTuple, passwordOrKey, options = {}) {
+    let manifest = manifestOrTuple;
+    if (Array.isArray(manifestOrTuple)) {
+        const [unpacked, err] = unpackManifest(manifestOrTuple);
+        if (err || !unpacked) return [null, err || new Error('manifest: unpack failed')];
+        manifest = unpacked;
+    }
+
     const structural = validateManifestStructure(manifest);
     if (structural) return [null, structural];
 

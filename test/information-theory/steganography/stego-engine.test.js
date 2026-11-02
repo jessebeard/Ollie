@@ -77,4 +77,34 @@ describe('Format v4 StegoEngine (STC + J-UNIWARD + Argon2id)', () => {
         expect(extracted instanceof Uint8Array).toBe(true);
         expect(Array.from(extracted)).toEqual(Array.from(TEST_PAYLOAD));
     });
+
+    it('Format v4.1: Carrier-bound extraction succeeds, and tampering with DC coefficient breaks derivation', async () => {
+        const blocks = createMockBlocks(200);
+        const [ok, embedErr] = await StegoEngine.embed(blocks, TEST_PAYLOAD, TEST_PASSWORD, {
+            useCarrierSalt: true,
+            bucketSize: 256,
+            kdfOpts: KDF_OPTS
+        });
+        expect(embedErr).toBe(null);
+        expect(ok).toBe(true);
+
+        // Standard extraction succeeds
+        const [extracted, extractErr] = await StegoEngine.extract(blocks, TEST_PASSWORD, {
+            useCarrierSalt: true,
+            kdfOpts: KDF_OPTS
+        });
+        expect(extractErr).toBe(null);
+        expect(Array.from(extracted)).toEqual(Array.from(TEST_PAYLOAD));
+
+        // Tamper with a DC coefficient (block 0, coeff 0)
+        blocks[0][0] ^= 1;
+
+        // Extraction MUST fail because carrierSalt derivation is altered
+        const [tamperedExtracted, tamperedErr] = await StegoEngine.extract(blocks, TEST_PASSWORD, {
+            useCarrierSalt: true,
+            kdfOpts: KDF_OPTS
+        });
+        expect(tamperedExtracted).toBe(null);
+        expect(tamperedErr instanceof Error).toBe(true);
+    });
 });

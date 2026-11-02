@@ -72,7 +72,7 @@ describe('manifest enforcement across batch pipeline', () => {
             seen.push(m);
         }
 
-        const strip = (x) => { const c = { ...x }; delete c.share; delete c.mac; return JSON.stringify(c); };
+        const strip = (x) => { const c = { ...x }; delete c.share; delete c.shares; delete c.mac; return JSON.stringify(c); };
         for (const m of seen.slice(1)) {
             expect(strip(m)).toBe(strip(seen[0]));
         }

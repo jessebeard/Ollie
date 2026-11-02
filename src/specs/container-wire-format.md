@@ -1,8 +1,26 @@
-# Ollie Container Wire Format — Reference Specification (v4)
+# Ollie Container Wire Format — Reference Specification (v4.1)
 
-**Status:** Current Reference Specification.
-**Normative Implementation:** `src/information-theory/steganography/stego-engine.js`, `src/information-theory/steganography/opaque-container.js`, `src/information-theory/steganography/stc-matrix.js`, `src/information-theory/steganography/juniward.js`, `src/information-theory/cryptography/kdf-chain.js`.
-**Test Suites:** `test/conformance/wire-format-conformance.test.js`, `test/conformance/wire-format.pbt.js`.
+**Status:** Current Reference Specification (Format v4.1 with Decoupled Stego/Envelope Keys, Carrier-Invariant DC Nonce, Binary Slice Framing, and Deflate Expansion Immunity).
+**Normative Implementation:**
+- `src/information-theory/steganography/carrier-salt.js` (Canonical 24-byte prefix DC nonce derivation)
+- `src/information-theory/steganography/stego-payload.js` (Binary slice framing version 41 & strong parser)
+- `src/information-theory/steganography/stego-engine.js` (STC + J-UNIWARD orchestrator)
+- `src/information-theory/steganography/opaque-container.js` (Bit-31 Deflate bypass & opaque bucket framing)
+- `src/information-theory/steganography/stc-matrix.js` (Syndrome-Trellis Coding & submatrix generation)
+- `src/information-theory/steganography/juniward.js` (Directional spatial wavelet distortion & detailed balance)
+- `src/information-theory/cryptography/kdf-chain.js` (Argon2id + RFC 5869 HKDF decoupled key derivation)
+- `src/information-theory/secret-sharing/cauchy-ec.js` (Cauchy MDS parity allocation & quorum invariant)
+
+**Test Suites:**
+- `test/information-theory/steganography/carrier-salt.test.js`
+- `test/information-theory/steganography/stego-payload-v41.test.js`
+- `test/information-theory/steganography/opaque-container-expansion.test.js`
+- `test/information-theory/secret-sharing/cauchy-ec-invariant.test.js`
+- `test/information-theory/steganography/histogram-balance.test.js`
+- `test/pbt/stego-payload-v41.pbt.js`
+- `test/fuzz/stego-payload-fuzz.test.js`
+- `test/conformance/wire-format-conformance.test.js`
+- `test/conformance/wire-format.pbt.js`
 
 All multi-byte integers are BIG-ENDIAN unless explicitly stated otherwise.
 All byte counts are decimal. "MUST" / "MUST NOT" / "SHOULD" are normative.
@@ -87,95 +105,132 @@ Embedding a message $\mathbf{m} \in \{0, 1\}^M$ into AC cover coefficients $\mat
 
 ---
 
-## 4. Layer 2 — Argon2id + HKDF Key Derivation Chain
+## 4. Layer 2 — Format v4.1 Decoupled Key Derivation Chain
 
-All cryptographic and steganographic keys are derived from the user password via unified domain separation:
+All cryptographic and steganographic keys are derived from the user password via decoupled carrier-bound and envelope-bound domain separation:
 
 ```
-                      Password + Salt (16B CSPRNG)
-                                   |
-                                   v
-                         Argon2id (RFC 9106)
-                     t=3, m=64MB, p=1, keyLen=32B
-                                   |
-                                   v
-                             Master Secret
-                                   |
-                +------------------+------------------+
-                |                                     |
-                v                                     v
-          HKDF-Extract                          SHA-256 Digest
-                |                                     |
-       +--------+--------+                            v
-       |                 |                   Deterministic STC Seed
-       v                 v                 ("ollie/v4/stc-matrix/", pw)
-   AES-256 Key       AES-256 IV
-   ("aes-key")       ("aes-iv")
+                      Password + Carrier Salt (32B Canonical DC Nonce)
+                                           |
+                                           v
+                                 Argon2id (RFC 9106)
+                             t=3, m=64MB, p=1, keyLen=32B
+                                           |
+                                           v
+                                       Master Key
+                                           |
+                 +-------------------------+-------------------------+
+                 |                                                   |
+                 v                                                   v
+            HKDF-Expand                                         HKDF-Extract
+     ("ollie/v4.1/stc-matrix", 32)                         (Envelope Salt: 16B CSPRNG,
+     ("ollie/v4.1/cost-seed", 32)                                  Master Key)
+                 |                                                   |
+                 v                                                   v
+        Stego Seeding Suite                                      prk_env
+        stcSeed, costSeed                                            |
+                                                    +----------------+----------------+
+                                                    |                                 |
+                                                    v                                 v
+                                               HKDF-Expand                       HKDF-Expand
+                                       ("ollie/v4.1/aes-key", 32)        ("ollie/v4.1/aes-iv", 12)
+                                                    |                                 |
+                                                    v                                 v
+                                               AES-256 Key                       AES-256 IV
 ```
 
-### 4.1 Argon2id Parameters
-- Algorithm: Argon2id (RFC 9106, vendored OpenPGP.js WASM engine)
-- Time cost: $t = 3$ iterations
-- Memory cost: $m = 65,536\text{ KiB}$ ($64\text{ MB}$)
-- Parallelism: $p = 1$ (single-threaded browser/Node compatibility)
-- Output Key Length: 32 bytes
+### 4.1 Carrier Salt (`carrierSalt`) Derivation
+The carrier salt is derived deterministically from the carrier's canonical DC coefficients and quantization tables:
+$$\text{carrierSalt} = \text{SHA-256}\left(\text{"ollie/v4.1/carrier-salt/"} \parallel C \parallel \text{canonical}(Q) \parallel \text{canonical}(DC)\right)$$
+- Prefix: Exact 24 ASCII bytes (`"ollie/v4.1/carrier-salt/"`).
+- Big-Endian `DataView` serializes component count $C \in \{1, 3\}$, quantization tables ($C \times 128$ bytes), and all DC coefficients ($\text{blockCount} \times 2$ bytes).
+- Invariant across embedding: because DC coefficients and quantization tables are never modified during steganographic embedding, the cover and stego carrier yield identical `carrierSalt`.
+- Eliminates fast offline password cracking: an attacker cannot evaluate STC parity checks without evaluating Argon2id over `carrierSalt`.
 
-### 4.2 HKDF-Expand Domain Separation (RFC 5869)
-- `aesKey` (32 bytes): `HKDF-Expand(masterSecret, "ollie/v4/aes-key", 32)`
-- `aesIV` (12 bytes): `HKDF-Expand(masterSecret, "ollie/v4/aes-iv", 12)`
-- `costSeed` (32 bytes): `HKDF-Expand(masterSecret, "ollie/v4/cost-seed", 32)`
-- `stcSeed` (32 bytes): Derived as `SHA-256("ollie/v4/stc-matrix/" || UTF8(password))` to allow linear syndrome extraction prior to salt unmasking.
+### 4.2 Decoupled Envelope Encryption
+To guarantee **Zero AES-GCM Nonce Reuse** even when re-embedding into the same carrier:
+- Every embedding generates a fresh 16-byte CSPRNG `envelopeSalt`.
+- Per-encryption keys extract from `envelopeSalt` and `masterKey`:
+  $$\text{prk\_env} = \text{HKDF-Extract}(\text{envelopeSalt}, \text{masterKey})$$
+  $$\text{aesKey} = \text{HKDF-Expand}(\text{prk\_env}, \text{"ollie/v4.1/aes-key"}, 32)$$
+  $$\text{aesIV} = \text{HKDF-Expand}(\text{prk\_env}, \text{"ollie/v4.1/aes-iv"}, 12)$$
 
 ---
 
-## 5. Layer 3 & 4 — Opaque Framing & Encrypted Container
+## 5. Layer 3 & 4 — Opaque Framing & Incompressible Deflate Bypass
 
-Format v4 seals payloads into zero-length opaque frames with CSPRNG bucket padding.
+### 5.1 Bit-31 Compression Flag
+To prevent high-entropy compressed stripes from spilling into larger bucket boundaries via Deflate 5-byte stored header expansion:
+- Bit 31 of the 4-byte length header in `opaque-container.js` indicates compression status (`0x80000000`).
+- If Deflate output length $\ge$ raw payload length, the payload is stored raw with Bit 31 clear ($0$).
+- If Deflate output length $<$ raw payload length, compressed bytes are stored with Bit 31 set ($1$).
+- Bits 0–30 store the exact stored byte length.
 
-### 5.1 Framed Payload Structure
-Prior to encryption, the payload is framed with a 7-byte control header:
+### 5.2 Format v4.1 Stego-Payload Binary Slice Framing & Positional Array Metadata (Rule 16)
+Individual carrier chunk data is serialized using a zero-overhead binary slice frame, strictly avoiding Base64 and labeled JSON dictionary objects:
 
 ```
 Offset  Length  Field           Type            Description
 --------------------------------------------------------------------------------
-0       2       Length (L)      uint16 BE       Byte length of uncompressed payload
-2       1       Flags           uint8           Bit 0: Deflate compressed (1=yes, 0=no)
-3       4       CRC-32          uint32 BE       IEEE 802.3 CRC-32 of uncompressed payload
-7       L'      Payload Data    bytes           Payload (raw or Deflate compressed)
-7+L'    Pad     CSPRNG Padding  bytes           Random noise filling remaining bucket
+0       1       version         uint8           Format version (constant 41)
+1       4       carrierChecksum uint32 BE       IEEE 802.3 CRC-32 of rawChunkBytes
+5       2       metaLen (M)     uint16 BE       Byte length of metadata JSON string
+7       M       metaBytes       UTF-8 bytes     JSON tuple [chunkTuple, manifestTuple, filename]
+7+M     R       rawChunkBytes   bytes           Raw binary ciphertext stripe (zero-copy)
 ```
 
-### 5.2 Discrete Bucket Sizes
-The total plaintext frame size is rounded up to the nearest standard discrete bucket:
-$$\text{Bucket Sizes: } 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072\text{ bytes}$$
+#### 5.2.1 Positional Tuples (No Labeled JSON Objects)
+Formats outside the raw stego payload (manifests, chunk metadata, records) must be serialized as compact positional arrays (tuples) rather than labeled string-keyed JSON dictionary objects:
+- **Chunk Tuple (`chunkTuple`)**: `[id, index, total, count, stripeSize, startIndex]`
+- **Manifest Tuple (`manifestTuple`)**:
+  ```
+  [
+    0: format ('ollie-manifest'),
+    1: version (1),
+    2: chunkSetId (UUID),
+    3: total (uint32),
+    4: revision (uint32),
+    5: created (ISO timestamp / numeric),
+    6: entries ([[index, checksum], ...]),
+    7: kdf ([algo, iterations, salt] or null),
+    8: ec ([k, n, size] or null),
+    9: shares ([[index, threshold, data], ...] or null),
+    10: mac (HMAC-SHA256 base64 string or null)
+  ]
+  ```
+All unpackers must fail closed with explicit validation of tuple length, primitive types, and bounds.
 
-### 5.3 Opaque Wire Envelope
-The framed bucket is encrypted via AES-256-GCM and prefixed with the CSPRNG salt:
-
+### 5.2.2 Vault Export Envelope Positional Wire Tuple (Rule 16)
+Standalone encrypted vault export containers (`.ollie` / `exportEncrypted()`) serialize as a 4-element positional array tuple:
+```json
+[
+  "ollie-export",
+  2,
+  ["PBKDF2-SHA256", 600000, "<salt-b64>", "<iv-b64>"],
+  "<ciphertext-b64>"
+]
 ```
-Offset  Length  Field           Type            Description
---------------------------------------------------------------------------------
-0       16      Salt            bytes           CSPRNG 16-byte random salt
-16      B       Ciphertext      bytes           AES-256-GCM ciphertext of bucket (B bytes)
-16+B    16      Auth Tag        bytes           AES-256-GCM 16-byte authentication tag
-```
+Schema indices:
+* `0: format` (`string`, strictly `"ollie-export"`)
+* `1: version` (`integer`, strictly `2` for tuple; legacy version `1` dictionary supported backward-compatibly)
+* `2: kdf` (`[algo, iterations, salt, iv]` tuple)
+* `3: ciphertext` (`string`, base64-encoded AES-256-GCM ciphertext + 16-byte tag)
 
-Total wire envelope length: $16 + B + 16 = B + 32$ bytes.
+All unpackers (`unpackExportEnvelope`) fail closed on length mismatch, missing indices, or corrupted ciphertext.
 
 ---
 
-## 6. Layer 5 — Multi-Carrier Threshold Distribution
+## 6. Layer 5 — Multi-Carrier Threshold & Cauchy MDS Invariant
 
 When splitting a vault across $n$ photo carriers with threshold $k$:
 1. The vault document is erasure-coded using **Cauchy MDS Reed-Solomon Parity Coding** over $\text{GF}(256)$.
-2. Carrier capacities are allocated proportionally according to available non-zero AC coefficients, subject to:
-   - **Carrier Capacity Clamping:** Each carrier's usable capacity is clamped to `DEFAULT_MAX_CARRIER_BYTES = 65536` (64 KB) to prevent oversized photos from dominating total capacity.
-   - **No-SPOF Invariant:** In proportional parity mode, no single carrier may hold $\ge k$ blocks or exceed $40\%$ of threshold $k$ (`maxSharePerCarrier = 0.4`), ensuring no single image becomes a single point of failure or unilaterally holds reconstruction quorum.
-3. The cryptographic DEK is secret-shared across carriers using **$\text{GF}(256)$ Shamir Secret Sharing**.
-4. Recovery succeeds from **any valid $k$-subset** of carriers and fails closed on $k-1$ carriers.
+2. **Cauchy MDS Quorum Invariant:** In proportional parity allocation, block counts $c_i$ for carriers sorted in ascending capacity order MUST satisfy:
+   $$\sum_{i=1}^k c_{(i)} \ge K_{\text{MDS}}$$
+   Any subset of $k$ carriers (including the $k$ smallest carriers) is guaranteed to supply at least $K_{\text{MDS}}$ chunks for complete vault reconstruction.
+3. Carrier usable capacities are clamped to `DEFAULT_MAX_CARRIER_BYTES = 65536` (64 KB) with `maxSharePerCarrier = 0.4`.
 
 ---
 
 ## 7. Test Conformance Vectors
 
-All implementations MUST conform to the formal property-based test suites in `test/conformance/wire-format-conformance.test.js` and `test/conformance/wire-format.pbt.js`.
+All implementations MUST conform to the formal property-based test suites in `test/conformance/wire-format-conformance.test.js`, `test/conformance/wire-format.pbt.js`, `test/information-theory/steganography/stego-payload-v41.test.js`, and `test/information-theory/secret-sharing/cauchy-ec-invariant.test.js`.

@@ -14,7 +14,12 @@ end-to-end by one person in an afternoon.
 
 ### Feature Highlights
 
-- **Format v4 Steganography:** Rate-distortion optimal **Syndrome-Trellis Codes (STC)** combined with **J-UNIWARD** spatial Daubechies 8-tap (db8) wavelet distortion modeling and anti-SCA key randomization.
+- **Format v4.1 Steganography & Architecture:** Rate-distortion optimal **Syndrome-Trellis Codes (STC)** combined with **Directional J-UNIWARD** spatial Daubechies 8-tap (db8) wavelet distortion modeling, asymmetric directional cost scaling, and anti-SCA key randomization.
+- **Trap-Immune Carrier Salt (`carrierSalt`):** Layer 2 derivation from canonical component counts, quantization tables ($Q$), and carrier-invariant DC nonces, preventing chosen-carrier trap attacks while guaranteeing uniform carrier independence.
+- **Decoupled Key Derivation Chain:** Independent RFC 5869 HKDF expansion separating envelope encryption keys (`prk_env`) from steganographic embedding keys (`prk_stego`), enabling blind embedding without exposing master envelope secrets.
+- **Deflate Expansion Immunity:** 31-bit bypass in opaque container framing automatically preventing high-entropy compressed payload expansion from spilling across discrete power-of-two bucket boundaries.
+- **Binary Slice Stego-Payload Framing:** Zero-copy raw binary stripes embedded directly inside carrier envelopes, eliminating Base64 overhead in steganographic storage ($\ge 20\%$ byte footprint reduction on 1KB chunks).
+- **Rule 16 Positional Serialized Arrays (Tuples):** All wire, carrier, and export envelopes outside the raw payload (such as carrier manifests, chunk metadata, and vault exports) serialize as compact positional array tuples rather than labeled string-keyed JSON dictionary objects, eliminating semantic leakage and string key bloat, enforced by strict fail-closed unpackers.
 - **Zero Plaintext Metadata & Zero-Length Opaque Framing:** No unencrypted headers, magic bytes, length counters, or salt metadata are exposed in the carrier. Ciphertexts are padded with CSPRNG noise to discrete power-of-two buckets ($256\text{B} \dots 128\text{KB}$).
 - **Argon2id Key Derivation Chain (RFC 9106):** High-work-factor memory-hard password hashing ($t=3, m=64\text{MB}, p=1$) + RFC 5869 HKDF domain separation for AES keys, IVs, STC matrices, and distortion seeds.
 - **Multi-Carrier Storage with Threshold ($k$-of-$n$) Recovery:** Cauchy MDS erasure coding over $\text{GF}(256)$ and Shamir secret sharing: lose carriers down to the threshold and the vault still loads.
@@ -63,10 +68,13 @@ The enrollment dialog states this disclaimer verbatim.
 | Property | Mechanism |
 |----------|-----------|
 | Confidentiality | AES-256-GCM per entry + AES-256-GCM opaque container envelope |
-| Key Derivation | Argon2id ($t=3, m=64\text{MB}, p=1$) $\to$ HKDF-Expand (RFC 5869) |
-| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 4$, 2-bit packed trellis) + J-UNIWARD spatial wavelet costs |
-| Length Hiding | Zero-length framing + CSPRNG noise bucket padding ($256\text{B} \dots 128\text{KB}$) |
-| Tamper Detection | HMAC-SHA-256 carrier manifests (password-gated) |
+| Key Derivation | Argon2id ($t=3, m=64\text{MB}, p=1$) $\to$ HKDF-Expand (RFC 5869) with decoupled stego/envelope chains |
+| Carrier Invariance | Trap-immune `carrierSalt` (canonical $Q$ + carrier-invariant DC nonces) |
+| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 4$, 2-bit packed trellis) + Directional J-UNIWARD |
+| Length Hiding | Zero-length framing + CSPRNG noise bucket padding ($256\text{B} \dots 128\text{KB}$) + Bit-31 Deflate bypass |
+| Carrier Framing | Native binary slice framing (raw binary stripes, zero Base64 overhead in carriers) |
+| Wire Serialization | Rule 16 Positional Array Tuples (no labeled JSON dictionaries) with fail-closed schema unpackers |
+| Tamper Detection | HMAC-SHA-256 carrier manifests (password-gated, positional tuple wire format) |
 | Loss Tolerance | Cauchy MDS erasure coding + Shamir secret sharing (any $k$ of $n$ carriers) |
 | Replay Detection | Strictly increasing revision counter bound into authenticated manifest |
 | Size-Lie Defense | Carrier-bounded framing validation before any memory allocation |
@@ -89,9 +97,9 @@ retains ~128-bit quantum security). This is documented as a constitutional rule 
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-repo/ollie.git
-cd ollie
-npm test             # Full suite: 874 tests, all green
+git clone git@github.com:jessebeard/Ollie.git
+cd Ollie
+npm test             # Full multithreaded suite: 1,130 tests across 163 files, 100% green
 ```
 
 Open `app/vault.html` in a modern browser (or serve locally via `npm run serve`) to use the visual vault.
@@ -121,24 +129,27 @@ flowchart LR
     DOC["Vault document<br/>(JSON, AES-GCM encrypted)"]
     SEAL["CSS envelope<br/>(random DEK + Shamir split)"]
     EC["Cauchy erasure coding<br/>(n coded stripes)"]
-    MANIFEST["HMAC-authenticated manifests<br/>(per-carrier share + set identity)"]
-    OPAQUE["Opaque Framing<br/>(Deflate + CSPRNG bucket padding)"]
-    STC["Stego Engine<br/>(J-UNIWARD + STC Trellis)"]
+    MANIFEST["Positional Manifest Tuples<br/>(HMAC-SHA256 authenticated)"]
+    OPAQUE["Opaque Framing<br/>(Deflate bypass + CSPRNG bucket padding)"]
+    SLICE["Binary Slice Framing<br/>(zero Base64 overhead)"]
+    STC["Stego Engine<br/>(Directional J-UNIWARD + STC Trellis)"]
     CARRIER["JPEG carrier photos"]
 
-    DOC --> SEAL --> EC --> OPAQUE --> STC --> CARRIER
-    MANIFEST --> OPAQUE
+    DOC --> SEAL --> EC --> OPAQUE --> SLICE --> STC --> CARRIER
+    MANIFEST --> SLICE
 ```
 
-1. **Seal**: the vault document is encrypted under a fresh random 256-bit DEK (AES-256-GCM).
-2. **Split**: the DEK is Shamir-secret-shared across carriers over $\text{GF}(256)$.
-3. **Code**: the sealed envelope is Cauchy-erasure-coded into coded stripes distributed
+1. **Seal**: The vault document is encrypted under a fresh random 256-bit DEK (AES-256-GCM).
+2. **Split**: The DEK is Shamir-secret-shared across carriers over $\text{GF}(256)$.
+3. **Code**: The sealed envelope is Cauchy-erasure-coded into coded stripes distributed
    proportionally across carriers by capacity.
-4. **Opaque Frame**: each stripe + its key share + signed manifest are compressed, CRC-32-checked,
+4. **Opaque Frame**: Each stripe + its key share are compressed (with Bit-31 expansion bypass), CRC-32-checked,
    and padded with CSPRNG noise into a zero-length bucket ($256\text{B} \dots 128\text{KB}$) encrypted via AES-256-GCM.
-5. **Embed**: the wire envelope is embedded into JPEG DCT AC coefficients using Syndrome-Trellis Codes
-   (STC) with distortion costs calculated via J-UNIWARD spatial Daubechies db8 wavelets.
-6. **Authenticate**: every carrier carries an authenticated manifest; on load, all
+5. **Binary Slice Frame**: The stripe is packaged with HMAC-authenticated positional manifest tuples directly
+   into binary slice frames without Base64 encoding.
+6. **Embed**: The wire envelope is embedded into JPEG DCT AC coefficients using Syndrome-Trellis Codes
+   (STC) with distortion costs calculated via Directional J-UNIWARD spatial Daubechies db8 wavelets.
+7. **Authenticate**: Every carrier carries an authenticated manifest tuple; on load, all
    copies must agree, verify under the password, and bind every extracted chunk.
 
 Any `threshold` carriers recover the vault. Fewer reveal nothing.
@@ -159,14 +170,14 @@ src/
     cryptography/       # KDF chain (Argon2id + HKDF), AES-GCM, PBKDF2, HMAC, TOTP
     error-correction/   # Reed-Solomon over GF(256), interleaver, profiles
     secret-sharing/     # Shamir, CSS envelope, Cauchy erasure codec, GF(256)
-    steganography/      # StegoEngine, OpaqueContainer, STCMatrix, JUniward, manifests, chunks
+    steganography/      # StegoEngine, OpaqueContainer, STCMatrix, JUniward, manifests, chunks, stego-payload
   structures/vault/     # Immutable vault model, secure records, CSV import
   utils/                # Compression, CRC32, encoding, logger, URL safety, atomic writer
   vendor/               # Vendored OpenPGP.js Argon2id WASM SIMD/non-SIMD engine
   specs/                # Normative specifications, project rules, living wireframe
 app/                    # Browser UI (vault page, test runner)
 scripts/                # CLI, dev server, golden-vector generator
-test/                   # 874 tests: unit, integration, security, conformance, PBT
+test/                   # 1,130 tests: unit, integration, security, conformance, PBT, fuzz
 src/specs/WIREFRAME.md  # Complete mermaid.js architecture diagram
 ```
 
@@ -178,10 +189,10 @@ Ollie is designed to be audited:
 
 1. **Read the spec first**: [`src/specs/container-wire-format.md`](src/specs/container-wire-format.md)
    defines the exact byte layout at every layer.
-2. **Follow the data flow**: plaintext $\to$ CSS seal $\to$ Cauchy erasure code $\to$ Opaque bucket framing $\to$ STC / J-UNIWARD embed $\to$ carrier.
+2. **Follow the data flow**: plaintext $\to$ CSS seal $\to$ Cauchy erasure code $\to$ Opaque bucket framing $\to$ Binary slice framing $\to$ STC / J-UNIWARD embed $\to$ carrier.
 3. **Check the crypto surface**: everything lives in `information-theory/cryptography/` and `src/vendor/argon2/`.
    Primitives: Argon2id, HKDF-Expand, AES-256-GCM, HMAC-SHA256, SHA-256.
-4. **Verify the claims**: run `npm test` (874 assertions).
+4. **Verify the claims**: run `npm test` (1,130 assertions across 163 test files).
 5. **Inspect the WASM binary**: `src/vendor/argon2/` contains the unmodified OpenPGP.js Argon2id WASM binary alongside its original MIT license, inlined as base64 to ensure zero-network offline operation.
 
 ---
@@ -189,10 +200,10 @@ Ollie is designed to be audited:
 ## Testing
 
 ```bash
-npm test               # Full suite: 874 tests
+npm test               # Full multithreaded suite: 1,130 tests across 163 files
 PBT_SEED=N npm test   # Reproducible property-based runs
 npm run lint           # ESLint
-npm run typecheck      # Validates JSDoc type annotations (no TypeScript)
+npm run typecheck      # Validates JSDoc type annotations
 ```
 
 ---

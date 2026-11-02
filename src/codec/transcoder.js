@@ -18,6 +18,8 @@ export class JpegTranscoder {
      * @param {Object} options - Options
      * @param {Object} [options.metadata] - Metadata for the container format
      * @param {string} [options.password] - Password for encryption
+     * @param {Uint8Array} [options.sealedWire] - Format v4.1 pre-sealed wire container bytes
+     * @param {string} [options.stcSeed] - Format v4.1 pre-derived STC seed hash
      * @returns {Promise<[Uint8Array|null, Error|null]>} Result tuple of [updatedJpegBytes, error]
      */
     async updateSecret(jpegBytes, newSecretData, options = {}) {

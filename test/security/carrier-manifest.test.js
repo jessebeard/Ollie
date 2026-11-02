@@ -3,11 +3,14 @@ import { Arbitrary, assertProperty } from '../utils/pbt.js';
 import {
     MANIFEST_FORMAT,
     MANIFEST_VERSION,
+    MANIFEST_TUPLE_LENGTH,
     createManifest,
     canonicalManifestBytes,
     verifyManifest,
     bindChunkRecords,
-    validateManifestStructure
+    validateManifestStructure,
+    packManifest,
+    unpackManifest
 } from '../../src/information-theory/steganography/carrier-manifest.js';
 import { crc32 } from '../../src/utils/crc32.js';
 
@@ -232,6 +235,60 @@ describe('carrier manifest chunk binding', () => {
                 },
                 30
             );
+        });
+    });
+
+    describe('Format v4.1 positional array manifest serialization (Rule 16)', () => {
+        it('packs and losslessly unpacks a manifest positional tuple', async () => {
+            const m = await buildSample();
+            const [tuple, packErr] = packManifest(m);
+            expect(packErr).toBe(null);
+            expect(Array.isArray(tuple)).toBe(true);
+            expect(tuple.length).toBe(MANIFEST_TUPLE_LENGTH);
+
+            // Invariant: tuple serialization contains zero labeled JSON dictionary keys
+            const serialized = JSON.stringify(tuple);
+            expect(serialized.includes('"format"')).toBe(false);
+            expect(serialized.includes('"chunkSetId"')).toBe(false);
+            expect(serialized.includes('"total"')).toBe(false);
+            expect(serialized.includes('"entries"')).toBe(false);
+            expect(serialized.includes('"checksum"')).toBe(false);
+            expect(serialized.includes('"kdf"')).toBe(false);
+
+            const [unpacked, unpackErr] = unpackManifest(tuple);
+            expect(unpackErr).toBe(null);
+            expect(unpacked.format).toBe(m.format);
+            expect(unpacked.version).toBe(m.version);
+            expect(unpacked.chunkSetId).toBe(m.chunkSetId);
+            expect(unpacked.total).toBe(m.total);
+            expect(unpacked.revision).toBe(m.revision);
+            expect(unpacked.created).toBe(m.created);
+            expect(unpacked.entries).toEqual(m.entries);
+            expect(unpacked.kdf).toEqual(m.kdf);
+            expect(unpacked.mac).toBe(m.mac);
+        });
+
+        it('verifies a manifest directly from its positional tuple', async () => {
+            const m = await buildSample();
+            const [tuple] = packManifest(m);
+            const [verified, vErr] = await verifyManifest(tuple, PASSWORD);
+            expect(vErr).toBe(null);
+            expect(verified).toBe(true);
+
+            const [bad] = await verifyManifest(tuple, 'wrong password');
+            expect(bad).toBe(false);
+        });
+
+        it('fails closed when positional tuple is truncated or corrupted', () => {
+            const truncated = ['ollie-manifest', 1, 'set-id'];
+            const [res, err] = unpackManifest(truncated);
+            expect(res).toBe(null);
+            expect(err instanceof Error).toBe(true);
+
+            const wrongType = ['ollie-manifest', 1, 12345, 3, 0, '2026-11-01', [], null, null, null, 'mac'];
+            const [res2, err2] = unpackManifest(wrongType);
+            expect(res2).toBe(null);
+            expect(err2 instanceof Error).toBe(true);
         });
     });
 });
