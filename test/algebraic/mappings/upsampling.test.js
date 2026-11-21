@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { upsampleNearest, upsampleBilinear, upsampleChroma } from '../../../src/algebraic/mappings/upsampling.js';
 
 describe('Chroma Upsampling', () => {
@@ -147,5 +148,66 @@ describe('Chroma Upsampling', () => {
         for (let i = 0; i < result.length - 1; i++) {
             expect(result[i] <= result[i + 1]).toBe(true);
         }
+    });
+
+    describe('PBT & Metamorphic Invariants', () => {
+        it('Property: upsampling output length is strictly targetWidth * targetHeight', async () => {
+            await assertProperty(
+                [Arbitrary.integer(2, 16), Arbitrary.integer(2, 16)],
+                (srcW, srcH) => {
+                    const targetW = srcW * 2;
+                    const targetH = srcH * 2;
+                    const input = new Float32Array(srcW * srcH).fill(128);
+
+                    const resNearest = upsampleNearest(input, srcW, srcH, targetW, targetH);
+                    expect(resNearest.length).toBe(targetW * targetH);
+
+                    const resBilinear = upsampleBilinear(input, srcW, srcH, targetW, targetH);
+                    expect(resBilinear.length).toBe(targetW * targetH);
+                },
+                40
+            );
+        });
+
+        it('Property: uniform input planes remain strictly uniform under bilinear upsampling', async () => {
+            await assertProperty(
+                [Arbitrary.integer(2, 16), Arbitrary.integer(2, 16), Arbitrary.integer(0, 255)],
+                (srcW, srcH, val) => {
+                    const targetW = srcW * 2;
+                    const targetH = srcH * 2;
+                    const input = new Float32Array(srcW * srcH).fill(val);
+
+                    const output = upsampleBilinear(input, srcW, srcH, targetW, targetH);
+                    expect(output.length).toBe(targetW * targetH);
+                    for (let i = 0; i < output.length; i++) {
+                        expect(output[i]).toBeCloseTo(val, 1);
+                    }
+                },
+                40
+            );
+        });
+
+        it('Metamorphic MR: upsampled values are bounded by [min(input), max(input)]', async () => {
+            await assertProperty(
+                [Arbitrary.integer(2, 8), Arbitrary.integer(2, 8)],
+                (srcW, srcH) => {
+                    const input = new Float32Array(srcW * srcH);
+                    let minVal = Infinity;
+                    let maxVal = -Infinity;
+                    for (let i = 0; i < input.length; i++) {
+                        input[i] = (i * 17) % 256;
+                        if (input[i] < minVal) minVal = input[i];
+                        if (input[i] > maxVal) maxVal = input[i];
+                    }
+
+                    const output = upsampleBilinear(input, srcW, srcH, srcW * 2, srcH * 2);
+                    for (let i = 0; i < output.length; i++) {
+                        expect(output[i]).toBeGreaterThanOrEqual(minVal - 0.001);
+                        expect(output[i]).toBeLessThanOrEqual(maxVal + 0.001);
+                    }
+                },
+                30
+            );
+        });
     });
 });

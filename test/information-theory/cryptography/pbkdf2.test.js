@@ -1,5 +1,6 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { KeyDerivation } from '../../../src/information-theory/cryptography/pbkdf2.js';
+import { Encryption } from '../../../src/information-theory/cryptography/aes-gcm.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 
 async function getCrypto() {
@@ -46,19 +47,15 @@ describe('KeyDerivation (Property-Based Tests)', () => {
                 const [key2, err2] = await KeyDerivation.deriveKey(password, saltB);
                 expect(err2).toEqual(null);
 
-                const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
-                const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
+                // Keys are non-extractable; compare behaviorally.
+                const plaintext = new Uint8Array([1, 2, 3, 4, 5]);
+                const [encResult, encErr] = await Encryption.encrypt(plaintext, key1);
+                expect(encErr).toEqual(null);
 
-                const arr1 = new Uint8Array(raw1);
-                const arr2 = new Uint8Array(raw2);
+                const [decrypted, decErr] = await Encryption.decrypt(encResult.ciphertext, key2, encResult.iv);
+                if (decErr) return false;
 
-                if (arr1.length !== arr2.length) return false;
-
-                for (let i = 0; i < arr1.length; i++) {
-                    if (arr1[i] !== arr2[i]) return false;
-                }
-
-                return true;
+                return decrypted.length === plaintext.length && decrypted.every((b, i) => b === plaintext[i]);
             },
             50
         );
@@ -86,23 +83,13 @@ describe('KeyDerivation (Property-Based Tests)', () => {
                 const [key2, err2] = await KeyDerivation.deriveKey(password, salt2);
                 expect(err2).toEqual(null);
 
-                const raw1 = await cryptoGlobal.subtle.exportKey('raw', key1);
-                const raw2 = await cryptoGlobal.subtle.exportKey('raw', key2);
+                // Different salts must yield behaviorally unrelated keys.
+                const plaintext = new Uint8Array([1, 2, 3, 4, 5]);
+                const [encResult, encErr] = await Encryption.encrypt(plaintext, key1);
+                expect(encErr).toEqual(null);
 
-                const arr1 = new Uint8Array(raw1);
-                const arr2 = new Uint8Array(raw2);
-
-                let different = false;
-                for (let i = 0; i < arr1.length; i++) {
-                    if (arr1[i] !== arr2[i]) {
-                        different = true;
-                        break;
-                    }
-                }
-
-                if (!different) return false;
-
-                return true;
+                const [, decErr] = await Encryption.decrypt(encResult.ciphertext, key2, encResult.iv);
+                return decErr !== null && decErr !== undefined;
             },
             50
         );
@@ -133,5 +120,29 @@ describe('KeyDerivation (Property-Based Tests)', () => {
             },
             100 // 100 collision checks
         );
+    });
+});
+
+describe('KeyDerivation.deriveRawBits', () => {
+    it('derives deterministic raw key material of requested length', async () => {
+        const salt = new Uint8Array(16).fill(7);
+        const [a, errA] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+        const [b, errB] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+
+        if (errA || errB) throw new Error('deriveRawBits failed');
+        expect(a instanceof Uint8Array && a.length === 32).toBe(true);
+        expect(Array.from(a)).toEqual(Array.from(b));
+    });
+
+    it('differs by password, salt, and iteration count', async () => {
+        const salt = new Uint8Array(16).fill(7);
+        const [base] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1000, bits: 256 });
+        const [otherPw] = await KeyDerivation.deriveRawBits('px', salt, { iterations: 1000, bits: 256 });
+        const [otherSalt] = await KeyDerivation.deriveRawBits('pw', new Uint8Array(16).fill(8), { iterations: 1000, bits: 256 });
+        const [otherIter] = await KeyDerivation.deriveRawBits('pw', salt, { iterations: 1001, bits: 256 });
+
+        for (const other of [otherPw, otherSalt, otherIter]) {
+            expect(Array.from(base)).not.toEqual(Array.from(other));
+        }
     });
 });

@@ -1,17 +1,16 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
     describe('PasswordVault E2E Steganography (Crypto Boundary)', () => {
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class MockFile {
     constructor(buffer, name) {
@@ -68,11 +67,9 @@ describe('PasswordVault E2E Steganography (Crypto Boundary)', () => {
                     vault = newVault;
                 }
 
-                let savedImageFiles = [];
-                try {
-                    savedImageFiles = await vault.save(selectedImages, passwordOne);
-                } catch (e) {
-                    if (e.message.includes('capacity')) return true;
+                const [savedImageFiles, saveErr] = await vault.save(selectedImages, passwordOne);
+                if (saveErr) {
+                    if (saveErr.message.includes('capacity')) return true;
                     return false;
                 }
 

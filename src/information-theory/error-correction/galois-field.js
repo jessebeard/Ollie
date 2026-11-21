@@ -28,7 +28,7 @@ export class GenericGF {
 
     buildMonomial(degree, coefficient) {
         if (degree < 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: degree must be non-negative');
         }
         if (coefficient === 0) {
             return this.zero;
@@ -52,14 +52,14 @@ export class GenericGF {
 
     log(a) {
         if (a === 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: log(0) is undefined');
         }
         return this.logTable[a];
     }
 
     inverse(a) {
         if (a === 0) {
-            throw new Error("ArithmeticException()");
+            throw new Error('galois-field: division by zero');
         }
         return this.expTable[this.size - this.logTable[a] - 1];
     }
@@ -91,7 +91,7 @@ export class GenericGF {
 export class GenericGFPoly {
     constructor(field, coefficients) {
         if (coefficients.length === 0) {
-            throw new Error("IllegalArgumentException()");
+            throw new Error('galois-field: coefficients cannot be empty');
         }
         this.field = field;
         const coefficientsLength = coefficients.length;
@@ -101,7 +101,7 @@ export class GenericGFPoly {
             while (firstNonZero < coefficientsLength && coefficients[firstNonZero] === 0) {
                 firstNonZero++;
             }
-            if (firstNonZero == coefficientsLength) {
+            if (firstNonZero === coefficientsLength) {
                 this.coefficients = GenericGFPoly.COEFFICIENTS_ZERO;
             } else {
                 this.coefficients = coefficients.subarray(firstNonZero, coefficientsLength);
@@ -136,7 +136,7 @@ export class GenericGFPoly {
         const coefficients = this.coefficients;
         const size = coefficients.length;
         let result;
-        if (a == 1) {
+        if (a === 1) {
             
             result = 0;
             for (let i = 0, len = coefficients.length; i < len; i++) {
@@ -154,7 +154,7 @@ export class GenericGFPoly {
 
     addOrSubtract(other, buf) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (this.isZero()) {
             return other;
@@ -191,7 +191,7 @@ export class GenericGFPoly {
 
     multiplyGenericGFPoly(other) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (this.isZero() || other.isZero()) {
             return this.field.zero;
@@ -214,7 +214,7 @@ export class GenericGFPoly {
         if (scalar === 0) {
             return this.field.zero;
         }
-        if (scalar == 1) {
+        if (scalar === 1) {
             return this;
         }
         const size = this.coefficients.length;
@@ -227,7 +227,7 @@ export class GenericGFPoly {
 
     multiplyByMonomial(degree, coefficient) {
         if (degree < 0) {
-            throw new Error('IllegalArgumentException()');
+            throw new Error('galois-field: degree must be non-negative');
         }
         if (coefficient === 0) {
             return this.field.zero;
@@ -242,10 +242,10 @@ export class GenericGFPoly {
 
     divide(other) {
         if (this.field !== other.field) {
-            throw new Error('IllegalArgumentException("GenericGFPolys do not have same GenericGF field")');
+            throw new Error('galois-field: polynomials must share the same Galois field');
         }
         if (other.isZero()) {
-            throw new Error('IllegalArgumentException("Divide by 0")');
+            throw new Error('galois-field: division by zero');
         }
 
         let quotient = this.field.getZero();
@@ -279,11 +279,11 @@ export class GenericGFPoly {
                         result += " + ";
                     }
                 }
-                if (degree === 0 || coefficient != 1) {
+                if (degree === 0 || coefficient !== 1) {
                     const alphaPower = this.field.log(coefficient);
                     if (alphaPower === 0) {
                         result += '1';
-                    } else if (alphaPower == 1) {
+                    } else if (alphaPower === 1) {
                         result += 'a';
                     } else {
                         result += "a^";
@@ -291,7 +291,7 @@ export class GenericGFPoly {
                     }
                 }
                 if (degree !== 0) {
-                    if (degree == 1) {
+                    if (degree === 1) {
                         result += 'x';
                     } else {
                         result += "x^";

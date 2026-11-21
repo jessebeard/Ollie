@@ -1,17 +1,33 @@
 {
-  "name": "Ollie",
+  "name": "ollie",
   "version": "0.2.0",
-  "description": "",
+  "description": "Pure JavaScript JPEG codec with STC and J-UNIWARD steganography, Reed-Solomon error correction, and an encrypted password vault hidden inside carrier photos.",
   "type": "module",
   "main": "bundle.js",
   "scripts": {
     "test": "node test/runner.js",
-    "serve": "node scripts/dev-server.js"
+    "serve": "node scripts/dev-server.js",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "vectors": "node scripts/generate-golden-vectors.mjs",
+    "fuzz": "node scripts/fuzz.mjs",
+    "bench:concurrency": "node scripts/benchmark-concurrency.mjs"
   },
-  "keywords": [],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "jpeg",
+    "codec",
+    "steganography",
+    "reed-solomon",
+    "password-vault"
+  ],
   "author": "Jesse Beard",
   "license": "ISC",
   "devDependencies": {
-    "node": "^22.22.1"
+    "@types/node": "^26.2.0",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3"
   }
 }

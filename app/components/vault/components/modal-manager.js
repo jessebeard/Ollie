@@ -1,11 +1,23 @@
+import { escapeHtml } from '../../../../src/utils/escape-html.js';
+import { decodeQR } from '../../../../src/codec/qr-decoder.js';
+import { calculatePasswordStrength, generateStrongPassword } from '../../../../src/utils/password-strength.js';
+import { renderQrOnCanvas } from './qr-canvas.js';
+import { OnboardingWizard } from './onboarding-wizard.js';
+import { ChangePasswordModal, TwoFactorSettingsModal, ShortcutsModal } from './vault-modals.js';
+
+export { calculatePasswordStrength, generateStrongPassword, renderQrOnCanvas };
 
 export class ModalManager {
     constructor() {
         this.overlay = this.createOverlay();
-        document.body.appendChild(this.overlay);
+        if (typeof document !== 'undefined' && document.body && typeof document.body.appendChild === 'function' && this.overlay) {
+            document.body.appendChild(this.overlay);
+        }
+        this.toastContainer = null;
     }
 
     createOverlay() {
+        if (typeof document === 'undefined') return null;
         const el = document.createElement('div');
         el.className = 'modal-overlay';
         el.style.display = 'none';
@@ -13,58 +25,96 @@ export class ModalManager {
     }
 
     show(modal) {
-        // Clear previous
+        if (!this.overlay) return;
         this.hide();
-
         this.overlay.appendChild(modal);
         this.overlay.style.display = 'flex';
 
-        // Focus first input or button
         const focusable = modal.querySelector('input, button');
-        if (focusable) focusable.focus();
+        if (focusable && typeof focusable.focus === 'function') focusable.focus();
     }
 
     hide() {
+        if (!this.overlay) return;
         this.overlay.style.display = 'none';
-        this.overlay.innerHTML = ''; // Force remove all children
+        this.overlay.innerHTML = '';
     }
 
     escape(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return escapeHtml(str);
+    }
+
+    /**
+     * Non-blocking toast notification pill.
+     * @param {string} message
+     * @param {'info'|'success'|'error'|'warn'} [type='info']
+     * @param {number} [duration=2500]
+     */
+    showToast(message, type = 'info', duration = 2500) {
+        if (typeof document === 'undefined' || !document.body || typeof document.body.appendChild !== 'function') return;
+        if (!this.toastContainer) {
+            this.toastContainer = document.querySelector('.toast-container');
+            if (!this.toastContainer) {
+                this.toastContainer = document.createElement('div');
+                this.toastContainer.className = 'toast-container';
+                document.body.appendChild(this.toastContainer);
+            }
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        if (typeof toast.setAttribute === 'function') toast.setAttribute('role', 'status');
+        toast.innerHTML = `<span class="toast-text">${this.escape(message)}</span>`;
+
+        if (this.toastContainer && typeof this.toastContainer.appendChild === 'function') {
+            this.toastContainer.appendChild(toast);
+        }
+
+        setTimeout(() => {
+            toast.classList.add('toast-fadeout');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    /**
+     * Generates a cryptographically strong random password.
+     * @param {number} [length=20]
+     * @returns {string}
+     */
+    generateStrongPassword(length = 20) {
+        return generateStrongPassword(length);
+    }
+
+    /**
+     * Calculates entropy and qualitative strength of a password string.
+     * @param {string} pass
+     * @returns {{ score: number, label: string, color: string, percent: number }}
+     */
+    static calculatePasswordStrength(pass) {
+        return calculatePasswordStrength(pass);
+    }
+
+    /**
+     * Renders an otpauth URI as a pixelated QR code onto a canvas.
+     */
+    renderQrOnCanvas(canvas, uri) {
+        return renderQrOnCanvas(canvas, uri);
     }
 
     async prompt(title, label, type = 'text') {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
-            modal.innerHTML = `
-                <h3>${this.escape(title)}</h3>
-                <div class="form-group">
-                    <label>${this.escape(label)}</label>
-                    <input type="${this.escape(type)}" class="prompt-input">
-                </div>
-                <div class="modal-actions">
-                    <button class="btn btn-secondary cancel-btn">Cancel</button>
-                    <button class="btn btn-primary confirm-btn">OK</button>
-                </div>
-            `;
 
-            this.show(modal);
+            let getInputValue = () => '';
 
             const cleanup = () => {
                 this.hide();
             };
 
             const confirm = () => {
-                const input = modal.querySelector('.prompt-input');
-                const val = input ? input.value : '';
+                const val = getInputValue();
                 cleanup();
-                // Small delay to ensure UI updates before next prompt
                 setTimeout(() => resolve(val), 50);
             };
 
@@ -73,16 +123,71 @@ export class ModalManager {
                 setTimeout(() => resolve(null), 50);
             };
 
-            modal.querySelector('.confirm-btn').onclick = confirm;
-            modal.querySelector('.cancel-btn').onclick = cancel;
-
-            const input = modal.querySelector('.prompt-input');
-            if (input) {
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') confirm();
-                    if (e.key === 'Escape') cancel();
-                };
+            if (type === 'password') {
+                modal.innerHTML = `
+                    <div class="modal-header">
+                        <h3>${this.escape(title)}</h3>
+                        <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <div class="password-shadow-host"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+                        <button type="button" class="btn btn-primary confirm-btn">OK</button>
+                    </div>
+                `;
+                const host = modal.querySelector('.password-shadow-host');
+                if (host && typeof host.attachShadow === 'function') {
+                    const shadow = host.attachShadow({ mode: 'closed' });
+                    const input = document.createElement('input');
+                    input.type = 'password';
+                    input.className = 'prompt-input form-control';
+                    shadow.appendChild(input);
+                    getInputValue = () => input.value || '';
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') confirm();
+                        if (e.key === 'Escape') cancel();
+                    };
+                }
+            } else {
+                modal.innerHTML = `
+                    <div class="modal-header">
+                        <h3>${this.escape(title)}</h3>
+                        <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <input type="${this.escape(type)}" class="prompt-input form-control">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+                        <button type="button" class="btn btn-primary confirm-btn">OK</button>
+                    </div>
+                `;
+                const input = modal.querySelector('.prompt-input');
+                if (input) {
+                    getInputValue = () => input.value || '';
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') confirm();
+                        if (e.key === 'Escape') cancel();
+                    };
+                }
             }
+
+            this.show(modal);
+
+            const confirmBtn = modal.querySelector('.confirm-btn');
+            if (confirmBtn) confirmBtn.onclick = confirm;
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) cancelBtn.onclick = cancel;
+            const closeBtn = modal.querySelector('.close-btn');
+            if (closeBtn) closeBtn.onclick = cancel;
         });
     }
 
@@ -91,11 +196,16 @@ export class ModalManager {
             const modal = document.createElement('div');
             modal.className = 'modal-dialog';
             modal.innerHTML = `
-                <h3>Confirmation</h3>
-                <p>${this.escape(message)}</p>
-                <div class="modal-actions">
-                    <button class="btn btn-secondary cancel-btn">No</button>
-                    <button class="btn btn-primary confirm-btn">Yes</button>
+                <div class="modal-header">
+                    <h3>Confirmation</h3>
+                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p style="white-space: pre-line; line-height: 1.5; margin: 0;">${this.escape(message)}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary cancel-btn">No</button>
+                    <button type="button" class="btn btn-primary confirm-btn">Yes</button>
                 </div>
             `;
 
@@ -105,21 +215,62 @@ export class ModalManager {
                 this.hide();
             };
 
-            modal.querySelector('.confirm-btn').onclick = () => {
-                cleanup();
-                setTimeout(() => resolve(true), 50);
-            };
-            modal.querySelector('.cancel-btn').onclick = () => {
+            const confirmBtn = modal.querySelector('.confirm-btn');
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    cleanup();
+                    setTimeout(() => resolve(true), 50);
+                };
+            }
+            const cancel = () => {
                 cleanup();
                 setTimeout(() => resolve(false), 50);
             };
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) cancelBtn.onclick = cancel;
+            const closeBtn = modal.querySelector('.close-btn');
+            if (closeBtn) closeBtn.onclick = cancel;
         });
     }
 
-    async showForm(title, fields, initialValues = {}) {
+    async showAlert(title, message, type = 'info') {
         return new Promise((resolve) => {
             const modal = document.createElement('div');
-            modal.className = 'modal-dialog modal-lg'; // Larger modal
+            modal.className = `modal-dialog modal-alert modal-${type}`;
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3>${this.escape(title)}</h3>
+                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p style="white-space: pre-line; line-height: 1.5; margin: 0;">${this.escape(message)}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary ok-btn">OK</button>
+                </div>
+            `;
+
+            this.show(modal);
+
+            const cleanup = () => {
+                this.hide();
+                setTimeout(() => resolve(), 50);
+            };
+
+            const okBtn = modal.querySelector('.ok-btn');
+            if (okBtn) okBtn.onclick = cleanup;
+            const closeBtn = modal.querySelector('.close-btn');
+            if (closeBtn) closeBtn.onclick = cleanup;
+        });
+    }
+
+    /**
+     * Shows a rich dynamic form modal.
+     */
+    async showForm(title, fields, initialValues = {}, options = {}) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal-dialog modal-lg';
 
             const inputsHtml = fields.map(field => {
                 const val = initialValues[field.name] || '';
@@ -131,7 +282,38 @@ export class ModalManager {
                     return `
                         <div class="form-group">
                             <label>${this.escape(label)}</label>
-                            <textarea name="${this.escape(field.name)}" class="form-control" ${required}>${this.escape(val)}</textarea>
+                            <textarea name="${this.escape(field.name)}" class="notes-textarea form-control" placeholder="Markdown documentation, notes, recovery keys..." ${required}>${this.escape(val)}</textarea>
+                        </div>`;
+                }
+
+                if (field.name === 'password') {
+                    return `
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <div class="password-input-group">
+                                <input type="password" name="${this.escape(field.name)}" value="${this.escape(val)}" class="form-control password-input" ${required}>
+                                <button type="button" class="btn-input-action toggle-reveal-btn" title="Show/Hide Password" aria-label="Show password">👁</button>
+                                <button type="button" class="btn-input-action generate-pw-btn" title="Generate Strong Password" aria-label="Generate password">🎲</button>
+                            </div>
+                            <div class="password-strength-container">
+                                <div class="password-strength-bar"><div class="strength-fill"></div></div>
+                                <span class="strength-text"></span>
+                            </div>
+                        </div>`;
+                }
+
+                if (field.name === 'totp') {
+                    return `
+                        <div class="form-group">
+                            <label>${this.escape(label)}</label>
+                            <div class="totp-input-group">
+                                <input type="text" name="${this.escape(field.name)}" value="${this.escape(val)}" placeholder="JBSWY3DPEHPK3PXP or otpauth://..." class="form-control totp-input" ${required}>
+                                <button type="button" class="btn-input-action scan-qr-btn" title="Scan or Drop QR Code image">📷 Scan QR</button>
+                            </div>
+                            <div class="modal-qr-dropzone" style="display: none;">
+                                <span>Drop QR code image here, paste, or click to browse</span>
+                                <input type="file" accept="image/*" class="modal-qr-file-input" style="display: none;">
+                            </div>
                         </div>`;
                 }
 
@@ -142,71 +324,215 @@ export class ModalManager {
                     </div>`;
             }).join('');
 
+            const deleteBtnHtml = options.showDelete
+                ? `<button type="button" class="btn btn-danger delete-btn" style="margin-right: auto;">🗑️ Delete</button>`
+                : '';
+
             modal.innerHTML = `
-                <h3>${this.escape(title)}</h3>
-                <form id="dynamicForm">
-                    ${inputsHtml}
-                    <div class="modal-actions">
+                <div class="modal-header">
+                    <h3>${this.escape(title)}</h3>
+                    <button type="button" class="btn-icon close-btn" aria-label="Close">✕</button>
+                </div>
+                <form id="dynamicForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+                    <div class="modal-body">
+                        ${inputsHtml}
+                    </div>
+                    <div class="modal-footer">
+                        ${deleteBtnHtml}
                         <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="submit" class="btn btn-primary submit-btn">Save</button>
                     </div>
                 </form>
             `;
 
             this.show(modal);
 
+            const closeBtn = modal.querySelector('.close-btn');
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    this.hide();
+                    resolve(null);
+                };
+            }
+
+            // Password Reveal Toggle
+            const toggleRevealBtn = modal.querySelector('.toggle-reveal-btn');
+            const passwordInput = modal.querySelector('.password-input');
+            if (toggleRevealBtn && passwordInput) {
+                toggleRevealBtn.onclick = () => {
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        toggleRevealBtn.textContent = '🙈';
+                        toggleRevealBtn.setAttribute('aria-label', 'Hide password');
+                    } else {
+                        passwordInput.type = 'password';
+                        toggleRevealBtn.textContent = '👁';
+                        toggleRevealBtn.setAttribute('aria-label', 'Show password');
+                    }
+                };
+            }
+
+            // Password Strength and Generator
+            const updateStrength = () => {
+                if (!passwordInput) return;
+                const val = passwordInput.value || '';
+                const { label, color, percent } = ModalManager.calculatePasswordStrength(val);
+                const fill = modal.querySelector('.strength-fill');
+                const text = modal.querySelector('.strength-text');
+                if (fill && fill.style) {
+                    fill.style.width = `${percent}%`;
+                    fill.style.backgroundColor = color;
+                }
+                if (text) {
+                    text.textContent = val ? `Strength: ${label}` : '';
+                    if (text.style) text.style.color = color;
+                }
+            };
+
+            if (passwordInput) {
+                passwordInput.addEventListener('input', updateStrength);
+                updateStrength();
+            }
+
+            const generatePwBtn = modal.querySelector('.generate-pw-btn');
+            if (generatePwBtn && passwordInput) {
+                generatePwBtn.onclick = () => {
+                    const generated = this.generateStrongPassword(20);
+                    passwordInput.value = generated;
+                    passwordInput.type = 'text';
+                    if (toggleRevealBtn) toggleRevealBtn.textContent = '🙈';
+                    updateStrength();
+                    this.showToast('Generated strong 20-character password', 'success');
+                };
+            }
+
+            // Modal QR Scan / Drop Integration
+            const scanQrBtn = modal.querySelector('.scan-qr-btn');
+            const qrDropzone = modal.querySelector('.modal-qr-dropzone');
+            const qrFileInput = modal.querySelector('.modal-qr-file-input');
+            const totpInput = modal.querySelector('.totp-input');
+
+            if (scanQrBtn && qrDropzone && qrFileInput && totpInput) {
+                const handleQrFile = async (file) => {
+                    try {
+                        let imageData = null;
+                        if (file && file.imageData) {
+                            imageData = file.imageData;
+                        } else if (typeof createImageBitmap === 'function') {
+                            const bmp = await createImageBitmap(file);
+                            const canvas = document.createElement('canvas');
+                            canvas.width = bmp.width;
+                            canvas.height = bmp.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(bmp, 0, 0);
+                            imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            bmp.close && bmp.close();
+                        }
+
+                        if (!imageData) {
+                            throw new Error('Could not rasterize image');
+                        }
+
+                        const [decoded, decodeErr] = decodeQR(imageData);
+                        if (decodeErr) {
+                            this.showToast('Could not read QR code: ' + decodeErr.message, 'error');
+                            return;
+                        }
+
+                        const text = new TextDecoder().decode(decoded.bytes).trim();
+                        totpInput.value = text;
+                        qrDropzone.style.display = 'none';
+                        this.showToast('Scanned TOTP QR code successfully!', 'success');
+                    } catch (err) {
+                        this.showToast('QR scan failed: ' + err.message, 'error');
+                    }
+                };
+
+                scanQrBtn.onclick = () => {
+                    qrDropzone.style.display = qrDropzone.style.display === 'none' ? 'block' : 'none';
+                };
+
+                qrDropzone.onclick = () => qrFileInput.click();
+                qrFileInput.onchange = () => {
+                    if (qrFileInput.files[0]) handleQrFile(qrFileInput.files[0]);
+                };
+
+                qrDropzone.ondragover = (e) => e.preventDefault();
+                qrDropzone.ondrop = (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer && e.dataTransfer.files[0]) {
+                        handleQrFile(e.dataTransfer.files[0]);
+                    }
+                };
+            }
+
             const cleanup = () => {
                 this.hide();
             };
 
+            // Delete Entry Button
+            const deleteBtn = modal.querySelector('.delete-btn');
+            if (deleteBtn) {
+                deleteBtn.onclick = () => {
+                    cleanup();
+                    setTimeout(() => resolve({ _action: 'delete' }), 50);
+                };
+            }
+
             const form = modal.querySelector('form');
-            form.onsubmit = (e) => {
-                e.preventDefault();
-                const formData = new FormData(form);
-                const data = {};
-                for (let [key, val] of formData.entries()) {
-                    data[key] = val;
-                }
+            if (form) {
+                form.onsubmit = (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(form);
+                    const data = {};
+                    for (const [key, val] of formData.entries()) {
+                        data[key] = val;
+                    }
 
-                // Handle Tags special case (comma separated string -> array)
-                if (data.tags) {
-                    data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
-                }
+                    if (data.tags) {
+                        data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+                    }
 
-                cleanup();
-                setTimeout(() => resolve(data), 50);
-            };
+                    cleanup();
+                    setTimeout(() => resolve(data), 50);
+                };
+            }
 
-            modal.querySelector('.cancel-btn').onclick = () => {
-                cleanup();
-                setTimeout(() => resolve(null), 50);
-            };
+            const cancelBtn = modal.querySelector('.cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    cleanup();
+                    setTimeout(() => resolve(null), 50);
+                };
+            }
         });
     }
 
-    showAlert(title, message, type = 'info') {
-        let iconSrc = 'components/assets/ollie-happy.svg';
-        if (type === 'error') {
-            iconSrc = 'components/assets/ollie-sad.svg';
-        }
+    /**
+     * Guided Multi-step Onboarding Wizard for new vault creation.
+     */
+    async showOnboardingWizard(options = {}) {
+        return new OnboardingWizard(this).show(options);
+    }
 
-        const modal = document.createElement('div');
-        modal.className = `modal-dialog alert-${this.escape(type)}`;
-        modal.innerHTML = `
-            <div style="text-align: center; margin-bottom: 1rem;">
-                <img src="${this.escape(iconSrc)}" width="80" height="80" alt="Ollie ${this.escape(type)}">
-            </div>
-            <h3 style="text-align: center;">${this.escape(title)}</h3>
-            <p style="text-align: center; color: var(--text-muted);">${this.escape(message)}</p>
-            <div class="modal-actions" style="justify-content: center; margin-top: 1.5rem;">
-                <button class="btn btn-primary confirm-btn">OK</button>
-            </div>
-        `;
+    /**
+     * Modal for changing the master password with live hardware benchmark calibration.
+     */
+    async showChangePasswordModal(options = {}) {
+        return new ChangePasswordModal(this).show(options);
+    }
 
-        this.show(modal);
+    /**
+     * Modal for viewing and configuring 2FA Tier B TOTP gate settings.
+     */
+    async show2FaSettingsModal(options = {}) {
+        return new TwoFactorSettingsModal(this).show(options);
+    }
 
-        modal.querySelector('.confirm-btn').onclick = () => {
-            this.hide();
-        };
+    /**
+     * Shows Keyboard Shortcuts cheat-sheet modal.
+     */
+    async showShortcutsModal() {
+        return new ShortcutsModal(this).show();
     }
 }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Scan Header Parser - Parses SOS (Start of Scan) segment
  * 
  * SOS segment format (JPEG spec lines 57-69):

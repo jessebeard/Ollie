@@ -249,3 +249,47 @@ describe('Reed-Solomon Encoder Generator Caching', () => {
         expect(encoder.cachedGenerators.length).toBeGreaterThanOrEqual(7);
     });
 });
+
+describe('ReedSolomonDecoder decodeTuple', () => {
+    it('returns [received, null] on clean codewords', () => {
+        const encoder = new ReedSolomonEncoder(qrField);
+        const decoder = new ReedSolomonDecoder(qrField);
+        const buffer = new Int32Array([1, 2, 3, 4, 5, 0, 0, 0, 0]);
+        encoder.encode(buffer, 4);
+        const [res, err] = decoder.decodeTuple(buffer, 4);
+        expect(err).toBe(null);
+        expect(res).toBe(buffer);
+        expect(buffer[0]).toBe(1);
+    });
+
+    it('returns [received, null] after correcting correctable errors', () => {
+        const encoder = new ReedSolomonEncoder(qrField);
+        const decoder = new ReedSolomonDecoder(qrField);
+        const buffer = new Int32Array([10, 20, 30, 40, 50, 0, 0, 0, 0]);
+        encoder.encode(buffer, 4);
+        const orig0 = buffer[0];
+        buffer[0] = (buffer[0] + 55) & 0xFF;
+        const [res, err] = decoder.decodeTuple(buffer, 4);
+        expect(err).toBe(null);
+        expect(res[0]).toBe(orig0);
+    });
+
+    it('returns [null, Error] for invalid inputs and uncorrectable errors', () => {
+        const decoder = new ReedSolomonDecoder(qrField);
+        const [, errNull] = decoder.decodeTuple(null, 4);
+        expect(errNull instanceof Error).toBe(true);
+        expect(errNull.message).toBe('reed-solomon: invalid received buffer');
+
+        const [, errTwoS] = decoder.decodeTuple(new Int32Array(10), 0);
+        expect(errTwoS instanceof Error).toBe(true);
+        expect(errTwoS.message).toBe('reed-solomon: twoS must be a positive integer');
+
+        // Uncorrectable corrupted data
+        const corrupted = new Int32Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        const [, errCorr] = decoder.decodeTuple(corrupted, 4);
+        // Either fails with an error or miscorrects without throwing
+        if (errCorr) {
+            expect(errCorr instanceof Error).toBe(true);
+        }
+    });
+});

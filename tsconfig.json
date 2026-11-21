@@ -1,0 +1,17 @@
+{
+    "//": "checkJs covers the library core and Node tooling where JSDoc contracts are load-bearing. app/ UI code is excluded until its DOM access is typed (getElementById returns HTMLElement; input.value/canvas.getContext noise dominates). Adopt incrementally.",
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "strict": false,
+        "noImplicitAny": false,
+        "strictNullChecks": false,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*.js", "scripts/**/*.mjs"],
+    "exclude": ["src/vendor/**"]
+}

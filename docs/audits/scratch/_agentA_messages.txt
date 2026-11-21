@@ -1,0 +1,85 @@
+﻿LINE 46 LEN 230
+I've found that `BitReaderOptimized` converts error tuples into thrown exceptions across all read methods, including `skipBits`. Now I'll trace how this affects `decodeScan` in decoder.js and check the bit-writer implementation.
+
+
+=====
+LINE 147 LEN 206
+I've pinned huffman-optimized-fsm.js. The grep tool is failing on patterns here â€” I'll use targeted reads to pin the remaining exact lines in dht-automaton.js and double-check a few other key locations.
+
+
+=====
+LINE 150 LEN 457
+I've confirmed all pins in dht-automaton.js (L73, L75, L78-79, L82, L86-88, L95) and huffman-optimized-fsm.js (L10 def, L6-9 JSDoc missing @returns, L12, L28, L30, L32, L34-36 write at L35, L38-39, L42, L52, L57, L59-60, L62-64, L66, L68). 
+
+The Critical uncaught-throw chain is the headline finding â€” before composing the deliverable I want to verify it directly in decoder.js rather than rely on the prior-session summary. Let me read the key regions.
+
+
+=====
+LINE 153 LEN 279
+Confirmed: `decode()` wraps only `parseFileStructure` in try/catch (L109-113); JFIF `getUint16` (L132-133) and DRI `getUint16` (L167) are outside any try/catch â†’ RangeError escapes. Now let me pin down `decodeScan` itself to confirm the BitReader throw path and bare returns.
+
+
+=====
+LINE 156 LEN 159
+Both reads are consistent. Now let me pin down `decodeScan` itself â€” the BitReader construction, RST handling, bare-error returns, and its return contract.
+
+
+=====
+LINE 159 LEN 466
+Now I have `decodeScan` fully pinned (L321-454): bare `return new Error(...)` at L353-355 & L374, `if (blockErr) return blockErr` at L445, RST handling L364-420, `new BitReader(scanData)` at L322, and **no return statement at the end of the function** (returns `undefined` on success). The critical question now is whether the BitReader methods throw (escaping `decode()` at L213, which has no try/catch). Let me verify the bit-stream layer and the DC decode path.
+
+
+=====
+LINE 162 LEN 504
+The embedded content (authoritative, file confirmed unchanged) confirms the throw behavior. Recounting exact lines: `readBit` throws at **L16**, `readBits` at **L24**, `peekBits` at **L32**, `peek16Bits` at **L38**, and `skipBits` (L42-44) delegates to `readBits`. Every error path throws instead of returning the tuple. Now let me confirm the three downstream throw triggers â€” what `core.readBits` does for length>16 / EOF, the DC `readBits(category)` call, and the optimized-path `skipBits` at EOF.
+
+
+=====
+LINE 165 LEN 132
+The embedded content was for bit-reader-optimized.js only; bit-core.js was not re-embedded. Let me fetch it with explicit offsets.
+
+
+=====
+LINE 168 LEN 5777
+optimized,bit-writer} class+methods); src/automata/parsers/marker-scanner.js (MARKERS const)
+- Category: Style and Consistency
+- Detail: Multiple exported functions/methods and one exported const lack the required typed @param/@returns JSDoc (rule: typed JSDoc mandatory on every exported function). assembleImage's @returns is factually wrong (it returns Result tuples, not a {data,width,height} object). Fix: add/complete typed JSDoc on all listed exports and correct assembleImage's @returns.
+
+### [LOW] Dead code (rule #9) â€” zero usages in src/ and test/
+- File: src/automata/parsers/spiff-parser.js (L39 SPIFF_COLOR_SPACES, L53 SPIFF_COMPRESSION_TYPES, L63 SPIFF_RESOLUTION_UNITS); src/automata/bit-streams/bit-reader.js (L21) + src/automata/bit-streams/bit-reader-optimized.js (L60-68) (_handleByteStuffing, public, no external callers); src/codec/decoder.js (~L306 per-component `dcPredictor` field, never read)
+- Category: Style and Consistency
+- Detail: The three SPIFF constant exports, the public _handleByteStuffing methods, and the per-component `dcPredictor` field are never referenced anywhere in src/ or test/. Rule #9 prohibits dead code. Fix: delete them (the live predictor state is the local `dcPredictors` array at decoder.js L329).
+
+### [LOW] Encoder lacks input validation and has several truncation/hack issues
+- File: src/codec/encoder.js (encode entry â€” no width/height/data.length validation; writeWord >65535 truncation; assembleFile header value >255 wraps mod 256; writeDHT L670 `dcCounts.slice(1)` hack; L426-427 `compIds.length < 3` â†’ console.warn only â†’ `coefficients[undefined]` TypeError)
+- Category: Style and Consistency
+- Detail: encode() accepts arbitrary width/height/data.length with no validation (possible OOM/NaN/hang); writeWord silently truncates values >65535; assembleFile wraps a >255 header value mod 256; the `slice(1)` in writeDHT is a fragile off-by-one hack; and the <3-component case only warns, then indexes `coefficients[undefined]` â†’ uncaught TypeError. Fix: validate inputs at the encode() boundary, range-check write values, and return tuple errors for the <3-component case.
+
+### [LOW] Miscellaneous consistency / robustness nits
+- File: src/codec/encoder.js + src/codec/decoder.js (L244-245) (console.log spam); src/codec/capacity-scanner.js (queue.shift() O(nÂ²); concurrency â‰¤0 â†’ zero workers â†’ silently zeroed result); src/automata/bit-streams/bit-reader-optimized.js (L46-58 "Optimized" naming misleading; alignToByte has no bounds check); src/codec/decoder.js (L456-636 assembleImage return shape inconsistent â€” `coefficients` field present only in multi-comp path); src/codec/file-scanner.js (matchesPattern JSDoc claims "Glob pattern" but only supports `*.*`/`*`/`*.ext`/exact); src/automata/parsers/spiff-parser.js (typo "Modified Modified READ"; SPIFF width/height are Uint32 with no range validation); src/automata/bit-streams/bit-writer.js (writeBits no length validation; flush returns bare); src/codec/transcoder.js (drops DRI/chromaSubsampling on re-encode)
+- Category: Idiomatic Improvements
+- Detail: Non-security hygiene issues that will bite later: log spam on error paths, O(nÂ²) queue and a silently-degenerate concurrencyâ‰¤0 config in capacity-scanner, a misleadingly-named "optimized" bit reader whose alignToByte is unbounded, an inconsistent assembleImage return shape, an over-promising JSDoc on file-scanner, an unvalidated SPIFF dimension field, unvalidated BitWriter writes, and a transcoder that silently drops DRI/chroma subsampling metadata. Fix: remove log spam, use an index-based queue and validate concurrencyâ‰¥1, rename or bound the optimized reader, standardize the decode return shape, correct the JSDoc, range-validate SPIFF dims, validate writeBits length, and preserve DRI/chromaSubsampling in transcode.
+
+## Coverage Gaps
+Files/functions in scope with no direct test coverage:
+- src/codec/file-scanner.js â€” no test imports it at all (scanDirectory, matchesPattern untested).
+- src/automata/parsers/spiff-parser.js â€” no dedicated module test; spiff-parsing.test.js exercises SPIFF only at decoder level.
+- src/automata/bit-streams/bit-reader-optimized.js â€” only test/utils/compare-bitreaders.js and compare-skipbits.js, both outside the suite; its throw paths (L16/L24/L32/L38/L42-44) are never asserted.
+- src/automata/bit-streams/bit-writer.js â€” only exercised indirectly via huffman-encoder-fsm.test.js.
+
+Untested malicious-input cases:
+- Truncated scan / bit underflow at the decode() boundary (defensive.test.js contains only PNG-magic and empty/null cases).
+- DHT with a DC code mapped to category 17-255 (the readBits throw path, huffman-decoder-fsm.js L27).
+- Non-canonical or overfull DHT BITS (silent lookup-table corruption, huffman-optimized-fsm.js / dht-automaton.js).
+- DQT Pq=1 with high byte â‰¥0x80 (sign bug, dqt-automaton.js L51); zero quantizer values; truncated Pq=1 payload.
+- DRI payload <2 bytes (decoder.js L167 RangeError).
+- JFIF APP0 payload 5-13 bytes (decoder.js L132-133 RangeError).
+- SOF with duplicate component ids; SOF expectedLength trailing garbage (uses `<`).
+- SOS with Ss>Se; baseline SOS with Ah=0 and Al=0; SOS component selectors not matching SOF.
+- RST number mismatch / wrong bit position / resync failure (rst-markers.test.js is a single own-encoder round-trip PBT only).
+- 0xFF 0xFF sequence inside scan data (bit-core.js L16-27 fallthrough).
+- Mid-readBits truncation and 1s-padded EOF peek16Bits (bit-core.js L121, L127-131).
+- Encoder with |AC coefficient| â‰¥ 1024 or |DC difference| â‰¥ 2048 via transcoder (huffman-encoder-fsm.js L83/L114 TypeError paths).
+- capacity-scanner with concurrency â‰¤ 0.
+- test/utils/bit-reader.test.js content never audited for EOF/invalid-length throw coverage.
+=====

@@ -59,7 +59,7 @@ describe('BitCore', () => {
             const data = new Uint8Array([0b10101010]);
             let bOff = 0;
             let bitOff = 0;
-            let results = [];
+            const results = [];
 
             for (let i = 0; i < 8; i++) {
                 const [bit, nextB, nextBit, err] = readBit(data, bOff, bitOff);

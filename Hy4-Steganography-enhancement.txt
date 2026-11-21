@@ -1,0 +1,124 @@
+Bottom line
+Your crypto/container layer is in good shape (AES‑GCM, PBKDF2 with sane iteration bounds, CRC, domain‑separated seeds). Your embedding layer is the problem , and it isn't a tuning issue — it's two structural fingerprints that a 2002 attack was purpose‑built to find:
+
+Shrinkage. Every modification decrements |coefficient|. When a ±1 becomes 0, the count of non‑zero ACs drops and the count of zeros rises. Fridrich–Goljan–Hogea ("Steganalysis of JPEG Images: Breaking the F5 Algorithm", IH 2002) recovers the cover histogram by decompressing → cropping 4 px on each side → recompressing with the same quant table, then least‑squares fits the modification rate β. Their paper's claim: reliable detection down to ~10% relative modification of usable coefficients , plus message‑length estimation.
+One‑directional bias. Because changes only ever go toward zero, the histogram distortion is a first difference of h(d) — large and systematic. This is what the least‑squares fit eats.
+Two more things worth knowing before you plan:
+
+The attack is calibrated (cropping destroys content adaptivity), so content adaptivity alone will not save you. Only lowering β and removing the directional bias do.
+There are ready‑made oracles: stegdetect -tF(the -tfvariant just greps for a JPEG comment — the original Java F5 wrote one; never add a COM segment), and a full Go implementation of the Fridrich attack with β and message‑length estimation. Use these as your red team.
+Detector tiers you need to survive, in ascending order of difficulty: file‑structure scans → first‑order statistics (chi‑square, Fridrich histogram/calibration, RS) → rich models (cc‑JRM, DCTR, GFR, PHARM + ensemble/FLD) → CNNs (SRNet, J‑XuNet, ZhuNet) → pipeline forensics (double‑JPEG, quant‑table estimation).
+
+Phase 0 — Build the measurement harness first (1 week)
+You cannot optimize what you don't score. Without this, every subsequent change is superstition.
+
+Cover set: BOSSbase 1.01 + BOWS2 (10k each), plus ALASKA2. Convert to JPEG at QF 75 and 95 with one encoder. Keep a held‑out split.
+Oracles, cheapest first:
+Fridrich calibration attack (implement it; ~200 lines, or test against the Go package).
+stegdetect -tF, zsteg, StegExpose.
+DCTR + GFR + low‑complexity linear FLD classifier (Python; reference code is public).
+SRNet / J‑XuNet in PyTorch — this is the tier that actually breaks modern schemes, so it's the one that matters.
+Metric: minimum total error under equal priors, PE = (P_FA + P_MD)/2, at 0.05 / 0.1 / 0.2 / 0.4 bpnzAC.
+Baseline first: run your current F5 through all four. My prediction: tier‑1/2 detect it with near‑100% accuracy at any useful payload, and SRNet lands near 0% PE even at 0.05 bpnzAC. That number is your scoreboard.
+Phase 1 — Kill the shrinkage fingerprint (small patch, large payoff)
+This is ~15 lines and needs no architectural change. Do it today.
+
+Never let a coefficient reach zero. For |v| = 1, only allow the increment direction (1 → 2); forbid 1 → 0.
+For |v| ≥ 2, choose direction pseudo‑randomly (keyed PRNG bit) instead of always decrementing. Both +1 and −1 flip the LSB, so the hash/XOR logic is untouched.
+Zeros stay untouched (they already are — the walk skips them).
+Why this works: |1| coefficients remain fully usable (1→2 still flips parity), so you lose no capacity — in fact you gain it, because you stop burning coefficients on shrink‑and‑re‑embed. And the histogram distortion changes character:
+
+decrement‑only: H(d) = h(d) + β·[h(d+1) − h(d)]← first difference, big
+symmetric: H(d) = h(d) + (β/2)·[h(d+1) + h(d−1) − 2h(d)]← second difference, small
+The attacker's least‑squares fit for β is now fitting a second difference of a smooth, roughly geometric histogram — dominated by the estimation error in the calibrated ĥ rather than by your signal.
+
+Sketch:
+
+js
+copy
+const entry = group[targetIdx];
+const v = entry.block[entry.coeffIdx];
+// nsF5 rule: |v| == 1 may only grow; otherwise pick a keyed direction.
+const grow = (Math.abs(v) === 1) ? true : (prngBit() === 1);
+entry.block[entry.coeffIdx] = (v > 0) === grow ? v + 1 : v - 1;
+// No zero can be produced -> no shrinkage branch, no permIdx rewind.
+You can then delete the permIdx = startPermIdx; continue;re‑embedding path entirely (keep it as a safety net), and drop the shrinkage fudge factor in selectK/ calculateCapacity.
+
+Optional add‑on (1c): a histogram sanity gate. After embedding, compute the folded |coefficient| histogram of cover vs stego, run the attacker's own β estimator, and if β̂ exceeds a threshold, re‑embed with a fresh 1‑byte attempt counter (stored in the header) that reseeds the direction PRNG. This is standard "stego selection" and it directly attacks the one detector you know is pointed at you.
+
+Phase 2 — Replace matrix encoding with STC (the single biggest win)
+F5's (1, n, k) Hamming matrix encoding is a 2001 coding scheme. Syndrome‑Trellis Codes (Filler–Judas–Fridrich, TIFS 2011) are the universal replacement and are what every modern scheme uses.
+
+The rate–distortion bound for ternary ±1 embedding is α = H(β) + β(α = relative payload, β = change rate). Compared to F5:
+
+relative payload α	F5 (k≤4) change rate	STC bound β	efficiency gain
+0.05	≤ α/4 = 0.0125	≈ 0.005	~2.5 × fewer changes
+0.10	0.025	≈ 0.011	~2.3×
+0.267 (k=4)	0.067	≈ 0.037	~1.8×
+At the payloads you care about, STC roughly halves to thirds the number of modified coefficients — and β is exactly the quantity the Fridrich attack estimates.
+
+The architectural bonus is just as important: extraction becomes m = H·yover the whole coefficient vector. There is no permutation walk, no group synchronization, no shrinkage‑desync. Shrinkage stops being a correctness problem and becomes merely a distortion you can price. Zeros become "wet" elements (ρ = ∞) so they're never touched — and the receiver needs to know nothing about the wet set.
+
+Implementation notes:
+
+Build H as the banded diagonal tiling of a small ĥ (h × w), h = 10–12 (1024–4096 states). Viterbi in the dual domain, forward pass storing one decision bit per state per column, backward pass reconstructing. Linear time and space; for h = 10 and n = 10⁶ that's ~122 MB for the path store, so chunk into segments of ~10⁴–10⁵ if you're browser‑bound.
+ĥ design rules from the paper: no identical columns, ones in the first and last rows, remaining bits random from your keyed PRNG.
+Use the multi‑layered construction for the ternary (±1) case — that's what lets you carry distinct ρ(+1) and ρ(−1) per coefficient.
+Reference to port from: there's a complete validated implementation walkthrough (Rust→WASM) covering exactly the parity‑check construction, both Viterbi passes, the multi‑layered ternary extension, and wet‑paper handling — including efficiency/memory tables for h = 4…10. That's your template.
+Keep your keyed permutation as defence‑in‑depth (permute costs and values ​​together, run STC, unpermute). Additivity means order doesn't affect optimality.
+Phase 3 — Content‑adaptive distortion, computed in the spatial domain
+With STC in place, the second axis is where the changes go. Ranked by security‑per‑effort:
+
+J‑UNIWARD (Holub–Fridrich–Denemark). Distortion is the sum of relative changes in the three first‑level undecimated directional wavelet subbands (db8, K⁽¹⁾=h·gᵀ, K⁽²⁾=g·hᵀ, K⁽³⁾=g·gᵀ, σ = 2⁻⁶). It beat nsF5 and UED by a sizeable margin on BOSSbase across QF 75/85/95 with SRMQ1+JRM and an ensemble classifier. Critically, its cost is computed on the decompressed image — which matters because the strongest JPEG detectors (DCTR, GFR, PHARM) are also computed in the spatial domain, phase‑aware. A pure DCT‑domain cost function is blind to the statistic your adversary is actually measuring.
+Performance is the usual objection. It's tractable: because the undecimated transform is shift‑invariant and both filter bank and DCT basis are outer products, the ±1 ripple factorises along each axis, so you can evaluate the cost in closed form rather than re‑running the transform per coefficient. There's a browser‑native TypeScript implementation doing exactly this in well under a second, validated against brute force to ~1e‑12.
+UERD — DCT‑domain only, ~4× faster than J‑UNIWARD, close but consistently behind. Good fallback for large images or low‑power targets.
+J‑MiPOD — competitive with J‑UNIWARD, ~2× faster, needs a variance estimator.
+Two design decisions to A/B test rather than assume:
+
+Are zeros in the carrier pool? J‑UNIWARD/SI‑UNIWARD use every coefficient including DC and zeros; classic schemes use non‑zero AC only. There's a real tension here — including zeros inflates your per‑change cost (one browser implementation measures F5's per‑change exposure as lower for exactly this reason), while excluding them concentrates changes in an already‑cheap subset and keeps the zero/non‑zero count fixed. My recommendation: start with zeros and DC wet + non‑zero AC only (matches your current, well‑understood behavior), then A/B against the full pool.
+Note that one Rust implementation never modifies DC or ±1 AC "to preserve JPEG RLE entropy coding stability" — that's a file‑size/robustness argument, not a security one, and it costs you your cheapest coefficients. Don't copy it blindly.
+If you can restructure the pipeline: if the tool ever compresses from a raw/PNG source rather than editing an existing JPEG, use SI‑UNIWARD / SI‑J‑MiPOD (side‑informed, using the pre‑quantisation coefficients). It's the most secure JPEG family by a clear margin at small payloads. This is the one change that would put you meaningfully ahead of everything else — and it requires owning the compression step.
+
+Phase 4 — Don’t get eaten by selection‑channel‑aware detectors
+There's a trap in Phase 3. Content‑adaptive costs are derived from the image , so the warden can estimate them too. SCA‑aware features (Denemark et al.; maxSRM, SCA‑DCTR, SCA‑GFR) accumulate change probabilities in the histograms and are currently among the best detectors of adaptive steganography — "even an imprecise knowledge of the embedding probabilities can substantially increase detection accuracy… overly adaptive schemes are more vulnerable than adaptive schemes that spread changes evenly."
+
+Countermeasure: randomise the cost function with your key , which is the "ensemble steganography" idea (Li et al., 2018) — introduce key‑dependent cost perturbations that barely raise total distortion but wreck the warden's estimate of the selection channel. Concretely: ρ'ᵢ = ρᵢ · (1 + λ·uᵢ)with uᵢ uniform from your keyed PRNG, λ ≈ 0.2–0.5, then feed ρ' to STC. Cheap, and it's the difference between "adaptive" and "predictably adaptive."
+
+Optional, later: synchronizing modification directions (SYNCH / CMD / ASYM) — iteratively adjust costs so neighboring coefficients change in consistent directions. Cheap to bolt on, reported gains of a few PE points.
+
+Skip for now: RL/GAN‑learned costs (JEC‑RL, ASDL‑GAN, UT‑GAN, ADV‑EMB). They're the current research frontier and post real gains against specific detectors, but they're heavyweight, they overfit to a target detector, and they're not worth it in JS until Phases 0–3 are measured and done.
+
+Phase 5 — Container and protocol hygiene
+This is where I'd push back hardest on the current design, because it's free detectability you're paying for no reason.
+
+Every embedded bit costs you changes, and every change costs you security. Audit the payload budget:
+
+The 255‑byte control codeword is a large fixed tax. 2040 bits. For a 512×512 QF75 cover with ~40k non‑zero ACs, a conservative 0.05 bpnzAC budget is ~2000 bits total — your header alone eats the entire safe payload. Replace the JSON‑ish control plane with a compact binary TLV (version, profile id, lengths, CRC) and give the header strong FEC (repetition or BCH — it's the highest‑value bits you have), not the body.
+Reconsider RS ​​'Extreme' on the whole body. AES‑GCM already gives you authenticated integrity. If your threat model is "JPEG survives a lossless round trip," GCM's tag is sufficient and the RS redundancy is pure overhead — likely a large multiplier on your embedded bit count. Keep light FEC only if you need robustness against lossy recompression (in which case you have bigger problems — see Phase 6).
+Compress plaintext before encrypting (never after). Fewer bits = fewer changes.
+Padding to length buckets. Right now the container is a fixed, recognisable structure. Quantise the total embedded length to a small set of buckets and pad with keyed random bytes.
+Two real bugs I'd flag, neither of them about steganalysis:
+
+Your permutation seed is a single SHA‑256 of the password, while your encryption key gets PBKDF2 at 50k–10M iterations. That makes password guessing ~200,000× cheaper than you intend: an attacker tests one SHA‑256 per candidate, derives the permutation, extracts the first 32 bits, and checks for F5SG. You've built a fast oracle next to a slow one. Fix: derive everything from one KDF — PBKDF2-SHA256(password, salt, N) → HKDF-Expandwith distinct info labels for the AES key, the permutation seed, and the STC parity‑check matrix. (A good public template: PBKDF2 600k → HKDF → AES‑CTR keystream for the ĥ matrix + Fisher‑Yates permutation, HMAC‑SHA‑256 integrity tag.)
+Metadata is plaintext. metaBytes goes into the coded body unencrypted while only the payload is encrypted. So a passive observer with no key learns: that the container is encrypted, the exact KDF parameters, the ECC profile, and — via payloadLen— the exact message length , which is precisely the quantity the Fridrich attack tries to estimate and which you're handing over for free. Fix: move all metadata inside the encrypted envelope. Leave outside only a minimal, fixed‑size, key‑independent header.
+Also: extractRawrecomputes selectKfrom the stego image when kisn't supplied. The stego's p1 and non‑zero count differ from the cover's, so the fallback can silently disagree with the embedder. STC removes this whole class of bug (k disappears), but until then, always pass kexplicitly and treat the fallback as legacy‑only.
+
+Phase 6 — Operational and pipeline hygiene
+None of Phases 1–5 matter if the JPEG container itself is forensically broken.
+
+Never re‑quantise. Re‑encode with the source's exact quantisation tables, sampling factors, Huffman tables, and progressive/baseline mode. A browser pipeline that goes JPEG → decode → canvas.toBlob('image/jpeg', quality)applies its own quantisation and produces a double‑compressed file — trivially detectable by double‑JPEG forensics, and it makes the calibration attack dramatically stronger (the Go attack implementation even has explicit double‑compression detection with recalibration). Write the DCT coefficients back losslessly.
+No COM/EXIF/comment segments, no appended data. stegdetect -tf and -taare literal greps.
+Cover selection matters more than algorithm tweaks. Prefer camera‑original natural photos at QF 75–95 with real texture. Reject or warn on: already‑double‑compressed images, synthetic/flat/low‑texture images (F5 exhausts non‑zero ACs on these — one implementation marks those comparisons invalid), very small images, grayscale‑converted images, and anything headed for a social platform that will re‑encode (that destroys the payload anyway).
+Cap the payload and say so in the UI. Suggested policy: default ≤ 0.05 bpnzAC; warn above 0.1; hard‑refuse above 0.2 with an explicit "this is likely detectable" confirmation. Show the user the equivalent bpnzAC, not just bytes.
+Prefer luma. If you currently embed across chroma, note that detectability is strongly channel‑dependent; embedding in Y only, or distributing payload by per‑channel detectability, is measurably better than a naive split.
+If the user embeds many images from the same source , say so — pooled steganalysis aggregates across a batch and each additional image is a free sample to the warden.
+What not to do
+Don't optimize against one CNN. ADV‑EMB‑style adversarial embedding buys a lot against the target detector and can make you worse against rich models. If you go there, use the min‑max strategy over an ensemble.
+Don't chase pure histogram preservation. OutGuess preserved the DCT histogram and was broken by a blockiness detector. It's a necessary condition, not a sufficient one — which is why the Phase 1c gate is a sanity check, not a defence.
+Don't trust stego‑source mismatch. The UNCOVER results are striking — train on UERD, test on J‑MiPOD and you get PE ≈ 46–49%, ie chance. Moving off F5 does buy you immediate practical safety against scanners trained on known tools. Treat that as a bonus, never as the plan.
+Don't chase capacity. Every published scheme looks secure at 0.05 bpnzAC and detectable at 0.3. The payload slider is the strongest control you have, and it's the one users will abuse.
+Realistic outcome
+Honest calibration, from published numbers for J‑UNIWARD at QF 75, 0.1 bpnzAC: PE ≈ 46% (PHARM), 45% (GFR), 42% (SCA‑GFR) — but 32% against SRNet and 41% against J‑XuNet . A well‑trained CNN detector is the real threat, not the 2002 statistics. At ≤ 0.05 bpnzAC, you're in genuinely good shape against feature‑based detectors and marginal against a dedicated CNN; above 0.2 bpnzAC, assume detection by anyone competent.
+
+Sequenced, my recommended order is: Phase 0 (harness) → Phase 1 (one‑afternoon patch, kills the known attack) → Phase 2 (STC, the big win) → Phase 5 (stop leaking length, stop over‑provisioning FEC) → Phase 3 (J‑UNIWARD) → Phase 4 (anti‑SCA) → Phase 6 (pipeline structural hygiene, continuously). Phases 1 and 5 alone should move you from "detected by a 20‑year‑old attack with near‑certainty" to "requires a trained CNN and a real payload to catch."
+

@@ -15,9 +15,8 @@ describe('Steganography Roundtrip', () => {
     }
 
     it('should roundtrip secret data', async () => {
-
-        const width = 64;
-        const height = 64;
+        const width = 128;
+        const height = 128;
         const original = createNoiseImage(width, height);
 
         const secretText = "This is a secret message hidden in the pixels!";
@@ -41,7 +40,6 @@ describe('Steganography Roundtrip', () => {
     });
 
     it('should handle data too large for capacity (graceful failure)', async () => {
-
         const width = 8;
         const height = 8;
         const original = createNoiseImage(width, height);

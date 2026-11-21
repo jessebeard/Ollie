@@ -36,7 +36,7 @@ export function getTestResults() {
     return testResults;
 }
 
-let rootNode = {
+const rootNode = {
     name: "Root",
     suites: [],
     tests: [],
@@ -70,12 +70,27 @@ export function describe(name, fn) {
     }
 }
 
-export function it(name, fn) {
-    currentSuiteObj.tests.push({ name, fn });
+export function it(name, fn, options = {}) {
+    currentSuiteObj.tests.push({ name, fn, options });
 }
 
 export async function executeTests() {
     await runSuite(rootNode);
+}
+
+async function executeWithTimeout(fn, timeoutMs = 30000) {
+    if (timeoutMs <= 0) return fn();
+    let timerId;
+    const timeoutPromise = new Promise((_, reject) => {
+        timerId = setTimeout(() => {
+            reject(new Error(`Test timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
+    try {
+        return await Promise.race([fn(), timeoutPromise]);
+    } finally {
+        if (timerId) clearTimeout(timerId);
+    }
 }
 
 async function runSuite(node) {
@@ -112,7 +127,7 @@ async function runSuite(node) {
     try {
         // Run all tests in this suite sequentially
         for (const testNode of node.tests) {
-            await runTest(node !== rootNode ? node : null, testNode.name, testNode.fn);
+            await runTest(node !== rootNode ? node : null, testNode.name, testNode.fn, testNode.options);
         }
 
         // Run all nested suites sequentially
@@ -133,15 +148,16 @@ async function runSuite(node) {
     }
 }
 
-async function runTest(parent, name, fn) {
+async function runTest(parent, name, fn, options = {}) {
     currentAssertionCount = 0;
     const startTime = Date.now();
     const suiteName = parent ? parent.name : currentSuite;
+    const timeoutMs = options.timeout !== undefined ? options.timeout : 30000;
 
     if (isNode) {
         stats.total++;
         try {
-            await fn();
+            await executeWithTimeout(fn, timeoutMs);
             const duration = Date.now() - startTime;
             stats.passed++;
 
@@ -190,7 +206,7 @@ async function runTest(parent, name, fn) {
 
         stats.total++;
         try {
-            await fn();
+            await executeWithTimeout(fn, timeoutMs);
             const duration = Date.now() - startTime;
             stats.passed++;
 
@@ -254,10 +270,34 @@ export function expect(actual) {
         },
         toEqual: (expected) => {
             tick();
+            // Handle Uint8Array / TypedArray byte-by-byte comparison
+            if (actual instanceof Uint8Array && expected instanceof Uint8Array) {
+                if (actual.length !== expected.length) {
+                    throw new Error(`Expected Uint8Array length ${expected.length} but got ${actual.length}`);
+                }
+                for (let i = 0; i < actual.length; i++) {
+                    if (actual[i] !== expected[i]) {
+                        throw new Error(`Uint8Array mismatch at index ${i}: expected ${expected[i]} but got ${actual[i]}`);
+                    }
+                }
+                return;
+            }
+
+            const describeValue = (v) => {
+                if (v instanceof Error) return `${v.name}: ${v.message}`;
+                if (typeof v === 'object' && v !== null && v.constructor && v.constructor.name !== 'Object') {
+                    return `${v.constructor.name} {}`;
+                }
+                return JSON.stringify(v);
+            };
             const actualStr = JSON.stringify(actual);
             const expectedStr = JSON.stringify(expected);
             if (actualStr !== expectedStr) {
-                throw new Error(`Expected ${expectedStr} but got ${actualStr}`);
+                const hint = (actual instanceof Error || expected instanceof Error ||
+                    (actual && typeof actual === 'object') || (expected && typeof expected === 'object'))
+                    ? ` [${describeValue(actual)} vs ${describeValue(expected)}]`
+                    : '';
+                throw new Error(`Expected ${expectedStr} but got ${actualStr}${hint}`);
             }
         },
         toBeCloseTo: (expected, precision = 2) => {
@@ -298,6 +338,12 @@ export function expect(actual) {
                 throw new Error(`Expected value to be defined`);
             }
         },
+        toBeUndefined: () => {
+            tick();
+            if (typeof actual !== 'undefined') {
+                throw new Error(`Expected undefined but got ${actual}`);
+            }
+        },
         toBeNull: () => {
             tick();
             if (actual !== null) {
@@ -308,6 +354,49 @@ export function expect(actual) {
             tick();
             if (!actual) {
                 throw new Error(`Expected ${actual} to be truthy`);
+            }
+        },
+        toBeFalsy: () => {
+            tick();
+            if (actual) {
+                throw new Error(`Expected ${actual} to be falsy`);
+            }
+        },
+        toBeNaN: () => {
+            tick();
+            if (!Number.isNaN(actual)) {
+                throw new Error(`Expected NaN but got ${actual}`);
+            }
+        },
+        toBeInstanceOf: (expectedClass) => {
+            tick();
+            if (!(actual instanceof expectedClass)) {
+                const actualName = (actual && actual.constructor) ? actual.constructor.name : typeof actual;
+                const expectedName = (expectedClass && expectedClass.name) ? expectedClass.name : 'expected class';
+                throw new Error(`Expected instance of ${expectedName} but got ${actualName}`);
+            }
+        },
+        toMatch: (pattern) => {
+            tick();
+            if (pattern instanceof RegExp) {
+                if (!pattern.test(String(actual))) {
+                    throw new Error(`Expected "${actual}" to match ${pattern}`);
+                }
+            } else if (typeof pattern === 'string') {
+                if (!String(actual).includes(pattern)) {
+                    throw new Error(`Expected "${actual}" to include "${pattern}"`);
+                }
+            } else {
+                throw new Error(`Expected RegExp or string pattern for toMatch`);
+            }
+        },
+        toHaveLength: (expectedLength) => {
+            tick();
+            const len = (actual && typeof actual.length === 'number') ? actual.length
+                : (actual && typeof actual.size === 'number') ? actual.size
+                : undefined;
+            if (len !== expectedLength) {
+                throw new Error(`Expected length ${expectedLength} but got ${len}`);
             }
         },
         toThrow: (expectedError) => {
@@ -326,11 +415,45 @@ export function expect(actual) {
                         if (!e.message.includes(expectedError)) {
                             throw new Error(`Expected error including "${expectedError}" but got "${e.message}"`);
                         }
+                    } else if (typeof expectedError === 'function') {
+                        if (!(e instanceof expectedError)) {
+                            throw new Error(`Expected error instance of ${expectedError.name} but got ${e.constructor.name}`);
+                        }
                     }
                 }
             }
             if (!threw) {
                 throw new Error('Expected function to throw an error');
+            }
+        },
+        toReject: async (expectedError) => {
+            tick();
+            if (typeof actual !== 'function') {
+                throw new Error('Expected a function returning a Promise for toReject');
+            }
+            let threw = false;
+            try {
+                await actual();
+            } catch (e) {
+                threw = true;
+                if (expectedError) {
+                    if (expectedError instanceof RegExp) {
+                        if (!expectedError.test(e.message)) {
+                            throw new Error(`Expected rejection matching ${expectedError} but got "${e.message}"`);
+                        }
+                    } else if (typeof expectedError === 'string') {
+                        if (!e.message.includes(expectedError)) {
+                            throw new Error(`Expected rejection including "${expectedError}" but got "${e.message}"`);
+                        }
+                    } else if (typeof expectedError === 'function') {
+                        if (!(e instanceof expectedError)) {
+                            throw new Error(`Expected rejection instance of ${expectedError.name} but got ${e.constructor.name}`);
+                        }
+                    }
+                }
+            }
+            if (!threw) {
+                throw new Error('Expected async function to reject with an error');
             }
         },
         toContain: (expected) => {
@@ -365,6 +488,19 @@ export function expect(actual) {
     };
 }
 
+/**
+ * Direct assertion function with per-test counting.
+ * Throws if condition is falsy.
+ * @param {boolean} condition
+ * @param {string} [message]
+ */
+export function assert(condition, message = 'Assertion failed') {
+    currentAssertionCount++;
+    if (!condition) {
+        throw new Error('Assertion failed: ' + message);
+    }
+}
+
 export function getStats() {
     return { ...stats };
 }
@@ -373,4 +509,8 @@ export function resetStats() {
     stats = { total: 0, passed: 0, failed: 0 };
     testResults = [];
     currentAssertionCount = 0;
+    rootNode.suites.length = 0;
+    rootNode.tests.length = 0;
+    currentSuiteObj = rootNode;
 }
+

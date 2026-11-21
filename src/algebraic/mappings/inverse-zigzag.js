@@ -19,7 +19,7 @@ export const ZIGZAG_ORDER = new Int32Array([
 /**
  * Convert 1D zigzag-ordered array to 8x8 2D block
  * 
- * @param {Int32Array|Float32Array} zigzagArray - 64-element array in zigzag order
+ * @param {Int32Array|Float32Array|Float64Array} zigzagArray - 64-element array in zigzag order
  * @returns {[Float32Array, null] | [null, Error]} Tuple: 64-element array in natural 2D order, or error
  */
 export function inverseZigZag(zigzagArray, outputBuffer = null) {

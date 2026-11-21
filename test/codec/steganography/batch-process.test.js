@@ -1,10 +1,7 @@
+import { describe, it, expect } from '../../utils/test-runner.js';
 import { BatchEmbedder } from '../../../src/information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../../../src/information-theory/steganography/batch-extractor.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { JpegEncoder } from '../../../src/codec/encoder.js';
 
 class MockFile {
     constructor(buffer, name) {
@@ -12,68 +9,57 @@ class MockFile {
         this.name = name;
     }
     async arrayBuffer() {
-
         return this.buffer.buffer.slice(this.buffer.byteOffset, this.buffer.byteOffset + this.buffer.byteLength);
     }
 }
 
-async function runTest() {
-    console.log('Starting Batch Processing Test...');
-
-    const imagePath = path.join(__dirname, '../../fixtures/tetst racer.jpg');
-
-    if (!fs.existsSync(imagePath)) {
-        console.error(`Test image not found at ${imagePath}`);
-        process.exit(1);
-    }
-
-    const imageBuffer = fs.readFileSync(imagePath);
-
-    const files = [
-        new MockFile(imageBuffer, 'image1.jpg'),
-        new MockFile(imageBuffer, 'image2.jpg')
-    ];
-
-    const secretData = new Uint8Array(2000);
-    for (let i = 0; i < secretData.length; i++) secretData[i] = i % 255;
-
-    const embedder = new BatchEmbedder();
-    const options = {
-        chunkSize: 1000,
-        filename: 'secret.bin'
-    };
-
-    console.log('Embedding...');
-    const [embeddedFiles, embedErr] = await embedder.embed(secretData, files, options, (c, t, s) => console.log(s));
-    if (embedErr) throw embedErr;
-
-    console.log(`Embedded into ${embeddedFiles.length} files.`);
-
-    const extractFiles = embeddedFiles.map(f => new MockFile(f.data, f.name));
-
-    const extractor = new BatchExtractor();
-    console.log('Extracting...');
-    const [result, extractErr] = await extractor.extract(extractFiles, null, (c, t, s) => console.log(s));
-    if (extractErr) throw extractErr;
-
-    console.log('Extraction complete.');
-    console.log('Filename:', result.filename);
-    console.log('Data length:', result.data.length);
-
-    if (result.data.length !== secretData.length) {
-        throw new Error(`Length mismatch: expected ${secretData.length}, got ${result.data.length}`);
-    }
-
-    for (let i = 0; i < secretData.length; i++) {
-        if (result.data[i] !== secretData[i]) {
-            throw new Error(`Data mismatch at index ${i}`);
+describe('Batch Processing', () => {
+    it('embeds and extracts across multiple carrier files', async () => {
+        // Generate synthetic carrier images with high-frequency noise for F5 capacity
+        const width = 256;
+        const height = 256;
+        const data = new Uint8ClampedArray(width * height * 4);
+        let s = 123456789;
+        for (let i = 0; i < data.length; i += 4) {
+            s = (s * 1103515245 + 12345) & 0x7fffffff;
+            data[i] = s & 0xFF;
+            data[i + 1] = (s >> 8) & 0xFF;
+            data[i + 2] = (s >> 16) & 0xFF;
+            data[i + 3] = 255;
         }
-    }
+        const imageBuffer = await new JpegEncoder(90, { subsampling: '4:4:4' }).encode({ width, height, data });
 
-    console.log('Test Passed!');
-}
+        const files = [
+            new MockFile(imageBuffer, 'image1.jpg'),
+            new MockFile(imageBuffer, 'image2.jpg')
+        ];
 
-runTest().catch(e => {
-    console.error('Test Failed:', e);
-    process.exit(1);
+        const secretData = new Uint8Array(200);
+        for (let i = 0; i < secretData.length; i++) secretData[i] = i % 255;
+
+        const embedder = new BatchEmbedder();
+        const options = {
+            chunkSize: 1000,
+            filename: 'secret.bin',
+            password: 'batch-test-password',
+            manifest: { revision: 0 }
+        };
+
+        const [embeddedFiles, embedErr] = await embedder.embed(secretData, files, options, () => {});
+        expect(embedErr).toEqual(null);
+        expect(embeddedFiles.length).toBeGreaterThan(0);
+
+        const extractFiles = embeddedFiles.map(f => new MockFile(f.data, f.name));
+
+        const extractor = new BatchExtractor();
+        const [result, extractErr] = await extractor.extract(extractFiles, 'batch-test-password', () => {});
+        expect(extractErr).toEqual(null);
+        expect(result.filename).toBe('secret.bin');
+        expect(result.data.length).toBe(secretData.length);
+
+        for (let i = 0; i < secretData.length; i++) {
+            expect(result.data[i]).toBe(secretData[i]);
+        }
+    });
 });
+

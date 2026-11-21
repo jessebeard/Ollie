@@ -1,4 +1,7 @@
 
+const MAX_TRAVERSAL_DEPTH = 16;
+const MAX_COLLECTED_FILES = 4096;
+
 export class DropZone {
     constructor(element, onFilesDropped) {
         this.element = element;
@@ -9,12 +12,30 @@ export class DropZone {
     }
 
     initialize() {
+        if (!this.element) return;
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             this.element.addEventListener(eventName, (e) => {
                 e.preventDefault();
                 e.stopPropagation();
             }, false);
         });
+
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('drop', (e) => {
+                if (e.target === this.element || (this.element.contains && this.element.contains(e.target))) {
+                    if (typeof e.stopImmediatePropagation === 'function') {
+                        e.stopImmediatePropagation();
+                    }
+                    if (typeof e.stopPropagation === 'function') {
+                        e.stopPropagation();
+                    }
+                    if (typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                    }
+                    this.handleDrop(e);
+                }
+            }, true);
+        }
 
         this.element.addEventListener('dragenter', () => this.highlight());
         this.element.addEventListener('dragover', () => this.highlight());
@@ -38,68 +59,106 @@ export class DropZone {
     async handleDrop(e) {
         this.unhighlight();
 
-        const items = e.dataTransfer.items;
-        if (!items) return;
+        const items = e.dataTransfer && e.dataTransfer.items;
+        if (!items || items.length === 0) return;
 
-        const files = []; // Mixed: Files or Handles
-        const queue = [];
+        const pending = [];
+        const errors = [];
 
         for (let i = 0; i < items.length; i++) {
-            // Modern API: File System Access Handles
-            if (items[i].kind === 'file' && typeof items[i].getAsFileSystemHandle === 'function') {
-                const handle = await items[i].getAsFileSystemHandle();
-                if (handle) queue.push(handle);
-            }
-            // Fallback: Webkit GetAsEntry
-            else if (typeof items[i].webkitGetAsEntry === 'function') {
-                const entry = items[i].webkitGetAsEntry();
-                if (entry) queue.push(entry);
+            const item = items[i];
+            if (item.kind !== 'file') continue;
+            try {
+                if (typeof item.getAsFileSystemHandle === 'function') {
+                    pending.push(item.getAsFileSystemHandle());
+                } else if (typeof item.webkitGetAsEntry === 'function') {
+                    const entry = item.webkitGetAsEntry();
+                    if (entry) pending.push(Promise.resolve(entry));
+                } else if (item.getAsFile) {
+                    const file = item.getAsFile();
+                    if (file) pending.push(Promise.resolve(file));
+                }
+            } catch (err) {
+                errors.push(err);
             }
         }
 
-        await this.processQueue(queue, files);
-
-        if (files.length > 0) {
-            this.onFilesDropped(files);
+        const roots = [];
+        for (const p of pending) {
+            try {
+                const root = await p;
+                if (root) roots.push(root);
+            } catch (err) {
+                errors.push(err);
+            }
         }
+
+        const files = [];
+        await this.processQueue(roots, files, errors, 0);
+
+        files.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+        this.onFilesDropped(files, errors);
     }
 
-    async processQueue(queue, files) {
-        // Optimize: Parallelize directory traversal and file processing to improve throughput
-        const promises = queue.splice(0, queue.length).map(async (item) => {
-            // Handle Logic (Modern)
-            if (item.kind === 'file' && item.getFile) {
-                // It's a FileSystemFileHandle
+    async processQueue(queue, files, errors, depth) {
+        if (depth > MAX_TRAVERSAL_DEPTH) return;
+
+        const batch = queue.splice(0, queue.length);
+        const promises = batch.map(async (item) => {
+            if (files.length >= MAX_COLLECTED_FILES) return;
+
+            if (item.kind === 'file' && typeof item.getFile === 'function') {
                 if (this.isJpeg(item.name)) {
                     files.push(item);
                 }
-            } else if (item.kind === 'directory' && item.values) {
-                // It's a FileSystemDirectoryHandle (Modern)
+            } else if (item.kind === 'directory' && typeof item.values === 'function') {
                 const subQueue = [];
-                for await (const entry of item.values()) {
-                    subQueue.push(entry);
+                try {
+                    for await (const entry of item.values()) {
+                        subQueue.push(entry);
+                    }
+                } catch (err) {
+                    errors.push(err);
                 }
-                await this.processQueue(subQueue, files);
-            }
-            // Entry Logic (Legacy)
-            else if (item.isFile) {
+                await this.processQueue(subQueue, files, errors, depth + 1);
+            } else if (item.isFile) {
                 if (this.isJpeg(item.name)) {
-                    const file = await this.getFileFromEntry(item);
-                    files.push(file);
+                    try {
+                        const file = await this.getFileFromEntry(item);
+                        files.push(file);
+                    } catch (err) {
+                        errors.push(err);
+                    }
                 }
             } else if (item.isDirectory) {
-                const reader = item.createReader();
-                const entries = await this.readEntriesPromise(reader);
-                await this.processQueue([...entries], files);
+                try {
+                    const reader = item.createReader();
+                    const entries = await this.readEntriesPromise(reader);
+                    await this.processQueue([...entries], files, errors, depth + 1);
+                } catch (err) {
+                    errors.push(err);
+                }
             }
         });
 
         await Promise.all(promises);
     }
 
-    readEntriesPromise(reader) {
+    async readEntriesPromise(reader) {
         return new Promise((resolve, reject) => {
-            reader.readEntries(entries => resolve(entries), err => reject(err));
+            const allEntries = [];
+            const readBatch = () => {
+                reader.readEntries(entries => {
+                    if (entries.length === 0) {
+                        resolve(allEntries);
+                        return;
+                    }
+                    allEntries.push(...entries);
+                    readBatch();
+                }, err => reject(err));
+            };
+            readBatch();
         });
     }
 

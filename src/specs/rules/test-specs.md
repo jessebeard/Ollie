@@ -27,3 +27,11 @@ This is a file to create a set of rules for the project's tests.
 12. **Mutation-Killing Assertion Strength**: Every assertion must constrain a specific, observable value — not merely assert non-failure. A test that only checks "it didn't throw" or "the output exists" is insufficient; if a source line were mutated (e.g., `+` changed to `-`, a constant altered, a branch flipped), at least one assertion in the suite must fail. Property-based tests must assert on the *content and structure* of results (e.g., byte-level equality, length invariants, algebraic identities), not just their type or existence, so that automated mutation testing can verify test suite thoroughness.
 
 13. **PBT Generator Bounding**: Property-based test generators (e.g. `Arbitrary.byteArray()`) must be explicitly bounded to respect the mathematical and physical capacity limits of the algorithms they test (e.g., maximum steganography payload capacities within mock image dimensions). Fuzzing inputs should target the algebraic properties seamlessly rather than blindly feeding arbitrarily large data that guarantees systemic memory or threshold exhaustion, unless explicitly testing boundary rejections.
+
+14. **Multi-Methodology Testing Spectrum**: Every feature, cryptographic layer, and data structure must be verified across the complete testing taxonomy:
+    - **Unit & Contract Tests**: Explicit input/output contracts, boundary checks, state mutations, and typed error tuples.
+    - **Integration & E2E Tests**: Cross-layer pipelines, UI workflows, full crypto + steganography carrier roundtrips, and CLI execution loops.
+    - **Property-Based Tests (PBT)**: Invariant verification (idempotence, roundtrip identity, algebraic symmetries) against hundreds of randomized inputs.
+    - **Metamorphic Tests (MT)**: Verification of Metamorphic Relations (MRs) where systematic input transformations yield mathematically constrained output transformations (e.g., monotonic execution time scaling, subset recovery equivalence, permutation invariance).
+    - **Fuzz Testing**: Hostile argument soup, truncated byte streams, malformed KDF parameters, random bit flips, and corrupt envelopes ensuring the system always fails closed cleanly without unhandled panics or silent corruptions.
+

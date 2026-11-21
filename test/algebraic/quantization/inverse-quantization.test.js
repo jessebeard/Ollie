@@ -1,5 +1,7 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { dequantize } from '../../../src/algebraic/quantization/inverse-quantization.js';
+import { quantize } from '../../../src/algebraic/quantization/forward-quantization.js';
 
 describe('Dequantization', () => {
     it('should multiply coefficients by quantization table values', () => {
@@ -144,5 +146,75 @@ describe('Dequantization', () => {
         for (let i = 0; i < 64; i++) {
             expect(result[i]).toBe((i + 1) * 2);
         }
+    });
+
+    it('Property: dequantize(zero_block, any_table) = zero_block', async () => {
+        await assertProperty(
+            [Arbitrary.integer(1, 255)],
+            (tableVal) => {
+                const block = new Int32Array(64).fill(0);
+                const table = new Int32Array(64).fill(tableVal);
+                const [result, err] = dequantize(block, table);
+                expect(err).toBe(null);
+                for (let i = 0; i < 64; i++) {
+                    expect(result[i]).toBe(0);
+                }
+            },
+            50
+        );
+    });
+
+    it('Property: identity scaling when quantTable is all ones', async () => {
+        await assertProperty(
+            [Arbitrary.integer(-2048, 2047)],
+            (coeff) => {
+                const block = new Int32Array(64).fill(coeff);
+                const table = new Int32Array(64).fill(1);
+                const [result, err] = dequantize(block, table);
+                expect(err).toBe(null);
+                for (let i = 0; i < 64; i++) {
+                    expect(result[i]).toBe(coeff);
+                }
+            },
+            50
+        );
+    });
+
+    it('Property: sign of dequantized matches sign of input coefficients', async () => {
+        await assertProperty(
+            [Arbitrary.integer(-1000, 1000), Arbitrary.integer(1, 255)],
+            (val, q) => {
+                const block = new Int32Array(64).fill(val);
+                const table = new Int32Array(64).fill(q);
+                const [result, err] = dequantize(block, table);
+                expect(err).toBe(null);
+                expect(Math.sign(result[0])).toBe(Math.sign(val));
+            },
+            50
+        );
+    });
+
+    it('Property: quantize and dequantize roundtrip error is bounded by quantization step', async () => {
+        await assertProperty(
+            [Arbitrary.integer(-1000, 1000), Arbitrary.integer(2, 64)],
+            (val, q) => {
+                const orig = new Float32Array(64).fill(val);
+                const table = new Uint8Array(64).fill(q);
+                const quantTableInt = new Int32Array(64).fill(q);
+
+                const [quantized, qErr] = quantize(orig, table);
+                expect(qErr).toBe(null);
+
+                const [reconstructed, dqErr] = dequantize(quantized, quantTableInt);
+                expect(dqErr).toBe(null);
+
+                // Roundtrip error for rounding in quantize is at most q / 2
+                for (let i = 0; i < 64; i++) {
+                    const diff = Math.abs(reconstructed[i] - orig[i]);
+                    expect(diff <= q / 2 + 0.001).toBe(true);
+                }
+            },
+            50
+        );
     });
 });

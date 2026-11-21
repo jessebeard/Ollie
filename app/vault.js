@@ -1,6 +1,7 @@
-import { BatchEmbedder } from '../src/information-theory/steganography/batch-embedder.js';
+﻿import { BatchEmbedder } from '../src/information-theory/steganography/batch-embedder.js';
 import { BatchExtractor } from '../src/information-theory/steganography/batch-extractor.js';
 import { FileScanner } from '../src/codec/file-scanner.js';
+import { escapeHtml } from '../src/utils/escape-html.js';
 
 /**
  * PasswordVault
@@ -306,7 +307,7 @@ class VaultUI {
                     URL.revokeObjectURL(url);
                 }
 
-                alert(`✅ Vault saved successfully!\n\n${embeddedFiles.length} image(s) created.\nYour vault is now distributed across these images.`);
+                alert(`âœ… Vault saved successfully!\n\n${embeddedFiles.length} image(s) created.\nYour vault is now distributed across these images.`);
 
             } catch (error) {
                 if (progressMsg.parentNode) {
@@ -317,7 +318,7 @@ class VaultUI {
 
         } catch (error) {
             console.error('Failed to save vault:', error);
-            alert(`❌ Failed to save vault:\n\n${error.message}`);
+            alert(`âŒ Failed to save vault:\n\n${error.message}`);
         }
     }
 
@@ -379,7 +380,7 @@ class VaultUI {
         navigator.clipboard.writeText(text).then(() => {
             // Change button text temporarily
             const originalText = button.textContent;
-            button.textContent = '✅';
+            button.textContent = 'âœ…';
             button.style.color = 'var(--success-color, #4caf50)';
 
             setTimeout(() => {
@@ -425,7 +426,7 @@ class VaultUI {
 
         const html = `
             <div class="search-bar">
-                <input type="text" placeholder="🔍 Search passwords..." id="searchInput">
+                <input type="text" placeholder="ðŸ” Search passwords..." id="searchInput">
             </div>
             <div class="password-list" id="passwordList">
                 ${this.vault.entries.map(entry => this.renderPasswordCard(entry)).join('')}
@@ -435,7 +436,7 @@ class VaultUI {
         this.vaultContent.innerHTML = html;
 
         // Add search functionality
-        // ⚡ Bolt Optimization: Debounce search input to prevent main thread blocking
+        // âš¡ Bolt Optimization: Debounce search input to prevent main thread blocking
         // This reduces synchronous DOM updates and expensive vault searches when typing quickly
         const searchInput = document.getElementById('searchInput');
         let searchTimeout;
@@ -461,19 +462,19 @@ class VaultUI {
                         ${entry.url ? `<p class="password-url">${this.escapeHtml(entry.url)}</p>` : ''}
                     </div>
                     <div class="password-actions">
-                        <button class="icon-btn edit-btn" title="Edit">✏️</button>
-                        <button class="icon-btn delete-btn" title="Delete">🗑️</button>
+                        <button class="icon-btn edit-btn" title="Edit">âœï¸</button>
+                        <button class="icon-btn delete-btn" title="Delete">ðŸ—‘ï¸</button>
                     </div>
                 </div>
                 <div class="password-card-body">
                     ${entry.username ? `
                         <span class="password-label">Username:</span>
                         <span class="password-value">${this.escapeHtml(entry.username)}</span>
-                        <button class="icon-btn copy-btn" data-value="${this.escapeHtml(entry.username)}" title="Copy">📋</button>
+                        <button class="icon-btn copy-btn" data-value="${this.escapeHtml(entry.username)}" title="Copy">ðŸ“‹</button>
                     ` : ''}
                     <span class="password-label">Password:</span>
-                    <span class="password-value hidden" data-password="${this.escapeHtml(entry.password)}">••••••••</span>
-                    <button class="icon-btn copy-btn" data-value="${this.escapeHtml(entry.password)}" title="Copy">📋</button>
+                    <span class="password-value hidden" data-password="${this.escapeHtml(entry.password)}">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</span>
+                    <button class="icon-btn copy-btn" data-value="${this.escapeHtml(entry.password)}" title="Copy">ðŸ“‹</button>
                 </div>
                 ${entry.notes ? `<p class="text-muted" style="margin-top: 0.75rem; font-size: 0.875rem;">${this.escapeHtml(entry.notes)}</p>` : ''}
             </div>
@@ -515,21 +516,16 @@ class VaultUI {
                     e.target.textContent = e.target.dataset.password;
                 } else {
                     e.target.classList.add('hidden');
-                    e.target.textContent = '••••••••';
+                    e.target.textContent = 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢';
                 }
             });
         });
     }
 
     escapeHtml(text) {
-        if (text == null) return '';
-        return String(text).replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return escapeHtml(text);
     }
 }
 
 // Initialize
-const ui = new VaultUI();
+new VaultUI();

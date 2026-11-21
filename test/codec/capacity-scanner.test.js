@@ -42,7 +42,7 @@ describe('CapacityScanner (Unit Tests)', () => {
             createMockJpeg('p2.jpg')
         ];
 
-        let progressCalls = [];
+        const progressCalls = [];
         const onProgress = (current, total, status) => {
             progressCalls.push({ current, total, status });
         };

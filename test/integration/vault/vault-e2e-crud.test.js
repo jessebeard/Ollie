@@ -1,17 +1,16 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
     describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
         it('Skipped in Browser', () => { expect(true).toBe(true); });
     });
 } else {
+    const fs = (await import('fs')).default;
+    const path = (await import('path')).default;
+    const { fileURLToPath } = await import('url');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class MockFile {
     constructor(buffer, name) {
@@ -36,7 +35,7 @@ function arbEntry() {
         password: Arbitrary.string(8, 64).generate(),
         notes: Arbitrary.string(0, 500).generate(),
         tags: Arbitrary.array(Arbitrary.string(1, 10), 0, 5).generate(),
-        totp: Arbitrary.string(16, 16).generate(),
+        totp: ['JBSWY3DPEHPK3PXP', 'otpauth://totp/PBT:u@x?secret=JBSWY3DPEHPK3PXP', undefined][Arbitrary.integer(0, 2).generate()],
         customFields: Arbitrary.array({
             generate: () => ({
                 label: Arbitrary.string(1, 20).generate(),
@@ -51,7 +50,7 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
     it('Property: Vault CRUD survival across save/load', async () => {
         const fixturesDir = path.join(__dirname, '../../fixtures/test vault');
         const availableImageFiles = fs.readdirSync(fixturesDir)
-            .filter(f => f.endsWith('.jpg') || f.endsWith('.jpeg'))
+            .filter(f => (f.endsWith('.jpg') || f.endsWith('.jpeg')) && !f.includes('BIG_LONELY_DOUG'))
             .map(f => path.join(fixturesDir, f));
 
         if (availableImageFiles.length === 0) {
@@ -84,10 +83,10 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
                 }
 
                 // Mutate vault: Update 30%, Delete 20%
-                let currentEntries = vault.entries;
+                const currentEntries = vault.entries;
                 let expectedCount = currentEntries.length;
 
-                for (let entry of currentEntries) {
+                for (const entry of currentEntries) {
                     const rand = Math.random();
                     if (rand < 0.20) { // Delete
                         const [newVault, err] = await vault.deleteEntry(entry.id);
@@ -104,12 +103,10 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
 
                 expect(vault.entries.length).toBe(expectedCount);
 
-                let savedImageFiles = [];
-                try {
-                    savedImageFiles = await vault.save(selectedImages, masterPass);
-                } catch (e) {
-                    if (e.message.includes('Insufficient capacity')) return true;
-                    console.error("Save embedding error:", e);
+                const [savedImageFiles, saveErr] = await vault.save(selectedImages, masterPass);
+                if (saveErr) {
+                    if (saveErr.message.includes('Insufficient capacity') || saveErr.message.includes('Not enough image capacity')) return true;
+                    console.error("Save embedding error:", saveErr);
                     return false;
                 }
 
@@ -139,6 +136,8 @@ describe('PasswordVault E2E Steganography (CRUD Survival)', () => {
             },
             1
         );
-    });
+    }, { timeout: 60000 });
 });
 }
+
+

@@ -155,17 +155,17 @@ describe('ErrorCorrection (Reed-Solomon Integration)', () => {
     });
 
     describe('Legacy path', () => {
-        it('protect with no profile returns Uint8Array directly', () => {
+        it('protect with no profile returns tuple wrapping Uint8Array', () => {
             const data = new Uint8Array([1, 2, 3, 4, 5]);
-            const result = ErrorCorrection.protect(data);
-            // Legacy returns Uint8Array, not tuple
+            const [result, err] = ErrorCorrection.protect(data);
+            expect(err).toEqual(null);
             expect(result instanceof Uint8Array).toBe(true);
             expect(result.length).toBeGreaterThan(data.length);
         });
 
         it('legacy protect systemtatic: data bytes preserved at start', () => {
             const data = new Uint8Array([10, 20, 30, 40, 50]);
-            const result = ErrorCorrection.protect(data);
+            const [result] = ErrorCorrection.protect(data);
             for (let i = 0; i < data.length; i++) {
                 expect(result[i]).toBe(data[i]);
             }

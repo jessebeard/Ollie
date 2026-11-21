@@ -60,7 +60,7 @@ export class BitReaderOptimized {
     }
 
     _handleByteStuffing() {
-        const [marker, nextByteOffset, err] = core.handleByteStuffing(this.data, this.byteOffset);
+        const [marker, , err] = core.handleByteStuffing(this.data, this.byteOffset);
         if (err) throw err;
         // In the original, this was an internal call. 
         // We expose it for compatibility if any tests rely on it directly.

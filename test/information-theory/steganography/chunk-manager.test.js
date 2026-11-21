@@ -13,7 +13,7 @@ describe('ChunkManager (Property-Based Tests)', () => {
                 const chunks = ChunkManager.split(dataBytes, chunkSize);
 
                 // Properties of the split
-                let totalExpected = Math.ceil(dataBytes.length / chunkSize);
+                const totalExpected = Math.ceil(dataBytes.length / chunkSize);
                 expect(chunks.length).toBe(totalExpected);
 
                 if (chunks.length > 0) {

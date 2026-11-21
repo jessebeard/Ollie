@@ -18,7 +18,9 @@ export class JpegTranscoder {
      * @param {Object} options - Options
      * @param {Object} [options.metadata] - Metadata for the container format
      * @param {string} [options.password] - Password for encryption
-     * @returns {Promise<Uint8Array>} Updated JPEG with new secret data
+     * @param {Uint8Array} [options.sealedWire] - Format v4.1 pre-sealed wire container bytes
+     * @param {string} [options.stcSeed] - Format v4.1 pre-derived STC seed hash
+     * @returns {Promise<[Uint8Array|null, Error|null]>} Result tuple of [updatedJpegBytes, error]
      */
     async updateSecret(jpegBytes, newSecretData, options = {}) {
 
@@ -38,7 +40,8 @@ export class JpegTranscoder {
             secretData: newSecretData,
             metadata: options.metadata,
             password: options.password,
-            progressive: decoded.metadata?.progressive || false
+            sealedWire: options.sealedWire,
+            stcSeed: options.stcSeed
         });
 
         try {

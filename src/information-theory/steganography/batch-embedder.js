@@ -1,13 +1,51 @@
 import { ChunkManager } from './chunk-manager.js';
-import { JpegTranscoder } from '../../codec/transcoder.js';
-import { JpegDecoder } from '../../codec/decoder.js';
+import { createManifest, deriveMacKey } from './carrier-manifest.js';
+import { KeyDerivation } from '../cryptography/pbkdf2.js';
+import { bytesToBase64 } from '../../utils/encoding.js';
+import { getCarrierPool } from '../../codec/carrier-pool.js';
+
+/** Fraction of a carrier's scanned capacity actually used for payload. */
+const CHUNK_SAFETY_FACTOR = 0.8;
 import { JpegEncoder } from '../../codec/encoder.js';
-import { F5 } from './f5-syndrome.js';
+import { StegoEngine } from './stego-engine.js';
+import { sealOpaque } from './opaque-container.js';
+import { serializePayloadV41 } from './stego-payload.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * BatchEmbedder - Handles embedding data across multiple images
  */
 export class BatchEmbedder {
+
+    /**
+     * Upper-bound template of the per-chunk container metadata used for
+     * capacity estimation. It must never serialize smaller than the real
+     * metadata written at embed time, or estimates overshoot capacity.
+     *
+     * @returns {Object}
+     */
+    static CAPACITY_METADATA_TEMPLATE() {
+        return {
+            filename: 'vault.json',
+            chunk: { id: '0'.repeat(36), index: 999, total: 9999 },
+            checksum: 4294967295,
+            originalLength: 99999999,
+            blockCount: 999999
+        };
+    }
+
+    /**
+     * Single source of truth for carrier capacity in container mode.
+     * Both the batch embedder and the capacity scanner must use this.
+     *
+     * @param {Array<Int32Array>} blocks
+     * @param {Object} [opts] - { eccProfile?, encrypted?, ecc? }
+     * @param {Object} [_extraMetadata] - Caller metadata merged over the template
+     * @returns {number} Capacity in bytes available for payload
+     */
+    static calculateCarrierCapacity(blocks, opts = {}, _extraMetadata = {}) {
+        return StegoEngine.calculateCapacity(blocks, opts);
+    }
     /**
      * Embeds data across multiple images with capacity-aware chunking
      * 
@@ -18,8 +56,11 @@ export class BatchEmbedder {
      * @param {string} [options.filename] - Original filename to preserve in metadata
      * @param {string} [options.eccProfile='Medium'] - ECC profile: 'Low', 'Medium', 'High', 'Ultra', 'Extreme'
      * @param {boolean} [options.ecc=true] - Enable error correction
+     * @param {{revision: number}} [options.manifest] - When present, sign and stamp an authenticated carrier manifest
+     * @param {number} [options.threshold] - CSS mode: required unique carriers k of n; replicates sealed payload per carrier
+     * @param {number} [options.margin=512] - Safety margin (bytes) reserved during erasure allocation planning
      * @param {Function} [onProgress] - Callback (current, total, status)
-     * @returns {Promise<Array<{name: string, data: Uint8Array}>>} Array of output files
+     * @returns {Promise<[Array<{name: string, data: Uint8Array, sourceIndex: number}>|null, Error|null]>} Result tuple of [outputFiles, error]
      */
     async embed(data, imageFiles, options = {}, onProgress = null) {
 
@@ -43,7 +84,7 @@ export class BatchEmbedder {
                 if (isJpeg) {
 
                     jpegBytes = originalBytes;
-                    console.log(`${file.name}: Using original JPEG bytes (lossless path)`);
+                    logger.debug(`${file.name}: Using original JPEG bytes (lossless path)`);
                 } else {
 
                     let imageData;
@@ -74,7 +115,7 @@ export class BatchEmbedder {
 
                     const encoder = new JpegEncoder();
                     jpegBytes = await encoder.encode(imageData);
-                    console.log(`${file.name}: Converted to JPEG`);
+                    logger.debug(`${file.name}: Converted to JPEG`);
                 }
 
                 normalizedImages.push({
@@ -88,7 +129,7 @@ export class BatchEmbedder {
                     onProgress(i + 1, imageFiles.length, `Processed ${file.name}`);
                 }
             } catch (error) {
-                console.error(`Failed to process ${file.name}:`, error);
+                logger.error(`Failed to process ${file.name}:`, error);
                 return [null, new Error(`Failed to process ${file.name}: ${error.message}`)];
             }
         }
@@ -98,91 +139,52 @@ export class BatchEmbedder {
         const imageCapacities = [];
         let totalCapacity = 0;
 
-        for (let i = 0; i < normalizedImages.length; i++) {
-            const { file, jpegBytes } = normalizedImages[i];
+        const pool = getCarrierPool();
+        const eccProfile = options.eccProfile || 'Medium';
+        const useEcc = options.ecc !== false;
+        const capacityOpts = { ecc: useEcc, eccProfile, encrypted: !!options.password };
+        const extraMetadata = options.filename ? { filename: options.filename } : {};
 
-            const decoder = new JpegDecoder();
-            const [decoded, decodeErr] = await decoder.decode(jpegBytes, { skipExtraction: true, coefficientsOnly: true });
-            if (decodeErr) throw decodeErr;
+        const scanTasks = normalizedImages.map(async ({ file, jpegBytes }, i) => {
+            const bufferSlice = /** @type {ArrayBuffer} */ (jpegBytes.buffer.slice(jpegBytes.byteOffset, jpegBytes.byteOffset + jpegBytes.byteLength));
+            const payloadBytes = new Uint8Array(bufferSlice);
 
-            const allBlocks = [];
+            const isMultithreaded = (/** @type {any} */ (options)).multithreaded !== false;
+            const [res, err] = !isMultithreaded
+                ? await pool.fallbackHandler('scan-capacity', {
+                    jpegBytes: payloadBytes,
+                    options: capacityOpts,
+                    metadata: extraMetadata
+                })
+                : await pool.dispatch('scan-capacity', {
+                    jpegBytes: payloadBytes,
+                    options: capacityOpts,
+                    metadata: extraMetadata
+                }, [bufferSlice]);
 
-            if (decoded.coefficients) {
-                for (const compId in decoded.coefficients) {
-                    const compData = decoded.coefficients[compId];
-                    if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
-                    }
-                }
+            if (err) {
+                return { file, jpegBytes, capacity: 0, index: i, error: new Error(`Failed to decode ${file.name} for capacity calculation: ${err.message}`) };
             }
+            return { file, jpegBytes, capacity: res.capacity, index: i, error: null };
+        });
 
-            if (allBlocks.length === 0 && decoder.components) {
-                for (const compId in decoder.components) {
-                    const compData = decoder.components[compId];
-                    if (compData && compData.blocks) {
-
-                        for (let k = 0; k < compData.blocks.length; k++) {
-                            allBlocks.push(compData.blocks[k]);
-                        }
-                    }
-                }
-            }
-
-            if (allBlocks.length === 0) {
-                console.error('Failed to extract blocks. Decoder state:', {
-                    hasCoefficients: !!decoded.coefficients,
-                    hasComponents: !!decoder.components,
-                    decodedKeys: Object.keys(decoded),
-                    componentKeys: decoder.components ? Object.keys(decoder.components) : []
-                });
-                return [null, new Error(`Failed to extract blocks from ${file.name} for capacity calculation`)];
-            }
-
-            const representativeMetadata = {
-                filename: options.filename || 'placeholder_filename.ext',
-                chunk: { index: 99, total: 99, start: 999999, end: 999999 },
-                checksum: '0'.repeat(32)
-            };
-
-            const eccProfile = options.eccProfile || 'Medium';
-            const useEcc = options.ecc !== false;
-
-            let capacity = F5.calculateCapacity(allBlocks, {
-                format: 'container',
-                metadata: representativeMetadata,
-                ecc: useEcc,
-                eccProfile: eccProfile,
-                encrypted: !!options.password
-            });
-
-            if (capacity === 0 && useEcc) {
-                capacity = F5.calculateCapacity(allBlocks, {
-                    format: 'container',
-                    metadata: representativeMetadata,
-                    ecc: false,
-                    encrypted: !!options.password
-                });
-                console.log(`${file.name}: ECC capacity 0, fallback to no-ECC: ${capacity} bytes`);
-            }
-
+        const scanResults = await Promise.all(scanTasks);
+        for (let i = 0; i < scanResults.length; i++) {
+            const res = scanResults[i];
+            if (res.error) return [null, res.error];
             imageCapacities.push({
-                file: file,
-                jpegBytes: jpegBytes,
-                capacity: capacity,
-                index: i
+                file: res.file,
+                jpegBytes: res.jpegBytes,
+                capacity: res.capacity,
+                index: res.index
             });
-
-            totalCapacity += capacity;
-
+            totalCapacity += res.capacity;
             if (onProgress) {
-                onProgress(i + 1, imageFiles.length, `Analyzed ${file.name}: ${capacity} bytes`);
+                onProgress(i + 1, normalizedImages.length, `Analyzed ${res.file.name}: ${res.capacity} bytes`);
             }
         }
 
-        console.log(`Total capacity: ${totalCapacity} bytes, Data: ${data.length} bytes`);
+        logger.debug(`Total capacity: ${totalCapacity} bytes, Data: ${data.length} bytes`);
 
         if (data.length > totalCapacity) {
             return [null, new Error(
@@ -191,72 +193,234 @@ export class BatchEmbedder {
             )];
         }
 
-        const [chunks, allocErr] = this.allocateDataToImages(data, imageCapacities);
-        if (allocErr) return [null, allocErr];
+        // CSS + erasure coding: seal the payload once under a random DEK,
+        // then Cauchy-erasure-code the sealed envelope into n coded stripes
+        // distributed across carriers by capacity. Any `threshold` distinct
+        // stripes (plus their key shares) recover the payload; the envelope
+        // alone reveals nothing.
+        const margin = options.margin !== undefined ? options.margin : 64;
+        const capacities = imageCapacities.map(c => c.capacity);
+        const { planErasureAllocation } = await import('../secret-sharing/cauchy-ec.js');
+        const [plan, planErr] = planErasureAllocation(capacities, {
+            threshold: options.threshold,
+            margin: margin,
+            payloadSize: data.length + 28,
+            proportional: options.threshold === undefined && imageCapacities.length > 1
+        });
+        if (planErr || !plan || plan instanceof Error) {
+            const errObj = /** @type {any} */ (planErr || plan);
+            return [null, new Error(
+                `Carrier set cannot host a vault (${data.length}-byte document). ` +
+                `Planner said: ${errObj ? errObj.message : 'Erasure allocation failed'}`
+            )];
+        }
 
-        const results = [];
-        const transcoder = new JpegTranscoder();
+        const k = plan.k;
+        const totalBlocks = plan.n;
 
-        for (let i = 0; i < chunks.length; i++) {
-            const { imageInfo, chunkData, chunkMeta } = chunks[i];
+        // Seal DEK with k-of-totalBlocks Shamir shares matching block counts
+        const { sealPayload } = await import('../secret-sharing/css-envelope.js');
+        const [sealed, sealErr] = await sealPayload(data, { threshold: k, total: totalBlocks });
+        if (sealErr) return [null, new Error(`Threshold sealing failed: ${sealErr.message}`)];
+
+        const envelopeBytes = new Uint8Array(sealed.envelope.iv.length + sealed.envelope.ciphertext.length);
+        envelopeBytes.set(sealed.envelope.iv, 0);
+        envelopeBytes.set(sealed.envelope.ciphertext, sealed.envelope.iv.length);
+        const envelopeSize = envelopeBytes.length;
+
+        const { encodeErasure } = await import('../secret-sharing/cauchy-ec.js');
+        const [codedChunks, codeErr] = encodeErasure(envelopeBytes, { k, n: totalBlocks });
+        if (codeErr) return [null, new Error(`Erasure coding failed: ${codeErr.message}`)];
+
+        const singleBlockLen = codedChunks.length > 0 ? codedChunks[0].data.length : 0;
+        const chunkId = ChunkManager.generateId();
+        const carrierItems = [];
+        let blockOffset = 0;
+
+        for (let i = 0; i < imageCapacities.length; i++) {
+            const info = imageCapacities[i];
+            const count = plan.counts[i];
+            if (count <= 0) continue;
+
+            const carrierBlocks = codedChunks.slice(blockOffset, blockOffset + count);
+            const carrierShares = sealed.shares.slice(blockOffset, blockOffset + count);
+
+            // Pack count blocks into a single contiguous byte buffer
+            const carrierBytes = new Uint8Array(count * singleBlockLen);
+            for (let b = 0; b < count; b++) {
+                carrierBytes.set(carrierBlocks[b].data, b * singleBlockLen);
+            }
+
+            const chunkMeta = {
+                id: chunkId,
+                startIndex: blockOffset,
+                count: count,
+                index: blockOffset,
+                total: totalBlocks,
+                k: k,
+                stripeSize: singleBlockLen,
+                payloadSize: envelopeSize
+            };
+
+            carrierItems.push({
+                imageInfo: info,
+                chunkData: carrierBytes,
+                chunkMeta,
+                shares: carrierShares
+            });
+
+            blockOffset += count;
+        }
+
+        logger.debug(
+            `Erasure plan: k=${k} totalBlocks=${totalBlocks} stripeSize=${plan.stripeSize} carriers=${carrierItems.length}`
+        );
+
+        if (carrierItems.length === 0) {
+            return [null, new Error('Nothing to embed')];
+        }
+
+        // Signed manifest: one block per participating carrier
+        let manifestBlocks = null;
+        if (options.manifest) {
+            if (!options.password) {
+                return [null, new Error('Manifest signing requires a password')];
+            }
+            const records = carrierItems.map((item, idx) => ({
+                index: idx,
+                checksum: ChunkManager.calculateChecksum(item.chunkData)
+            }));
+
+            const [setSalt, setSaltErr] = await KeyDerivation.generateSalt();
+            if (setSaltErr) return [null, setSaltErr];
+            const sharedKdf = {
+                algo: 'PBKDF2-SHA256',
+                iterations: KeyDerivation.ITERATIONS,
+                salt: bytesToBase64(setSalt)
+            };
+            const created = new Date().toISOString();
+
+            // Derive HMAC key once ephemerally for this entire batch; collected when embedding finishes.
+            const [macKey, macKeyErr] = await deriveMacKey(options.password, sharedKdf);
+            if (macKeyErr || !macKey) {
+                return [null, new Error(`Manifest MAC key derivation failed: ${macKeyErr?.message || 'unknown error'}`)];
+            }
+
+            manifestBlocks = [];
+            for (let i = 0; i < carrierItems.length; i++) {
+                const manifestSpec = {
+                    chunkSetId: chunkId,
+                    records,
+                    revision: options.manifest.revision,
+                    created,
+                    kdf: sharedKdf,
+                    macKey,
+                    ec: { k, n: totalBlocks, size: envelopeSize, stripeSize: plan.stripeSize }
+                };
+                if (carrierItems[i].shares && carrierItems[i].shares.length > 0) {
+                    manifestSpec.shares = carrierItems[i].shares.map(s => ({
+                        index: s.index,
+                        threshold: k,
+                        data: bytesToBase64(s.data)
+                    }));
+                    if (carrierItems[i].shares.length === 1) {
+                        manifestSpec.share = manifestSpec.shares[0];
+                    }
+                }
+                const [manifest, manifestErr] = await createManifest(manifestSpec);
+                if (manifestErr) return [null, new Error(`Manifest creation failed: ${manifestErr.message}`)];
+                manifestBlocks.push(manifest);
+            }
+        }
+
+        const embeddingTasks = carrierItems.map(async (carrierItem, i) => {
+            const { imageInfo, chunkData, chunkMeta } = carrierItem;
 
             if (onProgress) {
-                onProgress(i, chunks.length, `Embedding into ${imageInfo.file.name}...`);
+                onProgress(i, carrierItems.length, `Embedding into ${imageInfo.file.name}...`);
             }
 
-            try {
+            const metadata = {
+                filename: options.filename || 'unknown',
+                chunk: chunkMeta,
+                checksum: ChunkManager.calculateChecksum(chunkData)
+            };
+            if (manifestBlocks) {
+                metadata.manifest = manifestBlocks[i];
+            }
 
-                const metadata = {
-                    filename: options.filename || 'unknown',
-                    chunk: chunkMeta,
-                    checksum: ChunkManager.calculateChecksum(chunkData),
-                    ecc: options.ecc !== false,
-                    eccProfile: options.eccProfile || 'Medium'
-                };
-
-                const [encodedBytes, transErr] = await transcoder.updateSecret(imageInfo.jpegBytes, chunkData, {
-                    metadata: metadata,
-                    password: options.password
-                });
-
-                if (transErr) {
-                    return [null, new Error(`Failed to embed into ${imageInfo.file.name}: ${transErr.message}`)];
+            let transcodeOpts;
+            if (options.password) {
+                const [carrierPayload, serErr] = serializePayloadV41(chunkData, metadata);
+                if (serErr) {
+                    throw new Error(`Failed to serialize payload: ${serErr.message}`);
                 }
-
-                results.push({
-                    name: `steg_${i}_${imageInfo.file.name}`,
-                    data: encodedBytes
-                });
-
-            } catch (error) {
-                console.error(`Error processing ${imageInfo.file.name}:`, error);
-                return [null, new Error(`Failed to embed into ${imageInfo.file.name}: ${error.message}`)];
+                const [sealedWire, sealErr] = await sealOpaque(carrierPayload, options.password);
+                if (sealErr) {
+                    throw new Error(`Failed to seal payload: ${sealErr.message}`);
+                }
+                const stcSeed = await StegoEngine.resolveSTCSeed(options.password);
+                transcodeOpts = {
+                    metadata,
+                    sealedWire,
+                    stcSeed
+                };
+            } else {
+                transcodeOpts = {
+                    metadata
+                };
             }
+
+            let encodedBytes, transErr;
+            if ((/** @type {any} */ (options)).multithreaded === false) {
+                [encodedBytes, transErr] = await pool.fallbackHandler('transcode-embed', {
+                    jpegBytes: imageInfo.jpegBytes,
+                    chunkData,
+                    options: transcodeOpts
+                });
+            } else {
+                const jpegBuf = /** @type {ArrayBuffer} */ (imageInfo.jpegBytes.buffer.slice(
+                    imageInfo.jpegBytes.byteOffset,
+                    imageInfo.jpegBytes.byteOffset + imageInfo.jpegBytes.byteLength
+                ));
+                const chunkBuf = /** @type {ArrayBuffer} */ (chunkData.buffer.slice(
+                    chunkData.byteOffset,
+                    chunkData.byteOffset + chunkData.byteLength
+                ));
+                [encodedBytes, transErr] = await pool.dispatch('transcode-embed', {
+                    jpegBytes: new Uint8Array(jpegBuf),
+                    chunkData: new Uint8Array(chunkBuf),
+                    options: transcodeOpts
+                }, [jpegBuf, chunkBuf]);
+            }
+
+            if (transErr) {
+                throw new Error(`Failed to embed into ${imageInfo.file.name}: ${transErr.message}`);
+            }
+
+            return {
+                name: `steg_${i}_${imageInfo.file.name}`,
+                data: encodedBytes,
+                sourceIndex: imageInfo.index
+            };
+        });
+
+        try {
+            const results = await Promise.all(embeddingTasks);
+            if (onProgress) {
+                onProgress(carrierItems.length, carrierItems.length, 'Done');
+            }
+            return [results, null];
+        } catch (error) {
+            logger.error(`Error processing carriers:`, error);
+            return [null, error instanceof Error ? error : new Error(String(error))];
         }
-
-        if (onProgress) {
-            onProgress(chunks.length, chunks.length, 'Done');
-        }
-
-        return [results, null];
-    }
-
-    /**
-     * Estimate capacity of a decoded JPEG
-     * @private
-     */
-    estimateCapacity(decoded) {
-
-        const totalBlocks = Math.ceil(decoded.width / 8) * Math.ceil(decoded.height / 8) * 3;
-
-        const estimatedCapacity = Math.floor(totalBlocks * 0.25);
-
-        return Math.max(100, estimatedCapacity);
     }
 
     /**
      * Allocate data to images based on their capacities
      * @private
+     * @returns {[Array<{imageInfo: Object, chunkData: Uint8Array, chunkMeta: Object}>|null, Error|null]} Result tuple of [chunkAllocations, error]
      */
     allocateDataToImages(data, imageCapacities) {
         const chunks = [];
@@ -268,11 +432,13 @@ export class BatchEmbedder {
         for (const imageInfo of imageCapacities) {
             if (offset >= data.length) break;
 
-            const safeCapacity = Math.floor(imageInfo.capacity * 0.8);
+            // 20% headroom absorbs metadata growth and shrinkage retries so a
+            // carrier is never asked to hold more than it verifiably can.
+            const safeCapacity = Math.floor(imageInfo.capacity * CHUNK_SAFETY_FACTOR);
             const chunkSize = Math.min(safeCapacity, data.length - offset);
 
             if (chunkSize < 10) {
-                console.warn(`Image ${imageInfo.file.name} has very low capacity (${imageInfo.capacity} bytes), skipping`);
+                logger.warn(`Image ${imageInfo.file.name} has very low capacity (${imageInfo.capacity} bytes), skipping`);
                 continue;
             }
 

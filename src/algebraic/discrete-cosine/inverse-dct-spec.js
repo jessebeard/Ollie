@@ -148,51 +148,51 @@ function idct1D(data, offset, stride) {
     const s6 = offset + 6 * stride;
     const s7 = offset + 7 * stride;
 
-    let x0 = data[s0] * S0;
-    let x1 = data[s1] * S1;
-    let x2 = data[s2] * S2;
-    let x3 = data[s3] * S3;
-    let x4 = data[s4] * S4;
-    let x5 = data[s5] * S5;
-    let x6 = data[s6] * S6;
-    let x7 = data[s7] * S7;
+    const x0 = data[s0] * S0;
+    const x1 = data[s1] * S1;
+    const x2 = data[s2] * S2;
+    const x3 = data[s3] * S3;
+    const x4 = data[s4] * S4;
+    const x5 = data[s5] * S5;
+    const x6 = data[s6] * S6;
+    const x7 = data[s7] * S7;
 
     let tmp0 = x0;
     let tmp1 = x4;
     let tmp2 = x2;
     let tmp3 = x6;
 
-    let tmp10 = tmp0 + tmp1;
-    let tmp11 = tmp0 - tmp1;
+    const tmp10 = tmp0 + tmp1;
+    const tmp11 = tmp0 - tmp1;
 
-    let tmp13 = tmp2 + tmp3;
-    let tmp12 = (tmp2 - tmp3) * 1.414213562 - tmp13;
+    const tmp13 = tmp2 + tmp3;
+    const tmp12 = (tmp2 - tmp3) * 1.414213562 - tmp13;
 
     tmp0 = tmp10 + tmp13;
     tmp3 = tmp10 - tmp13;
     tmp1 = tmp11 + tmp12;
     tmp2 = tmp11 - tmp12;
 
-    let tmp4 = x1;
-    let tmp5 = x3;
-    let tmp6 = x5;
-    let tmp7 = x7;
+    const tmp4 = x1;
+    const tmp5 = x3;
+    const tmp6 = x5;
+    const tmp7 = x7;
 
-    let z13 = tmp6 + tmp5;
-    let z10 = tmp6 - tmp5;
-    let z11 = tmp4 + tmp7;
-    let z12 = tmp4 - tmp7;
+    const z13 = tmp6 + tmp5;
+    const z10 = tmp6 - tmp5;
+    const z11 = tmp4 + tmp7;
+    const z12 = tmp4 - tmp7;
 
-    let tmp7_ = z11 + z13;
-    let tmp11_ = (z11 - z13) * 1.414213562;
+    const tmp7_ = z11 + z13;
+    const tmp11_ = (z11 - z13) * 1.414213562;
 
-    let z5 = (z10 + z12) * 1.847759065;
-    let tmp10_ = 1.082392200 * z12 - z5;
-    let tmp12_ = -2.613125930 * z10 + z5;
+    const z5 = (z10 + z12) * 1.847759065;
+    const tmp10_ = 1.082392200 * z12 - z5;
+    const tmp12_ = -2.613125930 * z10 + z5;
 
-    let tmp6_ = tmp12_ - tmp7_;
-    let tmp5_ = tmp11_ - tmp6_;
-    let tmp4_ = tmp10_ + tmp5_;
+    const tmp6_ = tmp12_ - tmp7_;
+    const tmp5_ = tmp11_ - tmp6_;
+    const tmp4_ = tmp10_ + tmp5_;
 
     data[s0] = tmp0 + tmp7_;
     data[s7] = tmp0 - tmp7_;

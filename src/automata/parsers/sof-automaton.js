@@ -52,6 +52,7 @@ export function parseFrameHeader(segmentData) {
     }
 
     const components = [];
+    const seenComponentIds = new Set();
     let maxH = 0, maxV = 0;
 
     for (let i = 0; i < numComponents; i++) {
@@ -60,6 +61,11 @@ export function parseFrameHeader(segmentData) {
         const hSampling = (hvByte >> 4) & 0x0F;
         const vSampling = hvByte & 0x0F;
         const quantTableId = segmentData[offset++];
+
+        if (seenComponentIds.has(componentId)) {
+            return [null, new Error(`Duplicate component ID in SOF: ${componentId}`)];
+        }
+        seenComponentIds.add(componentId);
 
         if (hSampling < 1 || hSampling > 4 || vSampling < 1 || vSampling > 4) {
             return [null, new Error(`Invalid sampling factors: H=${hSampling}, V=${vSampling}`)];

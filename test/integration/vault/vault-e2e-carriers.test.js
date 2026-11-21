@@ -2,13 +2,6 @@ import { describe, it, expect } from '../../utils/test-runner.js';
 import { PasswordVault } from '../../../src/structures/vault/immutable-vault.js';
 import { JpegEncoder } from '../../../src/codec/encoder.js';
 import { Arbitrary, assertProperty } from '../../utils/pbt.js';
-import { fileURLToPath } from 'url';
-
-if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
-    describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
-        it('Skipped in Browser', () => { expect(true).toBe(true); });
-    });
-} else {
 
 class MockFile {
     constructor(buffer, name) {
@@ -49,13 +42,11 @@ describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
         const imageData = { width, height, data };
 
         // Pre-encode carrier images using our JpegEncoder to control exact format
-        const baselineBytes = await new JpegEncoder(90, { progressive: false, subsampling: '4:4:4' }).encode(imageData);
-        const progressiveBytes = await new JpegEncoder(90, { progressive: true, subsampling: '4:4:4' }).encode(imageData);
-        const subsampledBytes = await new JpegEncoder(90, { progressive: false, subsampling: '4:2:0' }).encode(imageData);
+        const baselineBytes = await new JpegEncoder(90, { subsampling: '4:4:4' }).encode(imageData);
+        const subsampledBytes = await new JpegEncoder(90, { subsampling: '4:2:0' }).encode(imageData);
 
         const carriers = [
             { name: 'baseline.jpg', bytes: baselineBytes },
-            { name: 'progressive.jpg', bytes: progressiveBytes },
             { name: 'subsampled.jpg', bytes: subsampledBytes }
         ];
 
@@ -72,14 +63,12 @@ describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
                 }
 
                 // Test each carrier format separately
-                for (let carrier of carriers) {
+                for (const carrier of carriers) {
                     const mockImage = new MockFile(carrier.bytes, carrier.name);
 
-                    let savedFiles;
-                    try {
-                        savedFiles = await vault.save([mockImage], password);
-                    } catch (e) {
-                        if (e.message.includes('capacity')) continue; // Skip if small carrier is insufficient
+                    const [savedFiles, saveErr] = await vault.save([mockImage], password);
+                    if (saveErr) {
+                        if (saveErr.message.includes('capacity')) continue; // Skip if small carrier is insufficient
                         return false;
                     }
 
@@ -108,4 +97,3 @@ describe('PasswordVault E2E Steganography (Carrier Formats)', () => {
         );
     });
 });
-}

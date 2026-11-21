@@ -1,5 +1,12 @@
 import { ChunkManager } from './chunk-manager.js';
-import { JpegDecoder } from '../../codec/decoder.js';
+import { verifyManifest, deriveMacKey, bindChunkRecords } from './carrier-manifest.js';
+import { openEnvelope } from '../secret-sharing/css-envelope.js';
+import { base64ToBytes } from '../../utils/encoding.js';
+import { getCarrierPool } from '../../codec/carrier-pool.js';
+import { StegoEngine } from './stego-engine.js';
+import { unsealOpaque } from './opaque-container.js';
+import { parseStegoPayload } from './stego-payload.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * BatchExtractor - Handles extracting and reassembling data from multiple images
@@ -11,55 +18,135 @@ export class BatchExtractor {
      * @param {Array<File>} imageFiles - List of image files
      * @param {string} [password] - Password for decryption
      * @param {Function} [onProgress] - Callback (current, total, status)
-     * @returns {Promise<{data: Uint8Array, filename: string, metadata: Object}>}
+     * @param {Object} [options] - Options ({ multithreaded?: boolean, ... })
+     * @returns {Promise<[Object|null, Error|null]>} Result tuple of [{data, filename, metadata}, error]
      */
-    async extract(imageFiles, password, onProgress = null) {
+    async extract(imageFiles, password, onProgress = null, options = {}) {
         const chunks = [];
+        const manifests = [];
+        const shares = [];
         const total = imageFiles.length;
         let firstMetadata = null;
+        let completed = 0;
 
-        for (let i = 0; i < imageFiles.length; i++) {
-            const file = imageFiles[i];
+        const pool = getCarrierPool();
+        const decodeTasks = imageFiles.map(async (file, _i) => {
             if (onProgress) {
-                onProgress(i, total, `Extracting from ${file.name}...`);
+                onProgress(completed, total, `Extracting from ${file.name}...`);
             }
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                const jpegBytes = new Uint8Array(arrayBuffer);
-                const decoder = new JpegDecoder();
+                const jpegBuffer = /** @type {ArrayBuffer} */ (arrayBuffer.slice(0));
+                const jpegBytes = new Uint8Array(jpegBuffer);
 
-                const [result, err] = await decoder.decode(jpegBytes, { password });
-                if (err) throw err;
+                const stcSeed = await StegoEngine.resolveSTCSeed(password);
 
-                if (result.secretData) {
-                    console.log(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
-                    if (result.secretMetadata && result.secretMetadata.chunk) {
-                        const chunkMeta = result.secretMetadata.chunk;
-                        console.log(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
-
-                        chunks.push({
-                            chunkId: chunkMeta.id,
-                            index: chunkMeta.index,
-                            total: chunkMeta.total,
-                            data: result.secretData,
-                            checksum: result.secretMetadata.checksum
-                        });
-
-                        if (!firstMetadata) {
-                            firstMetadata = result.secretMetadata;
-                        }
-                    } else {
-                        console.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
-                    }
+                let outcome;
+                if (options && options.multithreaded === false) {
+                    outcome = await pool.fallbackHandler('extract-payload', {
+                        jpegBytes,
+                        stcSeed,
+                        options
+                    });
                 } else {
-                    console.log(`File ${file.name}: No secret data found.`);
+                    outcome = await pool.dispatch(
+                        'extract-payload',
+                        { jpegBytes, stcSeed, options },
+                        [jpegBuffer]
+                    );
                 }
+
+                completed++;
+                if (onProgress) {
+                    onProgress(completed, total, `Extracted from ${file.name}`);
+                }
+
+                const [result, err] = outcome;
+                if (err) return { file, result: null, error: err };
+
+                if (result && result.candidateWires && result.candidateWires.length > 0) {
+                    for (const wire of result.candidateWires) {
+                        const [payload, unsealErr] = await unsealOpaque(wire, password, options.kdfOpts);
+                        if (!unsealErr && payload) {
+                            const [parsed, parseErr] = parseStegoPayload(payload);
+                            if (!parseErr && parsed) {
+                                result.secretData = parsed.secretData;
+                                result.secretMetadata = parsed.secretMetadata;
+                            } else {
+                                result.secretData = payload;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                return { file, result, error: null };
             } catch (error) {
-                console.error(`Failed to extract from ${file.name}:`, error);
+                completed++;
+                return { file, result: null, error };
+            }
+        });
+
+        const decodedOutcomes = await Promise.all(decodeTasks);
+
+        for (let i = 0; i < decodedOutcomes.length; i++) {
+            const { file, result, error } = decodedOutcomes[i];
+            if (error) {
+                logger.error(`Failed to extract from ${file.name}:`, error);
                 if (onProgress) {
                     onProgress(i + 1, total, `Error extracting from ${file.name}`);
                 }
+                continue;
+            }
+
+            if (result && result.secretData) {
+                logger.debug(`File ${file.name}: Found secret data. Metadata:`, result.secretMetadata);
+                if (result.secretMetadata && result.secretMetadata.chunk) {
+                    const chunkMeta = result.secretMetadata.chunk;
+                    logger.debug(`File ${file.name}: Valid chunk found. Index ${chunkMeta.index}/${chunkMeta.total}`);
+
+                    if (chunkMeta.count && chunkMeta.count > 1 && chunkMeta.stripeSize) {
+                        const stripeSize = chunkMeta.stripeSize;
+                        for (let b = 0; b < chunkMeta.count; b++) {
+                            const blockData = result.secretData.slice(b * stripeSize, (b + 1) * stripeSize);
+                            chunks.push({
+                                chunkId: chunkMeta.id,
+                                index: (chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : 0) + b,
+                                total: chunkMeta.total,
+                                data: blockData,
+                                checksum: ChunkManager.calculateChecksum(blockData)
+                            });
+                        }
+                    } else {
+                        chunks.push({
+                            chunkId: chunkMeta.id,
+                            index: chunkMeta.startIndex !== undefined ? chunkMeta.startIndex : chunkMeta.index,
+                            total: chunkMeta.total,
+                            data: result.secretData,
+                            checksum: ChunkManager.calculateChecksum(result.secretData)
+                        });
+                    }
+
+                    if (result.secretMetadata.manifest) {
+                        manifests.push(result.secretMetadata.manifest);
+                        if (result.secretMetadata.manifest.shares) {
+                            for (const s of result.secretMetadata.manifest.shares) {
+                                shares.push(s);
+                            }
+                        } else if (result.secretMetadata.manifest.share) {
+                            shares.push(result.secretMetadata.manifest.share);
+                        }
+                    }
+
+                    if (!firstMetadata) {
+                        firstMetadata = result.secretMetadata;
+                    }
+                } else {
+                    logger.warn(`File ${file.name} has secret data but no chunk metadata. Ignoring.`);
+                }
+            } else {
+                logger.debug(`File ${file.name}: No secret data found.`);
             }
         }
 
@@ -67,43 +154,155 @@ export class BatchExtractor {
             return [null, new Error('No valid chunks found in provided images.')];
         }
 
-        // Group chunks by chunkId
-        const chunkGroups = new Map();
-        for (const chunk of chunks) {
-            if (!chunkGroups.has(chunk.chunkId)) {
-                chunkGroups.set(chunk.chunkId, []);
-            }
-            chunkGroups.get(chunk.chunkId).push(chunk);
+        // Manifest enforcement: every chunk-bearing carrier must carry a
+        // manifest; all manifests must agree and authenticate under the
+        // password. Legacy (manifest-less) sets fail closed.
+        const carriersWithManifest = manifests.length;
+        if (carriersWithManifest === 0 && chunks.length > 0) {
+            return [null, new Error(
+                'Carrier set has no tamper-protection manifest. ' +
+                'These images were saved by an older Ollie version - re-save the vault to continue.'
+            )];
         }
 
-        // Find a complete group
-        let completeGroup = null;
-        let bestErrorMsg = 'No complete vault payload found across images.';
+        let verifiedManifest = null;
+        let ephemeralMacKey = null;
+        let ephemeralSalt = null;
 
-        for (const [chunkId, groupChunks] of chunkGroups.entries()) {
-            const sorted = [...groupChunks].sort((a, b) => a.index - b.index);
-            const expectedTotal = sorted[0].total;
-
-            if (sorted.length !== expectedTotal) {
-                const presentIndices = new Set(sorted.map(c => c.index));
-                const missingIndices = [];
-                for (let i = 0; i < expectedTotal; i++) {
-                    if (!presentIndices.has(i)) missingIndices.push(i);
+        for (const m of manifests) {
+            let macKey = null;
+            if (ephemeralMacKey && m.kdf && m.kdf.salt === ephemeralSalt) {
+                macKey = ephemeralMacKey;
+            } else if (m.kdf && typeof m.kdf.salt === 'string') {
+                const [derived, keyErr] = await deriveMacKey(password, m.kdf);
+                if (keyErr || !derived) {
+                    return [null, new Error(`Manifest key derivation failed: ${keyErr?.message || 'unknown error'}`)];
                 }
-                const msg = `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`;
-                console.warn(msg);
-                bestErrorMsg = msg;
-                continue; // Try next group
+                ephemeralMacKey = derived;
+                ephemeralSalt = m.kdf.salt;
+                macKey = derived;
             }
 
-            // Group is complete
-            completeGroup = sorted;
-            break;
+            const [ok, verifyErr] = await verifyManifest(m, password, { macKey });
+            if (verifyErr) return [null, new Error(`Manifest verification failed: ${verifyErr.message}`)];
+            if (ok !== true) {
+                return [null, new Error('Manifest authentication failed: wrong password or tampered carriers.')];
+            }
+            if (!verifiedManifest) {
+                verifiedManifest = m;
+            } else {
+                // Agreement excludes the per-carrier share envelope and its
+                // MAC - both are individually verified above and intentionally
+                // distinct between carriers.
+                const strip = (x) => { const c = { ...x }; delete c.share; delete c.shares; delete c.mac; return JSON.stringify(c); };
+                if (strip(verifiedManifest) !== strip(m)) {
+                    return [null, new Error('Carrier manifests disagree: carrier set was mixed or rolled back.')];
+                }
+            }
         }
 
+        // Enforce manifest chunk integrity authentication (SEC-01)
+        if (verifiedManifest.entries && verifiedManifest.entries.length > 0) {
+            const uniqueRecordsByIndex = new Map();
+            for (const c of chunks) {
+                const existing = uniqueRecordsByIndex.get(c.index);
+                if (!existing) {
+                    uniqueRecordsByIndex.set(c.index, { index: c.index, checksum: c.checksum });
+                } else if (existing.checksum !== c.checksum) {
+                    return [null, new Error(`Conflicting coded stripes detected for chunk index ${c.index}.`)];
+                }
+            }
+            const chunkRecords = Array.from(uniqueRecordsByIndex.values());
+            const [, bindErr] = bindChunkRecords(chunkRecords, verifiedManifest, { subset: true });
+            if (bindErr) {
+                return [null, new Error(`Carrier manifest chunk authentication failed: ${bindErr.message}`)];
+            }
+        }
+
+        // Threshold (CSS + erasure) mode: distinct coded stripes + key shares.
+        // Replaces chunk reassembly with stripe reconstruction, DEK
+        // recombination, and GCM opening. This is now the ONLY extraction path.
+        if (verifiedManifest.share || verifiedManifest.shares || verifiedManifest.ec) {
+            const ec = verifiedManifest.ec;
+            const threshold = ec ? ec.k : (verifiedManifest.share ? verifiedManifest.share.threshold : verifiedManifest.shares[0].threshold);
+            if (!ec || ec.k !== threshold) {
+                return [null, new Error('Manifest is missing consistent erasure parameters for share mode.')];
+            }
+
+            // Unique key shares by index; same index must carry identical data.
+            const sharesByIndex = new Map();
+            for (const s of shares) {
+                if (!s || !Number.isInteger(s.index) || typeof s.data !== 'string') {
+                    return [null, new Error('Malformed key share detected.')];
+                }
+                const [shareBytes] = base64ToBytes(s.data);
+                const existing = sharesByIndex.get(s.index);
+                if (!existing) {
+                    sharesByIndex.set(s.index, { index: s.index, data: shareBytes });
+                } else if (existing.data.length !== shareBytes.length ||
+                           existing.data.join() !== shareBytes.join()) {
+                    return [null, new Error(`Conflicting key shares detected for share index ${s.index}.`) ];
+                }
+            }
+            if (sharesByIndex.size < threshold) {
+                return [null, new Error(
+                    `Insufficient shares: ${sharesByIndex.size} unique across provided carriers, threshold is ${threshold}. Provide more carriers.`
+                )];
+            }
+
+            // Unique coded stripes by chunk index; conflicting data rejected.
+            const stripesByIndex = new Map();
+            for (const c of chunks) {
+                const existing = stripesByIndex.get(c.index);
+                if (!existing) {
+                    stripesByIndex.set(c.index, c);
+                } else if (existing.checksum !== c.checksum ||
+                           existing.data.join() !== c.data.join()) {
+                    return [null, new Error(`Conflicting coded stripes detected for chunk index ${c.index}.`) ];
+                }
+            }
+            if (stripesByIndex.size < ec.k) {
+                return [null, new Error(
+                    `Insufficient coded stripes: collected ${stripesByIndex.size} unique of ${ec.k} required blocks across ${imageFiles.length} carriers. Provide more carriers.`
+                )];
+            }
+
+            const selected = Array.from(stripesByIndex.values()).sort((a, b) => a.index - b.index).slice(0, ec.k);
+            const selectedShares = Array.from(sharesByIndex.values()).sort((a, b) => a.index - b.index).slice(0, ec.k);
+
+            const { decodeErasure } = await import('../secret-sharing/cauchy-ec.js');
+            const [envelopeBytes, decodeErr] = decodeErasure(
+                selected.map(c => ({ index: c.index, data: c.data })),
+                { k: ec.k, n: ec.n, size: ec.size }
+            );
+            if (decodeErr) return [null, new Error(`Erasure reconstruction failed: ${decodeErr.message}`)];
+
+            const iv = envelopeBytes.slice(0, 12);
+            const ciphertext = envelopeBytes.slice(12);
+            const [plaintext, openErr] = await openEnvelope(
+                { iv, ciphertext },
+                selectedShares,
+                { threshold, total: ec.n }
+            );
+            if (openErr) return [null, openErr];
+
+            return [{
+                data: plaintext,
+                filename: firstMetadata?.filename || 'vault.json',
+                metadata: {
+                    chunk: { id: verifiedManifest.chunkSetId, index: 0, total: 1 },
+                    manifest: verifiedManifest
+                }
+            }, null];
+        }
+
+        const { group: completeGroup, error: groupError } = BatchExtractor.selectCompleteGroup(chunks, total);
         if (!completeGroup) {
-            console.error(bestErrorMsg);
-            return [null, new Error(bestErrorMsg)];
+            logger.warn(groupError.message);
+            return [null, groupError];
+        }
+        if (completeGroup[0].chunkId !== verifiedManifest.chunkSetId) {
+            return [null, new Error('Reassembled chunk set does not match the authenticated manifest.')];
         }
 
         if (onProgress) {
@@ -112,19 +311,71 @@ export class BatchExtractor {
 
         const [reassembled, reassembleErr] = ChunkManager.reassemble(completeGroup);
         if (reassembleErr) {
-            console.warn(`[BatchExtractor] Failed to reassemble chunks: ${reassembleErr.message}`);
-            return null; // or perhaps return [null, reassembleErr]
+            return [null, reassembleErr];
         }
-
-        firstMetadata = chunks.find(c => c.chunkId === completeGroup[0].chunkId);
-        // Find the metadata corresponding to the complete group! But wait, `firstMetadata` in the loop was tracking the very first one which might be from a corrupted group.
-        // Actually BatchExtractor returns simply { data, filename, metadata}.
-        // We can just use the chunk metadata of the successful group.
 
         return [{
             data: reassembled,
-            filename: firstMetadata ? 'vault.json' : 'unknown',
-            metadata: { chunk: completeGroup[0] } // Mock or assemble metadata
+            filename: firstMetadata?.filename || 'vault.json',
+            metadata: { chunk: completeGroup[0], manifest: verifiedManifest }
         }, null];
+    }
+
+    /**
+     * Selects a complete, contiguous, duplicate-free chunk group from
+     * carrier-extracted chunk records. All metadata here originates from
+     * attacker-readable carriers, so every value is bounded before use.
+     *
+     * @param {Array<Object>} records - Extracted chunk records
+     * @param {number} maxTotal - Upper bound for any plausible total (carrier file count)
+     * @returns {{group: Array<Object>|null, error: Error|null}}
+     */
+    static selectCompleteGroup(records, maxTotal) {
+        const groups = new Map();
+        let bestError = new Error('No complete vault payload found across images.');
+
+        for (const record of records) {
+            if (!Number.isInteger(record.total) || !Number.isInteger(record.index)) continue;
+            if (record.total < 1 || record.total > maxTotal || record.index < 0 || record.index >= record.total) continue;
+
+            let group = groups.get(record.chunkId);
+            if (!group) {
+                group = [];
+                groups.set(record.chunkId, group);
+            }
+            group.push(record);
+        }
+
+        for (const [chunkId, groupChunks] of groups.entries()) {
+            const sorted = [...groupChunks].sort((a, b) => a.index - b.index);
+            const expectedTotal = sorted[0].total;
+
+            let duplicate = false;
+            const presentIndices = new Set();
+            for (const chunk of sorted) {
+                if (presentIndices.has(chunk.index)) { duplicate = true; break; }
+                presentIndices.add(chunk.index);
+            }
+
+            if (duplicate) {
+                bestError = new Error(`Duplicate chunk indices in set ${chunkId}`);
+                continue;
+            }
+
+            if (sorted.length !== expectedTotal) {
+                const missingIndices = [];
+                for (let i = 0; i < expectedTotal; i++) {
+                    if (!presentIndices.has(i)) missingIndices.push(i);
+                }
+                bestError = new Error(
+                    `Incomplete chunk set (ID ${chunkId}): expected ${expectedTotal}, got ${sorted.length}. Missing indices: [${missingIndices.join(', ')}]`
+                );
+                continue;
+            }
+
+            return { group: sorted, error: null };
+        }
+
+        return { group: null, error: bestError };
     }
 }

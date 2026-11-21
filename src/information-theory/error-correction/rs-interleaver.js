@@ -2,7 +2,7 @@ import {
     ReedSolomonEncoder,
     ReedSolomonDecoder,
     GenericGF_QR_CODE_FIELD_256
-} from './reedsolomon.js';
+} from './index.js';
 
 /**
  * ECC Profiles for Reed-Solomon encoding.
@@ -42,9 +42,8 @@ export class ErrorCorrection {
      * 
      * @param {Uint8Array} data - Original data
      * @param {string|number} profileOrParity - Profile name ('Low', 'Medium', etc.) or legacy parity bytes count
-     *                                          If not provided, uses legacy behavior (4 parity bytes, returns Uint8Array)
-     * @returns {Object|Uint8Array} Profile mode: { encoded, originalLength, profile, blockCount }
-     *                              Legacy mode: Uint8Array
+     *                                          If not provided, uses legacy behavior (4 parity bytes)
+     * @returns {[Object|Uint8Array|null, Error|null]} Tuple: profile mode { encoded, originalLength, profile, blockCount }, legacy mode Uint8Array
      */
     static protect(data, profileOrParity = null) {
 
@@ -101,8 +100,7 @@ export class ErrorCorrection {
      *                                          If not provided, uses legacy behavior
      * @param {number} originalLength - Original data length (for padding removal)
      * @param {number} blockCount - Number of RS blocks (optional, calculated if not provided)
-     * @returns {Uint8Array} Recovered original data
-     * @throws {Error} If too many errors to correct
+     * @returns {[Uint8Array|null, Error|null]} Tuple of [recoveredData, error]
      */
     static recover(encoded, profileOrParity = null, originalLength = null, blockCount = null) {
 
@@ -122,8 +120,19 @@ export class ErrorCorrection {
         const { dataBytes, parityBytes } = profile;
         const decoder = new ReedSolomonDecoder(this.FIELD);
 
-        if (blockCount === null) {
+        if (blockCount === null || blockCount === undefined) {
             blockCount = Math.floor(encoded.length / BLOCK_SIZE);
+        }
+
+        const maxBlocks = Math.floor(encoded.length / BLOCK_SIZE);
+        if (!Number.isInteger(blockCount) || blockCount < 1 || blockCount > maxBlocks) {
+            return [null, new Error(`Invalid block count ${blockCount} for encoded payload of ${encoded.length} bytes`)];
+        }
+
+        if (originalLength !== null && originalLength !== undefined) {
+            if (!Number.isInteger(originalLength) || originalLength < 0 || originalLength > blockCount * dataBytes) {
+                return [null, new Error(`Invalid original length ${originalLength} for ${blockCount} block(s) of ${dataBytes} data bytes`)];
+            }
         }
 
         const blocks = this._deinterleave(encoded, blockCount, BLOCK_SIZE);
@@ -131,10 +140,9 @@ export class ErrorCorrection {
         const recoveredChunks = [];
         for (let i = 0; i < blockCount; i++) {
             const block = blocks[i];
-            try {
-                decoder.decode(block, parityBytes);
-            } catch (e) {
-                return [null, new Error(`ECC recovery failed on block ${i}: ${e.message}`)];
+            const [, decErr] = decoder.decodeTuple(block, parityBytes);
+            if (decErr) {
+                return [null, new Error(`ECC recovery failed on block ${i}: ${decErr.message}`)];
             }
 
             const chunk = new Uint8Array(dataBytes);
@@ -205,6 +213,8 @@ export class ErrorCorrection {
     /**
      * Legacy protect method for backward compatibility.
      * Single block, no interleaving.
+     *
+     * @returns {[Uint8Array|null, Error|null]} Tuple of [encodedData, error]
      */
     static _protectLegacy(data, parityBytes) {
         const encoder = new ReedSolomonEncoder(this.FIELD);
@@ -222,14 +232,20 @@ export class ErrorCorrection {
             result[i] = toEncode[i];
         }
 
-        return result;
+        return [result, null];
     }
 
     /**
      * Legacy recover method for backward compatibility.
      * Single block, no interleaving.
+     *
+     * @returns {[Uint8Array|null, Error|null]} Tuple of [recoveredData, error]
      */
     static _recoverLegacy(receivedData, parityBytes) {
+        if (receivedData.length < parityBytes) {
+            return [null, new Error(`ECC recovery failed: payload length ${receivedData.length} is shorter than parity length ${parityBytes}`)];
+        }
+
         const decoder = new ReedSolomonDecoder(this.FIELD);
         const toDecode = new Int32Array(receivedData.length);
 
@@ -237,7 +253,10 @@ export class ErrorCorrection {
             toDecode[i] = receivedData[i];
         }
 
-        decoder.decode(toDecode, parityBytes);
+        const [, decErr] = decoder.decodeTuple(toDecode, parityBytes);
+        if (decErr) {
+            return [null, new Error(`ECC recovery failed on legacy block: ${decErr.message}`)];
+        }
 
         const dataLength = receivedData.length - parityBytes;
         const result = new Uint8Array(dataLength);
@@ -245,7 +264,7 @@ export class ErrorCorrection {
             result[i] = toDecode[i];
         }
 
-        return result;
+        return [result, null];
     }
 
     /**

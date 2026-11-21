@@ -1,25 +1,25 @@
-import { describe, it, expect } from '../../utils/test-runner.js';
-import * as rs from '../../../src/information-theory/error-correction/reedsolomon.js';
+﻿import { describe, it, expect } from '../../utils/test-runner.js';
+import * as rs from '../../../src/information-theory/error-correction/index.js';
 
-var GenericGF = rs.GenericGF;
-var GenericGFPoly = rs.GenericGFPoly;
-var ReedSolomonEncoder = rs.ReedSolomonEncoder;
-var ReedSolomonDecoder = rs.ReedSolomonDecoder;
-var DECODER_RANDOM_TEST_ITERATIONS = 3;
-var DECODER_TEST_ITERATIONS = 10;
+const GenericGF = rs.GenericGF;
+const GenericGFPoly = rs.GenericGFPoly;
+const ReedSolomonEncoder = rs.ReedSolomonEncoder;
+const ReedSolomonDecoder = rs.ReedSolomonDecoder;
+const DECODER_RANDOM_TEST_ITERATIONS = 3;
+const DECODER_TEST_ITERATIONS = 10;
 
-var System = {
+const System = {
     arraycopy: function (src, srcPos, dest, destPos, length) {
         dest.set(src.subarray(srcPos, srcPos + length), destPos);
     }
 };
 
 function corrupt(received, howMany, random, max) {
-    var corrupted = new Array(received.length);
-    for (var j = 0; j < howMany; j++) {
-        var location = random.nextInt(received.length);
-        var value = random.nextInt(max);
-        if (corrupted[location] || received[location] == value) {
+    const corrupted = new Array(received.length);
+    for (let j = 0; j < howMany; j++) {
+        const location = random.nextInt(received.length);
+        const value = random.nextInt(max);
+        if (corrupted[location] || received[location] === value) {
             j--;
         } else {
             corrupted[location] = true;
@@ -44,15 +44,15 @@ function testEncodeDecodeRandom(field, dataSize, ecSize) {
     assert(dataSize > 0 && dataSize <= field.getSize() - 3, "Invalid data size for " + field);
     assert(ecSize > 0 && ecSize + dataSize <= field.getSize(), "Invalid ECC size for " + field);
 
-    var encoder = new ReedSolomonEncoder(field);
-    var message = new Int32Array(dataSize + ecSize);
-    var dataWords = new Int32Array(dataSize);
-    var ecWords = new Int32Array(ecSize);
-    var random = getPseudoRandom();
-    var iterations = field.getSize() > 256 ? 1 : DECODER_RANDOM_TEST_ITERATIONS;
-    for (var i = 0; i < iterations; i++) {
+    const encoder = new ReedSolomonEncoder(field);
+    const message = new Int32Array(dataSize + ecSize);
+    const dataWords = new Int32Array(dataSize);
+    const ecWords = new Int32Array(ecSize);
+    const random = getPseudoRandom();
+    const iterations = field.getSize() > 256 ? 1 : DECODER_RANDOM_TEST_ITERATIONS;
+    for (let i = 0; i < iterations; i++) {
 
-        for (var k = 0; k < dataSize; k++) {
+        for (let k = 0; k < dataSize; k++) {
             dataWords[k] = random.nextInt(field.getSize());
         }
 
@@ -67,9 +67,9 @@ function testEncodeDecodeRandom(field, dataSize, ecSize) {
 
 function testEncoder(field, dataWords, ecWords) {
 
-    var encoder = new ReedSolomonEncoder(field);
-    var messageExpected = new Int32Array(dataWords.length + ecWords.length);
-    var message = new Int32Array(dataWords.length + ecWords.length);
+    const encoder = new ReedSolomonEncoder(field);
+    const messageExpected = new Int32Array(dataWords.length + ecWords.length);
+    const message = new Int32Array(dataWords.length + ecWords.length);
     System.arraycopy(dataWords, 0, messageExpected, 0, dataWords.length);
     System.arraycopy(ecWords, 0, messageExpected, dataWords.length, ecWords.length);
     System.arraycopy(dataWords, 0, message, 0, dataWords.length);
@@ -79,13 +79,13 @@ function testEncoder(field, dataWords, ecWords) {
 }
 
 function testDecoder(field, dataWords, ecWords) {
-    var decoder = new ReedSolomonDecoder(field);
-    var message = new Int32Array(dataWords.length + ecWords.length);
-    var maxErrors = ecWords.length / 2;
-    var random = getPseudoRandom();
-    var iterations = field.getSize() > 256 ? 1 : DECODER_TEST_ITERATIONS;
-    for (var j = 0; j < iterations; j++) {
-        for (var i = 0; i < ecWords.length; i++) {
+    const decoder = new ReedSolomonDecoder(field);
+    const message = new Int32Array(dataWords.length + ecWords.length);
+    const maxErrors = ecWords.length / 2;
+    const random = getPseudoRandom();
+    const iterations = field.getSize() > 256 ? 1 : DECODER_TEST_ITERATIONS;
+    for (let j = 0; j < iterations; j++) {
+        for (let i = 0; i < ecWords.length; i++) {
             if (i > 10 && i < ecWords.length / 2 - 10) {
 
                 i += ecWords.length / 10;
@@ -114,8 +114,8 @@ function testEncodeDecode(field, dataWords, ecWords) {
 }
 
 function assertDataEquals(expected, received, message) {
-    for (var i = 0; i < expected.length; i++) {
-        if (expected[i] != received[i]) {
+    for (let i = 0; i < expected.length; i++) {
+        if (expected[i] !== received[i]) {
             expect([...received.subarray(0, expected.length)]).toEqual([...expected]);
         }
     }

@@ -1,10 +1,183 @@
 I would like to make the User Interface more engaging with more features.
 My roadmap right now is to:
 x add a way to export the secrets library to a file
-o comprehensive end to end testing
-- add some sort of size gauge that indicates how big the current directory is and how big the secrets library is.relative.
-- suport for totp secrets
-- add a way to import the secrets library from chrome, firefox and apple keychain
-- require master password re-entry to export the secrets library
-- allow resetting the master password
+x comprehensive end to end testing
+x add some sort of size gauge that indicates how big the current directory is and how big the secrets library is.relative.
+x suport for totp secrets
+x add a way to import the secrets library from chrome, firefox and apple keychain
+x require master password re-entry to export the secrets library
+x allow resetting the master password
 
+
+## RESOLVED 2026-08-24 - Whole-container ECC framing (format v3)
+Implemented in Wave K: RS(255,191) coded control header carrying all
+self-describing fields + RS-coded body covering metadata + payload + CRC.
+v2 containers fail closed. See container-wire-format.md section 3.
+
+## REJECTED 2026-08-24 - Signed manifest verification layer (Ed25519)
+REJECTED on post-quantum grounds. Ed25519 relies on elliptic-curve discrete
+logarithm, which Shor's algorithm breaks completely. The existing HMAC-SHA256
+manifest authentication is already post-quantum resistant (symmetric primitive,
+Grover's algorithm provides only quadratic speedup). Adding Ed25519 would have
+introduced the sole quantum-vulnerable component into an otherwise PQ-safe
+system. The design goal is purely symmetric cryptography throughout.
+
+## 2026-08-23 - Full fuzzing + metamorphic testing coverage (all layers)
+
+Goal: every module owned by seeded, structure-aware fuzzing plus explicit
+metamorphic relations (MRs), not just example tests. Builds on the seeded
+pbt.js harness and the Wave H fuzz/MR culture (npm run fuzz; CI smoke slice).
+Track per-layer adoption; "done" = listed MRs/generators exist + long-run
+fuzz script exercises them without finding open counterexamples.
+
+Current: wire-format L0-L3 (conformance + 12 PBT), capacity scanner,
+escapeHtml, vault structures, algebraic transforms, huffman encoder.
+
+- [x] codec: encode/decode roundtrip fuzzing (random dimensions/quality/
+      subsampling/restart intervals); MRs - decode-after-encode stability,
+      quality-vs-size monotonicity, dimension preservation
+- [x] automata parsers (marker-scanner, dht/dqt/sof/sos/spiff): mutated-JPEG
+      generator (truncation, marker injection, lying length fields); MR -
+      valid files unchanged, hostile input always fails closed
+- [x] bit-streams: differential testing across BitReader variants on random
+      streams (all three must agree bit-for-bit)
+- [x] error-correction core: GF(256) field axioms as properties; RS
+      roundtrip under random corruption distributions at tolerance edges;
+      interleave permutation-invariance MRs
+- [x] cryptography: AES-GCM/PBKDF2/HMAC roundtrip + AAD-binding properties
+      (structural; CSPRNG prevents byte vectors)
+- [x] vault layer: operation-sequence fuzzing against invariants (locked
+      never decrypts, revision strictly increases, freeze holds); MR -
+      clone chains equivalent to batch operations
+- [x] batch embedder/extractor: carrier-subset selection MRs, allocation
+      determinism, capacity-bound enforcement
+- [x] scripts/cli.mjs: argument fuzzing, fail-closed exit codes
+- [x] harness: npm run fuzz driver landed (CI smoke + scalable local runs); full corpus
+Related: RESOLVED whole-container ECC framing entry (see top of file).
+
+
+## 2026-08-24 - CSV import: Bitwarden card/identity item types
+Bitwarden CSV exports carry non-login item types in the `type` column
+(folder,favorite,type,...). Current importer scope:
+- type=login -> full import
+- type=note -> passwordless entry import
+- type=card / type=identity -> skipped with reason todo(card-identity-import)
+
+No meaningful field mapping exists yet (cardholder number, expiry, identity
+fields have no SecureEntry equivalents). Options when picked up: map to
+notes text dump, or extend customFields conventions. Track skipped counts
+in import summary either way.
+
+## RESOLVED 2026-08-24 - TOTP live codes never render in vault UI (broken)
+populateTotpCodes (app/components/vault/vault-ui.js) runs but produces no
+visible codes. Diagnosis:
+1. SECRET ENCODING BUG: line ~595 uses
+   `new TextEncoder().encode(params.secret)` on the Base32 secret STRING;
+   TOTP needs decodeBase32(params.secret) raw bytes (see scripts/cli.mjs
+   cliTotp for the correct pattern).
+2. Bare `catch {}` swallows every per-entry failure (suspect additional
+   algorithm-name mismatch between parseOtpauthUri output and totp()
+   options) -> slots stay blank forever with zero console signal.
+3. No lifecycle: no 30s refresh timer, no copy-code affordance, and
+   .totp-slot/.totp-code have no styling contract in vault.css.
+Fix = rewrite populateTotpCodes against src/utils/base32.js + totp.js,
+fail-loud logging, interval refresh aligned to period, CSS + hidden-until-
+present slot; pin with Node-runner DOM tests (revision-tracking pattern).
+NOTE: scripts/cli.mjs cliTotp has the SAME TextEncoder-as-base32 bug
+(line ~117) and must be fixed in the same pass.
+
+RESOLUTION: codeFromOtpauthUri() added to totp.js (single Base32-correct
+path; algorithm-name suspicion disproven - names already matched). UI and
+cliTotp both delegate to it now, with logger.warn on every failure path.
+Added TOTP field to Add/Edit forms with normalizeTotpInput() wrapping bare
+Base32 secrets at the PasswordVault.addEntry/updateEntry boundary
+(validateEntryInput rejects malformed values; lone-surrogate titles fall
+back to a safe label instead of throwing). Display renders click-to-copy
+code + countdown, single-interval refresh lifecycle stopped on re-render/
+lock. CSS contract added. Pinned by exact RFC 6238 vectors routed through
+URIs (UI + CLI), display/lifecycle DOM tests, and form-flow tests.
+
+## 2026-08-24 - Camera capture (getUserMedia) + perspective-corrected QR decode
+Current qr-decoder assumes axis-aligned, cleanly captured symbols
+(screenshots). For phone-camera photos: (a) add getUserMedia-based live
+capture into the card dropzone flow, (b) implement perspective correction -
+locate the three finder centers, estimate the homography, warp to a flat
+module grid before sampling. Both belong together; ship behind the same
+feature. PWA target (Android + iOS).
+
+## 2026-08-24 - iOS / PWA track: directory import fallback + app shell
+iOS Safari lacks showDirectoryPicker and full File System Access. Needed:
+1. <input type=file webkitdirectory multiple> fallback in the carrier
+   import path (also benefits desktop Firefox), feeding the existing
+   DropZone pipeline.
+2. PWA app shell: manifest.json (icons, standalone display) + service
+   worker for offline vault use on phones.
+
+## 2026-08-24 - Master-password second factor roadmap
+Tier B shipped this wave: optional TOTP gate enrolled during vault creation;
+explicitly weak access control vs shoulder-surfing only (anyone with the
+master password defeats it - disclaimer shown in UI).
+NEXT (high security option, discouraged-by-default): WebAuthn PRF wrap
+layer - session key additionally wrapped under a platform-authenticator
+PRF-derived symmetric key. Real 2FA offline (secret never leaves enclave),
+PQ-safe, ideal for the PWA target. UX MUST warn loudly: losing the
+authenticator = permanent vault lockout. Requires metadata.kdf2 wire-doc
+addition + golden vector regeneration.
+
+## 2026-08-25 - QR decoder: real-world fixture robustness (open)
+The decoder handles synthetic v1-v15 symbols correctly (roundtrip tests
+pass) but fails on 3 of 4 real TOTP enrollment screenshots. Remaining
+issues require production-grade CV preprocessing:
+- dropbox/github: grid sampling misalignment from anti-aliased edges;
+  needs adaptive/local binarization (Otsu) instead of global mean, or
+  sub-pixel edge-aware module sampling.
+- discord: anti-aliased edges break the run-length window matcher;
+  needs a smoothing/median pass on the binarized bitmap before scanning.
+- gitlab: RS block correction failure from accumulated sampling errors;
+  likely resolved by fixing the above two.
+Synthetic roundtrip tests (v1-v15, all scales, jitter tolerance, scattered
+damage within EC-M) pass. Only real-world captures fail. The fixture
+tests in test/security/qr-fixtures.test.js serve as acceptance criteria.
+
+
+## 2026-08-25 - QR decoder rewrite C1-C5 (committed)
+Shared ISO capacity tables v1-15 + encoder ISO conformance (C1/C2),
+Hamming-tolerant format parsing with all-level RS (C3), adaptive
+binarizer + cross-checked finders + basis-vector sampling (C4/C5).
+Result: 853/859 suite, discord fixture passes end-to-end.
+Remaining 6: dropbox/github/gitlab fixtures need adaptive block sizing
+(BLOCK=8 too coarse for ~2.4px/module images); jitter x2 needs spatially-
+correlated noise model; darkbg fixed by flat-block polarity comparison.
+
+## RESOLVED 2026-10-19 - Interactive UI Polish & Display Modes
+- [x] UI, make cards selectable:
+      - Active selection tracking with `aria-selected` and `.is-selected` styling.
+      - In Side Bar mode, action buttons visible only on selected card (or hover).
+      - In Card View and Both modes, copy and launch buttons stay accessible on all cards.
+- [x] Display view mode switcher (Side Bar / Card View / Both):
+      - Segmented control in header with localStorage persistence.
+      - Side Bar: compact cards + right detail pane showing notes, live TOTP countdown, tags, and edit actions.
+      - Card View: 4x grid slot expansion animation (`is-expanded`) with inline notes and metadata.
+      - Both: combines 4x card expansion with the right detail pane inspector.
+- [x] Card View scroll anchoring & spatial state automata:
+      - `CardFlowAutomata` state machine resolves spatial boundary states (`edge-left`, `edge-right`, `edge-interior`, `edge-single`) and vertical projection (`project-up`, `project-down`).
+      - Anchors cards in-place using directional CSS `transform-origin` (e.g. `top right` for right column, `top left` for left column), eliminating delayed horizontal sliding animations.
+      - Synchronous vertical displacement anchoring (`deltaY = newRect.top - oldRect.top`) applied directly to container `scrollTop`, with asynchronous `settle()` pass post notes/TOTP rendering.
+      - Maintains strict 2x2 grid expansion (`grid-column: span 2; grid-row: span 2; min-height: 280px`) with `grid-auto-flow: dense;` so elements below never drift under the cursor.
+- [x] Reversible tag sorting (Dual count vs A-Z):
+      - `tagSortDir` (`desc` and `asc`) with an interactive direction button (`#tagSortDirBtn`).
+      - Supports bidirectional sorting: Frequency descending (highest first) / ascending (least first), and Alphabetical descending (A-Z) / ascending (Z-A).
+- [x] OTP visibility scoping:
+      - `.totp-slot` relocated inside `.card-expanded-content` with CSS gating (`.password-card:not(.is-expanded) .totp-slot { display: none !important; }`).
+      - Compact home view cards strictly omit OTP; live ticking codes appear exclusively on expanded cards and in the right inspector pane.
+- [x] ModalManager refactoring & file size optimization:
+      - Factored out `password-strength.js`, `qr-canvas.js`, `onboarding-wizard.js`, and `vault-modals.js` into focused, reusable modules.
+      - Reduced `modal-manager.js` from 1,004 lines down to 443 lines, backed by dedicated unit and integration tests.
+- [x] Relative storage gauge:
+      - Multi-tiered gauge in status bar displaying carrier directory size, stego capacity, and vault footprint with relative percentage tooltips.
+- [x] Master password re-entry gate for plaintext export:
+      - Prompts for master password verification before unencrypted JSON download is authorized.
+- [x] Password strength & generator:
+      - Real-time entropy evaluation and random generator in Add/Edit modal.
+- [x] Keyboard shortcuts & Mascot state machine:
+      - Navigation shortcuts (`/`, `J`/`K`, `Enter`, `Esc`, `C`, `T`, `?`) and reactive mascot states (`static`, `animated`, `thinking`, `happy`, `sad`).

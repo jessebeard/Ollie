@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import { parseFrameHeader } from '../../../src/automata/parsers/sof-automaton.js';
 
 describe('FrameHeaderParser', () => {
@@ -181,5 +182,51 @@ describe('FrameHeaderParser', () => {
         expect(err).toEqual(null);
         expect(frame.mcuCols).toBe(7);
         expect(frame.mcuRows).toBe(7);
+    });
+
+    describe('PBT & Structural Validation', () => {
+        it('Property: parseFrameHeader extracts exact arbitrary 16-bit dimensions', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 65535), Arbitrary.integer(1, 65535)],
+                (w, h) => {
+                    const data = new Uint8Array([
+                        8,
+                        (h >> 8) & 0xFF, h & 0xFF,
+                        (w >> 8) & 0xFF, w & 0xFF,
+                        1,
+                        1, 0x11, 0
+                    ]);
+
+                    const [frame, err] = parseFrameHeader(data);
+                    expect(err).toBe(null);
+                    expect(frame.width).toBe(w);
+                    expect(frame.height).toBe(h);
+                    expect(frame.precision).toBe(8);
+                    expect(frame.numComponents).toBe(1);
+                },
+                50
+            );
+        });
+
+        it('Property: duplicate component IDs are unconditionally rejected with typed error', async () => {
+            await assertProperty(
+                [Arbitrary.integer(1, 255)],
+                (dupId) => {
+                    // 3 components where 2 share the exact duplicate ID
+                    const data = new Uint8Array([
+                        8, 0, 100, 0, 100, 3,
+                        dupId, 0x22, 0,
+                        dupId, 0x11, 1,
+                        (dupId + 1) & 0xFF, 0x11, 1
+                    ]);
+
+                    const [frame, err] = parseFrameHeader(data);
+                    expect(frame).toBe(null);
+                    expect(err instanceof Error).toBe(true);
+                    expect(err.message).toContain('Duplicate component ID');
+                },
+                50
+            );
+        });
     });
 });

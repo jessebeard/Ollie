@@ -5,6 +5,12 @@
  * Based on ISO/IEC 10918-3.
  */
 
+/**
+ * Parses a SPIFF header from APP8 segment payload bytes.
+ *
+ * @param {Uint8Array} data - APP8 segment payload
+ * @returns {[Object|null, Error|null]} Result tuple of [spiffHeader, error]
+ */
 export function parseSpiffHeader(data) {
 
     if (data.length < 30) {

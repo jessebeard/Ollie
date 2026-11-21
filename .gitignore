@@ -1,1 +1,14 @@
+# Dependencies
 node_modules/
+
+# Tool workspace state
+.qwen/
+.agents/
+
+# Transient run output
+test-output.txt
+test-run-output.txt
+*.log
+
+# Generated analysis corpora
+codebase_corpus.txt

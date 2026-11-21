@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import {
     HuffmanTable,
     parseHuffmanTable,
@@ -223,5 +224,31 @@ describe('HuffmanTableParser', () => {
         expect(tables.size).toBe(2);
         expect(tables.get('0_0').values[0]).toBe(100);
         expect(tables.get('1_0').values[0]).toBe(200);
+    });
+
+    describe('PBT & Parser Invariants', () => {
+        it('Property: parseHuffmanTable preserves structural invariants for arbitrary valid DHT segments', async () => {
+            await assertProperty(
+                [Arbitrary.integer(0, 1), Arbitrary.integer(0, 3), Arbitrary.byteArray(1, 20)],
+                (tc, th, symbols) => {
+                    const data = new Uint8Array(1 + 16 + symbols.length);
+                    data[0] = (tc << 4) | th;
+                    // Distribute symbols across length 1:
+                    data[1] = symbols.length; // BITS[0] = symbols.length
+                    for (let i = 0; i < symbols.length; i++) {
+                        data[17 + i] = symbols[i];
+                    }
+
+                    const [result, err] = parseHuffmanTable(data, 0);
+                    expect(err).toBe(null);
+                    expect(result.table.tableClass).toBe(tc);
+                    expect(result.table.tableId).toBe(th);
+                    expect(result.table.bits.length).toBe(16);
+                    expect(result.table.values.length).toBe(symbols.length);
+                    expect(result.nextOffset).toBe(1 + 16 + symbols.length);
+                },
+                50
+            );
+        });
     });
 });

@@ -1,0 +1,1001 @@
+﻿LINE 138 type=tool_result len=1204
+LINE 139 type=assistant len=2416
+  part1 THOUGHT len=1729
+LINE 140 type=assistant len=688
+LINE 141 type=assistant len=660
+LINE 142 type=tool_result len=1731
+LINE 143 type=tool_result len=1176
+LINE 144 type=assistant len=811
+  part1 THOUGHT len=139
+The grep on huffman-optimized-fsm.js failed again (looks like the pipe in the regex is breaking it). Let me just read the top of the file.
+
+LINE 145 type=assistant len=628
+LINE 146 type=tool_result len=2404
+LINE 147 type=assistant len=3021
+  part1 THOUGHT len=2122
+The grep tool had some issues with the regex pattern, so I'm using read_file to get the exact content of huffman-optimized-fsm.js with line numbers to confirm the structure. Now I need to double-check the dht-automaton.js file since my grep patterns failed there too. I need to verify the exact line numbers in dht-automaton.js for the bounds check and symbol reading logic, and confirm that buildOptimizedLookup in huffman-optimized-fsm.js doesn't have a @returns tag. Since I'm in a background task context where the tool names aren't available, I'll work with what I have from the read_file output to compose the final report with the findings I've confirmed. I'm checking the dht-automaton.js file to verify the specific line numbers where the symbol validation and bounds checking happen, since my earlier grep attempts failed. I need to confirm that totalSymbols is initialized at line 73 and that the bounds check comparing offset against data.length occurs at line 82.
+
+I also want to verify the buildOptimizedLookup function in huffman-optimized-fsm.js â€” it appears to lack a @returns tag in its JSDoc, which is a finding I've already noted. Additionally, I'm catching a potential bug: when symbolIndex exceeds the values array length, table.values[symbolIndex] becomes undefined, which when OR'd with the bitLength becomes NaN, and writing NaN to a Uint16Array coerces it to 0, so that's a data corruption issue worth flagging.
+
+But actually, the dht-automaton constrains totalSymbols to 256 and reads that many values from the stream, so values.length should equal totalSymbols. The real problem is if the DHT declares a total count that doesn't match what's actually encoded â€” a non-canonical or overfull table â€” then the baseIndex calculation could overflow beyond the 65536-entry array bounds, silently truncating writes and leaving stale zeros.
+
+I also notice `buildOptimizedLookup` is missing a `@returns` JSDoc tag, which is a minor documentation gap. Now I need to check the exact line numbers in dht-automaton.js where the symbol summing happens, since my grep searches weren't returning results.
+
+  part2 TEXT len=206
+I've pinned huffman-optimized-fsm.js. The grep tool is failing on patterns here â€” I'll use targeted reads to pin the remaining exact lines in dht-automaton.js and double-check a few other key locations.
+
+
+LINE 148 type=assistant len=614
+LINE 149 type=tool_result len=4081
+LINE 150 type=assistant len=18272
+  part1 THOUGHT len=16816
+The grep tool is failing (ripgrep issue), so I'm pinning the exact line numbers directly. Let me identify the line numbers within dht-automaton.js. I need to count the lines. Let me read the rest of the file and get a grasp of the structure. Actually, let me use the output of read_file with line numbers. The tool displayed "Showing lines 1-110 of 138 total", but it's not showing line numbers. I need to identify the line numbers precisely.
+
+Let me think about it. I need to identify the exact line numbers of the key findings. Since grep is failing, I'll read with offsets and count the lines manually. Actually, the read_file output above doesn't show line numbers. To identify the lines precisely, let me read a specific range.
+
+Let me reconsider â€” the output of the first read (lines 1â€“110) doesn't show explicit line numbers. I need to know which line `totalSymbols > 256` is on, which line `bits[i] = data[offset + 1 + i]` is on, and so on.
+
+Let me carefully count the lines in dht-automaton.js:
+
+```
+1  /**
+2   * Huffman Table Parser - Parses DHT (Define Huffman Table) segments
+3   *
+4   * DHT segment format (JPEG spec lines 79-86):
+5   * - Lh (16 bits): Segment length
+6   * - Loop while bytes remaining:
+7   *   - Tc_Th (8 bits): Table class (high 4 bits: 0=DC, 1=AC) | Table ID (low 4 bits)
+8   *   - BITS[1..16] (16 bytes): Number of codes of each length
+9   *   - HUFFVAL (variable): Symbol values
+10  */
+11  (empty line)
+12  /**
+13  * Huffman Table class for decoding
+14  */
+15  import { decodeOptimized, buildOptimizedLookup } from '../entropy-coding/huffman-optimized-fsm.js';
+16  (empty line)
+17  /**
+18  * Huffman Table class for decoding
+19  */
+20  export class HuffmanTable {
+21      constructor(bits, values, tableClass, tableId) {
+22          this.bits = bits;
+23          this.values = values;
+24          this.tableClass = tableClass;
+25          this.tableId = tableId;
+26  (empty line)
+27          buildOptimizedLookup(this);
+28      }
+29  (empty line)
+30      /**
+31       * Decode a symbol from a BitReader
+32       * This method delegates to the optimized implementation
+33       * @param {BitReader} bitReader - Bit reader positioned at start of code
+34       * @returns {[number, null] | [null, Error]} Tuple: decoded symbol, or error
+35       */
+36      decode(bitReader) {
+37          return decodeOptimized(this, bitReader);
+38      }
+39  }
+40  (empty line)
+41  /**
+42   * Parse a single Huffman table from DHT segment data
+43   * @param {Uint8Array} data - DHT segment data (without marker and length)
+44   * @param {number} offset - Offset within the segment data
+45   * @returns {[{table: HuffmanTable, nextOffset: number}, null] | [null, Error]}
+46   */
+47  export function parseHuffmanTable(data, offset = 0) {
+48      if (offset >= data.length) {
+49          return [null, new Error('Invalid DHT offset')];
+50      }
+51  (empty line)
+52      const tcTh = data[offset];
+53      const tableClass = (tcTh >> 4) & 0x0F;
+54      const tableId = tcTh & 0x0F;
+55  (empty line)
+56      if (tableClass !== 0 && tableClass !== 1) {
+57          return [null, new Error(`Invalid Huffman table class: ${tableClass}`)];
+58      }
+59  (empty line)
+60      if (tableId > 3) {
+61          return [null, new Error(`Invalid Huffman table ID: ${tableId}`)];
+62      }
+63  (empty line)
+64      if (offset + 1 + 16 > data.length) {
+65          return [null, new Error('Incomplete Huffman BITS array')];
+66      }
+67  (empty line)
+68      const bits = new Uint8Array(16);
+69      for (let i = 0; i < 16; i++) {
+70          bits[i] = data[offset + 1 + i];
+71      }
+72  (empty line)
+73      let totalSymbols = 0;
+74      for (let i = 0; i < 16; i++) {
+75          totalSymbols += bits[i];
+76      }
+77  (empty line)
+78      if (totalSymbols > 256) {
+79          return [null, new Error(`Invalid BITS sum: ${totalSymbols} (max 256)`)]
+80      }
+81  (empty line)
+82      if (offset + 1 + 16 + totalSymbols > data.length) {
+83          return [null, new Error('Incomplete Huffman HUFFVAL array')];
+84      }
+85  (empty line)
+86      const values = new Uint8Array(totalSymbols);
+87      for (let i = 0; i < totalSymbols; i++) {
+88          values[i] = data[offset + 1 + 16 + i];
+89      }
+90  (empty line)
+91      const table = new HuffmanTable(bits, values, tableClass, tableId);
+92  (empty line)
+93      return [{
+94          table,
+95          nextOffset: offset + 1 + 16 + totalSymbols
+96      }, null];
+97  }
+98  (empty line)
+99  /**
+100  * Parse all Huffman tables from DHT segment
+101  * @param {Uint8Array} segmentData - DHT segment data (without marker and length)
+102  * @returns {[Map<string, HuffmanTable>, null] | [null, Error]}
+103  */
+104 export function parseAllHuffmanTables(segmentData) {
+105     const tables = new Map();
+106     let offset = 0;
+107  (empty line)
+108     while (offset < segmentData.length) {
+109         const [result, err] = parseHuffmanTable(segmentData, offset);
+110         if (err) return [null, err];
+```
+
+Alright, this matches the pins in my summary (L73 totalSymbols, L75 totalSymbols +=, L78-79 the check, L82 bounds check, L86 values, L87 value loop, L95 nextOffset).
+
+So the key lines for dht-automaton.js:
+- L73: `let totalSymbols = 0;`
+- L75: `totalSymbols += bits[i];`
+- L78-79: `if (totalSymbols > 256) { return [null, new Error(...)] }`
+- L82: `if (offset + 1 + 16 + totalSymbols > data.length)`
+- L86: `const values = new Uint8Array(totalSymbols);`
+- L87: value loop
+- L95: `nextOffset: offset + 1 + 16 + totalSymbols`
+
+Gaps in dht-automaton:
+1. No canonical / Kraft inequality validation. The parser only checks totalSymbols â‰¤ 256 and the bounds. It doesn't verify that the BITS array forms a valid prefix-free / canonical Huffman code. This is exactly the finding that "non-canonical/overfull DHT â†’ silently dropped Uint16Array entries â†’ misdecode."
+2. No validation that totalSymbols > 0 (allows 0). Actually, if totalSymbols = 0, the values array is empty and buildOptimizedLookup generates an all-zero fastLookup, so decode always returns "Invalid Huffman code". Not a crash, but a misdecode.
+3. Duplicates of Tc_Th â†’ the last one wins silently (inside parseAllHuffmanTables's map.set).
+4. No check that bits[15] (16-bit codes) is zero. In fact, in baseline JPEG, 16-bit Huffman codes aren't used (DC is at most 11 bits, AC is at most 15 bits). However, the optimized decoder's lookup table is 16 bits, so a 16-bit code would beâ€¦ let me think. Actually the code supports up to 16 bits. The issue is that canonical code assignment with 16-bit codes can overflow. Let me not overclaim.
+
+Next, the key finding for huffman-optimized-fsm.js:
+
+```
+1  /**
+2   * Optimized Huffman decoding implementation (O(1))
+3   * Uses a 16-bit lookup table (Uint16Array)
+4   */
+5  (empty line)
+6  /**
+7   * Build a lookup table for optimized Huffman decoding
+8   * @param {HuffmanTable} table - The Huffman table instance
+9   */
+10  export function buildOptimizedLookup(table) {
+11  (empty line)
+12      table.fastLookup = new Uint16Array(65536);
+13      table.maxCodeLength = 0;
+14  (empty line)
+15      let code = 0;
+16      let symbolIndex = 0;
+17  (empty line)
+18      for (let bitLength = 1; bitLength <= 16; bitLength++) {
+19          const count = table.bits[bitLength - 1];
+20  (empty line)
+21          if (count > 0) {
+22              table.maxCodeLength = bitLength;
+23          }
+24  (empty line)
+25          for (let i = 0; i < count; i++) {
+26              const symbol = table.values[symbolIndex];
+27  (empty line)
+28              const baseIndex = code << (16 - bitLength);
+29  (empty line)
+30              const numEntries = 1 << (16 - bitLength);
+31  (empty line)
+32              const entry = (bitLength << 8) | symbol;
+33  (empty line)
+34              for (let j = 0; j < numEntries; j++) {
+35                  table.fastLookup[baseIndex + j] = entry;
+36              }
+37  (empty line)
+38              code++;
+39              symbolIndex++;
+40          }
+41  (empty line)
+42          code <<= 1;
+43      }
+44  }
+```
+
+So:
+- L10: `export function buildOptimizedLookup(table) {`
+- L6-9: JSDoc, only `@param {HuffmanTable} table`, missing @returns
+- L12: `table.fastLookup = new Uint16Array(65536);`
+- L18: `for (let bitLength = 1; bitLength <= 16; bitLength++)`
+- L28: `const baseIndex = code << (16 - bitLength);`
+- L30: `const numEntries = 1 << (16 - bitLength);`
+- L32: `const entry = (bitLength << 8) | symbol;`
+- L34-36: OOB write loop, write at L35 `table.fastLookup[baseIndex + j] = entry;`
+- L38: `code++;`
+- L39: `symbolIndex++;`
+- L42: `code <<= 1;`
+- L52: `export function decodeOptimized(table, bitReader) {`
+- L53-55: lazy build
+- L57: `const bits = bitReader.peek16Bits();`
+- L59: `const entry = table.fastLookup[bits];`
+- L60: `const length = entry >> 8;`
+- L62-64: length===0 â†’ error tuple
+- L66: `bitReader.skipBits(length);`
+- L68: `return [entry & 0xFF, null];`
+
+This is all consistent with my summary.
+
+Now, the crucial analysis of the OOB write / overfull table:
+
+buildOptimizedLookup does a canonical Huffman code assignment. If the BITS array is overfull (Kraft sum > 1), then during code assignment, `code` will exceed the available codespace for a given bitLength, and `baseIndex = code << (16 - bitLength)` will exceed 65535. In that case, `table.fastLookup[baseIndex + j] = entry` writes out of bounds. For a typed array (Uint16Array), an OOB write is silently discarded (doesn't throw, doesn't extend). So the result is a corrupted/incomplete lookup table â†’ misdecode. No crash. This is the "silently dropped Uint16Array entries â†’ misdecode" finding.
+
+Let me verify: for bitLength=16, numEntries = 1 << 0 = 1, baseIndex = code << 0 = code. If code exceeds 65535, baseIndex > 65535, OOB write is discarded. For smaller bitLength, if code is large, baseIndex + j can exceed 65535.
+
+Actually, a more subtle issue: even in a *valid* canonical assignment, the total number of codes at a given length is constrained. Overfull â†’ code counter exceeds â†’ OOB. Since typed arrays silently discard OOB writes, this becomes a silent misdecode.
+
+Also, another subtle issue: the canonical code assignment here doesn't handle the case where a length has more codes than fit. This is precisely the missing Kraft/canonical validation.
+
+Now, is there an actual crash path? The `code << (16 - bitLength)` â€” if bitLength is small and code is large, the result can exceed 2^31 and wrap to negative (JS's `<<` is signed 32-bit). Then baseIndex is negative, and `table.fastLookup[negative + j]` is OOB (negative index) â†’ silently discarded. Still no crash, just silent corruption.
+
+So the severity: this is a security weakness (silent misdecode / data corruption on malicious DHT) that is reachable, but not a crash. My summary had this as a High (security weakness). Actually, let me reconsider. The finding says "non-canonical/overfull DHT â†’ silently dropped Uint16Array entries â†’ misdecode." Silent misdecode of a JPEG is data corruption. Per the severity definitions: Critical = exploitable vulnerability or data corruption/loss. High = security weakness, correctness bugs reachable in normal use, contract violations.
+
+Silent misdecode is data corruption (produces wrong pixel data without error). This could be argued to be Critical (data corruption). But is it *exploitable* in a security sense? A password manager that silently decodes a malicious JPEG to wrong pixels â€” that's data corruption, but not necessarily a security exploit (no code execution, no hang/OOM). Actually, let me reconsider the whole thing.
+
+Hmm, the task says Critical = exploitable vulnerability or data corruption/loss. Silent misdecode = data corruption (wrong output presented as if it were correct). But actually, for a password manager, if the steganographic payload is misdecoded, it could lead to wrong password extraction or silent failure. But the codec here decodes the *image* pixels, and the secret is embedded via F5 in the DCT coefficients / pixel data. Misdecode of the image â†’ corruption of the embedded payload â†’ wrong or lost secret. That is data loss/corruption.
+
+But let me be careful. The main CRITICAL finding I've confirmed is the uncaught-throw chain (item 1) â€” a crafted JPEG can crash the process. That's clearly Critical (exploitable DoS / crash).
+
+For the DHT misdecode, I'll rate it High (security weakness / silent corruption) rather than Critical, because it's not a crash and is more of a silent integrity issue. Actually, the summary already classified these. Let me follow the summary's bank, but I should verify the severity assignments are defensible.
+
+Wait â€” the summary states "the bank is not pre-sorted; re-sort Criticalâ†’Highâ†’Mediumâ†’Low on output; items 10 and 16 have been re-graded to High." And it provides a re-sorted order: Critical: #1; High: #2-#10, #16; Medium: #11-#15; Low: #17-#20.
+
+Wait, let me re-read: "Re-sort Criticalâ†’Highâ†’Mediumâ†’Low on output (Critical: #1; High: #2-#10, #16; Medium: #11-#15; Low: #17-#20)."
+
+Hmm, but items are numbered 1-20 in the bank. Let me map them:
+- #1 = CRITICAL (uncaught throw)
+- #2 = HIGH (DQT sign bug)
+- #3 = HIGH (DRI <2 bytes RangeError)
+- #4 = HIGH (JFIF 5-9 bytes RangeError)
+- #5 = HIGH (non-canonical/overfull DHT â†’ misdecode)
+- #6 = HIGH (encoder TypeError on out-of-range coefficients)
+- #7 = HIGH (encoder hardcoded table remap)
+- #8 = HIGH (assembleImage tupleâ†’throw)
+- #9 = HIGH (duplicate SOF component ids)
+- #10 = HIGH (decodeScan bare errors)
+- #11 = MEDIUM (RST double handling)
+- #12 = MEDIUM (RST resync failure)
+- #13 = MEDIUM (bit-core spec gaps)
+- #14 = MEDIUM (1e6 block cap DoS)
+- #15 = MEDIUM (try/catch in business logic)
+- #16 = HIGH (encoder bare Uint8Array + throw)
+- #17 = LOW (JSDoc gaps)
+- #18 = LOW (dead code)
+- #19 = LOW (encoder validation/contract misc)
+- #20 = LOW (misc)
+
+So the re-sorted order is: #1 (Critical), then #2,3,4,5,6,7,8,9,10,16 (High), then #11,12,13,14,15 (Medium), then #17,18,19,20 (Low).
+
+Wait, but the re-sort says "High: #2-#10, #16". So #16 is grouped into High, but placed after #10? The order within High isn't fully specified, just that #16 is High. Let me put #16 somewhere in the High section. Actually, #16 is a contract violation (bare returns), so I could place it among the Highs. Let me order the Highs logically by severity/impact.
+
+Actually, wait. Let me reconsider whether some of these should be Critical. The task explicitly says to be a strict, meticulous reviewer and a red-team hacker. Let me re-examine the most important findings for correctness.
+
+Let me re-examine the critical chain more carefully, because that's the headline.
+
+CONFIRMED CRITICAL CHAIN:
+- bit-reader.js = pure delegation wrapper to BitReaderOptimized
+- BitReaderOptimized's readBit (L17) / readBits (L25) / peekBits (L33) / peek16Bits (L39) do `if (err) throw err`
+- skipBits (L43-45) = readBits â†’ throws at EOF
+- decodeScan (decoder.js L322) does `new BitReader(scanData)`
+- uncaught throws escape the top-level decode() (L217-218 has no try/catch)
+
+Wait, but the key question: does decodeScan actually propagate these throws, or does it catch them? Let me re-read the summary. The summary says:
+
+"L217-218 `const scanDecErr = this.decodeScan(...); if (scanDecErr) return [null, scanDecErr];` (no try/catch â†’ CRITICAL uncaught throw escape)"
+
+So decodeScan returns an error tuple (bare Error or undefined) on some paths, but the BitReader methods *throw*. If a BitReader method throws inside decodeScan, that throw is not caught by decodeScan (there's no try/catch in decodeScan), so it propagates up through decode() â†’ uncaught. That's the critical crash.
+
+But wait â€” does decodeScan catch the BitReader throws? Let me verify by reading decoder.js. Actually, my summary already confirms decodeScan has no try/catch and the throws escape. But let me be rigorous â€” this is the headline Critical finding, so I should verify it directly rather than relying on the summary. Let me read the relevant part of decoder.js.
+
+Actually, I'm in a research-only task and the summary is detailed and has been verified. But the Critical finding is the most important, and I want to make sure I'm citing the right lines and that the mechanism is as described. Let me read decoder.js around decodeScan and the top-level decode.
+
+Let me reconsider the whole situation. I've been given a very detailed summary from prior sessions. The remaining task is to (1) pin the last line in huffman-optimized-fsm.js [done], and (2) compose the final artifact. But before composing, given the importance, let me verify the Critical chain in decoder.js directly, since it's the headline.
+
+Let me read decoder.js to confirm:
+1. The top-level decode() and its lack of try/catch (L217-218)
+2. decodeScan (L315-453)
+3. The new BitReader at L322
+
+Let me do a targeted read of decoder.js.
+
+  part2 TEXT len=457
+I've confirmed all pins in dht-automaton.js (L73, L75, L78-79, L82, L86-88, L95) and huffman-optimized-fsm.js (L10 def, L6-9 JSDoc missing @returns, L12, L28, L30, L32, L34-36 write at L35, L38-39, L42, L52, L57, L59-60, L62-64, L66, L68). 
+
+The Critical uncaught-throw chain is the headline finding â€” before composing the deliverable I want to verify it directly in decoder.js rather than rely on the prior-session summary. Let me read the key regions.
+
+
+LINE 151 type=assistant len=597
+LINE 152 type=tool_result len=6513
+LINE 153 type=assistant len=11660
+  part1 THOUGHT len=10473
+This confirms the top-level structure. Let me get the exact line numbers. The output starts from line 96. Let me count:
+
+```
+96      * @param {Object} options - { password: '...' }
+97      * @returns {Promise<...>} ImageData-compatible object
+98      */
+99     async decode(jpegBytes, options = {}) {
+100         this.reset();
+101  (empty line)
+102         // Defensive Programming / Fast Failure:
+103         // Must strictly start with SOI Marker: FF D8
+104         if (!jpegBytes || jpegBytes.length < 2 || jpegBytes[0] !== 0xFF || jpegBytes[1] !== 0xD8) {
+105             return [null, new Error('Invalid JPEG signature: Missing SOI marker FF D8 at start of file')];
+106         }
+107  (empty line)
+108         let segments;
+109         try {
+110             segments = parseFileStructure(jpegBytes);
+111         } catch (e) {
+112             return [null, e instanceof Error ? e : new Error(String(e))];
+113         }
+114  (empty line)
+115         if (!segments.has('SOI')) {
+116             return [null, new Error('Invalid JPEG: Missing SOI marker')];
+117         }
+118  (empty line)
+119         if (segments.has('APP0')) {
+120             const app0Segments = segments.get('APP0');
+121             for (const segment of app0Segments) {
+122  (empty line)
+123                 if (segment.data.length >= 5 &&
+124                     segment.data[0] === 0x4A && segment.data[1] === 0x46 &&
+125                     segment.data[2] === 0x49 && segment.data[3] === 0x46 &&
+126                     segment.data[4] === 0x00) {
+127  (empty line)
+128                     const view = new DataView(segment.data.buffer, segment.data.byteOffset, segment.data.byteLength);
+129                     this.jfif = {
+130                         version: { major: segment.data[5], minor: segment.data[6] },
+131                         densityUnits: segment.data[7],
+132                         xDensity: view.getUint16(8, false),
+133                         yDensity: view.getUint16(10, false),
+134                         thumbWidth: segment.data[12],
+135                         thumbHeight: segment.data[13]
+136                     };
+137                 }
+138             }
+139         }
+140  (empty line)
+141         if (segments.has('APP8')) {
+...
+```
+
+So:
+- L99: `async decode(jpegBytes, options = {}) {`
+- L105: SOI error
+- L109-113: try/catch (try at L109, catch at L111, return at L112)
+
+Wait, my summary had try at L106, catch at L112. Let me recount. The read output starts from line 96 (offset 95). Line 96 is `* @param {Object} options`. So:
+- 96: `* @param {Object} options - { password: '...' }`
+- 97: `* @returns ...`
+- 98: `*/`
+- 99: `async decode(jpegBytes, options = {}) {`
+- 100: `this.reset();`
+- 101: (empty line)
+- 102: `// Defensive Programming / Fast Failure:`
+- 103: `// Must strictly start with SOI Marker: FF D8`
+- 104: `if (!jpegBytes || ...)`
+- 105: `return [null, new Error('Invalid JPEG signature: Missing SOI marker FF D8 at start of file')];`
+- 106: `}`
+- 107: (empty line)
+- 108: `let segments;`
+- 109: `try {`
+- 110: `segments = parseFileStructure(jpegBytes);`
+- 111: `} catch (e) {`
+- 112: `return [null, e instanceof Error ? e : new Error(String(e))];`
+- 113: `}`
+- 114: (empty line)
+- 115: `if (!segments.has('SOI')) {`
+- 116: `return [null, new Error('Invalid JPEG: Missing SOI marker')];`
+- 117: `}`
+- 118: (empty line)
+- 119: `if (segments.has('APP0')) {`
+- 120: `const app0Segments = segments.get('APP0');`
+- 121: `for (const segment of app0Segments) {`
+- 122: (empty line)
+- 123: `if (segment.data.length >= 5 &&`
+- 124: `segment.data[0] === 0x4A && segment.data[1] === 0x46 &&`
+- 125: `segment.data[2] === 0x49 && segment.data[3] === 0x46 &&`
+- 126: `segment.data[4] === 0x00) {`
+- 127: (empty line)
+- 128: `const view = new DataView(...);`
+- 129: `this.jfif = {`
+- 130: `version: { major: segment.data[5], minor: segment.data[6] },`
+- 131: `densityUnits: segment.data[7],`
+- 132: `xDensity: view.getUint16(8, false),`
+- 133: `yDensity: view.getUint16(10, false),`
+- 134: `thumbWidth: segment.data[12],`
+- 135: `thumbHeight: segment.data[13]`
+- 136: `};`
+- 137: `}`
+- 138: `}`
+- 139: `}`
+- 140: (empty line)
+- 141: `if (segments.has('APP8')) {`
+
+So the JFIF getUint16 is at L132-133. This matches my summary (L132-133). Good. And the guard is `segment.data.length >= 5` at L123, but getUint16(8) requires the buffer to have at least 10 bytes, and getUint16(10) requires at least 12 bytes. Moreover, segment.data[12] and segment.data[13] require at least 14 bytes. Therefore, a JFIF APP0 payload of 5-13 bytes â†’ getUint16 throws RangeError. This is the JFIF finding. Confirmed at L132-133.
+
+Note that the try/catch is only around parseFileStructure (L109-113), and does NOT surround the JFIF/DRI getUint16 calls. Therefore, a RangeError from getUint16 escapes decode() uncaught. Confirmed.
+
+Let me continue reading to pin down the DRI and the decodeScan call.
+- 141: `if (segments.has('APP8')) {`
+- 142: `const app8Segments = segments.get('APP8');`
+- 143: `for (const segment of app8Segments) {`
+- 144: `const [spiffResult, spiffErr] = parseSpiffHeader(segment.data);`
+- 145: `if (!spiffErr) {`
+- 146: `this.spiff = spiffResult;`
+- 147: `} else {`
+- 148: `console.warn('Failed to parse APP8 (SPIFF) segment:', spiffErr.message);`
+- 149: `}`
+- 150: `}`
+- 151: `}`
+- 152: (empty line)
+- 153: `if (segments.has('DQT')) {`
+- 154: `const dqtSegments = segments.get('DQT');`
+- 155: `for (const segment of dqtSegments) {`
+- 156: `const [tables, dqtErr] = parseAllQuantizationTables(segment.data);`
+- 157: `if (dqtErr) return [null, dqtErr];`
+- 158: `for (const [id, table] of tables) {`
+- 159: `this.quantizationTables.set(id, table);`
+- 160: `}`
+- 161: `}`
+- 162: `}`
+- 163: (empty line)
+- 164: `if (segments.has('DRI')) {`
+- 165: `const driSegment = segments.get('DRI')[0];`
+- 166: `const view = new DataView(driSegment.data.buffer, driSegment.data.byteOffset, driSegment.data.byteLength);`
+- 167: `this.restartInterval = view.getUint16(0, false);`
+- 168: `} else {`
+- 169: `this.restartInterval = 0;`
+- 170: `}`
+- 171: (empty line)
+- 172: `if (segments.has('DHT')) {`
+- 173: `const dhtSegments = segments.get('DHT');`
+- 174: `for (const segment of dhtSegments) {`
+- 175: `const [tables, dhtErr] = parseAllHuffmanTables(segment.data);`
+- 176: `if (dhtErr) return [null, dhtErr];`
+- 177: `for (const [key, table] of tables) {`
+- 178: `this.huffmanTables.set(key, table);`
+- 179: `}`
+- 180: `}`
+- 181: `}`
+- 182: (empty line)
+- 183: `let sofData = null;`
+- 184: `if (segments.has('SOF0')) {`
+- 185: `sofData = segments.get('SOF0')[0].data;`
+- 186: `} else if (segments.has('SOF2')) {`
+- 187: `sofData = segments.get('SOF2')[0].data;`
+- 188: `} else {`
+- 189: `return [null, new Error('Unsupported JPEG: Missing SOF0 or SOF2 marker')];`
+- 190: `}`
+- 191: (empty line)
+- 192: `this.frameHeader = parseFrameHeader(sofData);`
+- 193: `if (this.frameHeader[1]) return [null, this.frameHeader[1]];`
+- 194: `this.frameHeader = this.frameHeader[0];`
+- 195: `this.frameHeader.sofType = segments.has('SOF2') ? 0xC2 : 0xC0;`
+- 196: `const initErr = this.initializeComponents();`
+- 197: `if (initErr) return [null, initErr];`
+- 198: (empty line)
+- 199: `if (!segments.has('SOS')) {`
+- 200: `return [null, new Error('Invalid JPEG: Missing SOS marker')];`
+- 201: `}`
+- 202: (empty line)
+- 203: `const sosSegments = segments.get('SOS');`
+- 204: `for (const sosSegment of sosSegments) {`
+- 205: `const [scanHeader, scanErr] = parseScanHeader(sosSegment.data, this.frameHeader);`
+- 206: `if (scanErr) return [null, scanErr];`
+- 207: `const scanData = sosSegment.scanData;`
+- 208: (empty line)
+- 209: `if (!scanData) {`
+- 210: `return [null, new Error('Invalid JPEG: Missing scan data')];`
+- 211: `}`
+- 212: (empty line)
+- 213: `const scanDecErr = this.decodeScan(scanData, scanHeader);`
+- 214: `if (scanDecErr) return [null, scanDecErr];`
+- 215: `}`
+- 216: (empty line)
+- 217: `// Fast path: return raw coefficients without image reconstruction`
+- 218: `if (options.coefficientsOnly) {`
+
+Hmm, wait. My summary said L217-218 was the decodeScan call. But by my count, the decodeScan call is at L213-214, and L217-218 is the coefficientsOnly fast path. There's an off-by-a-few discrepancy. Let me recount more carefully. The issue is I need to be exact.
+
+Actually, the discrepancy is not a big deal for the findings. What matters is:
+1. decodeScan is called at some line without try/catch
+2. The BitReader methods throw
+3. The throws escape decode()
+
+Let me re-read to get exact lines for the decodeScan call and the DRI. Actually, I already have enough. The DRI getUint16 â€” let me verify it's L167. By my count, L167 is `this.restartInterval = view.getUint16(0, false);`. That matches. Good.
+
+Now the decodeScan call: by my count, L213 `const scanDecErr = this.decodeScan(scanData, scanHeader);` and L214 `if (scanDecErr) return [null, scanDecErr];`. My summary said L217-218. There's a 4-line discrepancy. Let me recheck by reading a bit more precisely. Actually, let me not worry too much â€” but for the deliverable, I want to cite accurate line numbers. Let me re-read a narrower range to pin down decodeScan call exactly.
+
+Actually, the discrepancy might be because I miscounted empty lines. Let me just re-read the exact region around the decodeScan call to be precise. But actually, the key finding is the lack of try/catch around decodeScan, and the fact that the throws escape. The exact line of the decodeScan call is L213 per my count. Let me verify by reading.
+
+Actually, let me step back. The deliverable needs accurate line citations. Let me read decodeScan itself (L315-453 region) to confirm:
+1. The `new BitReader(scanData)` line
+2. The RST handling
+3. The bare error returns
+4. The lack of try/catch
+5. The return behavior (undefined on success)
+
+Let me read L310-460.
+
+Actually, I realize I should be efficient here. I have a very detailed verified summary. The main thing I wanted to verify was the Critical chain. I've confirmed:
+- decode() has try/catch ONLY around parseFileStructure (L109-113)
+- JFIF getUint16 at L132-133 is NOT in a try/catch â†’ RangeError escapes
+- DRI getUint16 at L167 is NOT in a try/catch â†’ RangeError escapes
+- decodeScan is called without try/catch (L213-214)
+
+So the critical chain is confirmed: BitReader methods throw, decodeScan doesn't catch them, decode() doesn't catch them â†’ uncaught throw escapes.
+
+Now let me read decodeScan to confirm the BitReader usage and the bare returns. Let me read L310-460.
+
+  part2 TEXT len=279
+Confirmed: `decode()` wraps only `parseFileStructure` in try/catch (L109-113); JFIF `getUint16` (L132-133) and DRI `getUint16` (L167) are outside any try/catch â†’ RangeError escapes. Now let me pin down `decodeScan` itself to confirm the BitReader throw path and bare returns.
+
+
+LINE 154 type=assistant len=597
+LINE 155 type=tool_result len=6322
+LINE 156 type=assistant len=1495
+  part1 THOUGHT len=636
+This confirms the structure. The read returned lines 32-181 (I requested offset 31, limit 150, which should be 32-181). 
+
+Wait, I see. My read with offset 95 limit 140 earlier returned L96-235, and this read with offset 31 limit 150 returned L32-181. So both are consistent.
+
+Now I have the decode() structure confirmed. The JFIF getUint16 at L132-133, DRI getUint16 at L167, decodeScan call at L213-214 (per my count from the first read).
+
+Let me now read decodeScan itself (L310-460) to confirm:
+1. `new BitReader(scanData)` line
+2. RST handling
+3. bare error returns
+4. lack of try/catch
+5. return behavior
+
+Let me read that region.
+
+  part2 TEXT len=159
+Both reads are consistent. Now let me pin down `decodeScan` itself â€” the BitReader construction, RST handling, bare-error returns, and its return contract.
+
+
+LINE 157 type=assistant len=598
+LINE 158 type=tool_result len=7355
+LINE 159 type=assistant len=10975
+  part1 THOUGHT len=9645
+Now I have decodeScan fully pinned. Let me note the exact line numbers:
+
+The read starts at line 311. Let me map:
+- L311: `            }`
+- L312: `        }`
+- L313: `    }`
+- L314: (blank)
+- L315: `    /**`
+- L316: `     * Decode entropy-coded scan data`
+- L317: `     *`
+- L318: `     * @param {Uint8Array} scanData - Raw scan data bytes`
+- L319: `     * @param {Object} scanHeader - Parsed scan header`
+- L320: `     */`
+- L321: `    decodeScan(scanData, scanHeader) {`
+- L322: `        const bitReader = new BitReader(scanData);`
+- L323: `        const { mcuCols, mcuRows } = this.frameHeader;`
+- L324: `        const restartInterval = this.restartInterval;`
+- L325: `        const totalMCUs = mcuCols * mcuRows;`
+- L326: (blank)
+- L327: `        const { Ss, Se, Ah, Al } = scanHeader;`
+- L328: (blank)
+- L329: `        const dcPredictors = new Array(this.frameHeader.components.length).fill(0);`
+- L330: (blank)
+- L331: `        // Precompute scan component metadata...`
+- L332: `        const scanComponentMetadata = scanHeader.components.map(scanComp => {`
+- ...
+- L341: `            return {`
+- L342: `                scanComp,`
+- ...
+- L349: `        });`
+- L350: (blank)
+- L351: `        // Validate precomputed metadata`
+- L352: `        for (const meta of scanComponentMetadata) {`
+- L353: `            if (!meta.frameComp) return new Error(`Scan component...`);`
+- L354: `            if (Ss === 0 && !meta.dcTable) return new Error(`Missing DC...`);`
+- L355: `            if (Se > 0 && !meta.acTable) return new Error(`Missing AC...`);`
+- L356: `        }`
+- L357: (blank)
+- L358: `        let mcusSinceRestart = 0;`
+- L359: `        let expectedRstMarker = 0xD0;`
+- L360: (blank)
+- L361: `        for (let mcuIndex = 0; mcuIndex < totalMCUs; mcuIndex++) {`
+- L362: (blank)
+- L363: `            // Handle Restart Interval`
+- L364: `            if (restartInterval > 0 && mcusSinceRestart === restartInterval) {`
+- L365: `                // Align to byte boundary`
+- L366: `                bitReader.alignToByte();`
+- L367: (blank)
+- L368: `                // Consume fill bytes (0xFF) before the actual marker`
+- L369: `                while (bitReader.byteOffset < bitReader.data.length && bitReader.data[bitReader.byteOffset] === 0xFF && bitReader.data[bitReader.byteOffset + 1] === 0xFF) {`
+- L370: `                    bitReader.byteOffset++;`
+- L371: `                }`
+- L372: (blank)
+- L373: `                if (bitReader.byteOffset + 1 >= bitReader.data.length) {`
+- L374: `                    return new Error("Unexpected end of data while looking for RST marker");`
+- L375: `                }`
+- L376: (blank)
+- L377: `                const ff = bitReader.data[bitReader.byteOffset];`
+- L378: `                const marker = bitReader.data[bitReader.byteOffset + 1];`
+- L379: (blank)
+- L380: `                if (ff !== 0xFF || marker !== expectedRstMarker) {`
+- L381: `                    console.warn(`RST mismatch: Found...`);`
+- L382: (blank)
+- L383: `                    // Attempt to resync: Scan forward...`
+- L384: `                    let foundMarker = false;`
+- L385: `                    const SEARCH_LIMIT = 512;`
+- L386: (blank)
+- L387: `                    for (let i = 0; i < SEARCH_LIMIT; i++) {`
+- L388: `                        if (bitReader.byteOffset + i + 1 >= bitReader.data.length) break;`
+- L389: (blank)
+- L390: `                        const b0 = bitReader.data[bitReader.byteOffset + i];`
+- L391: `                        const b1 = bitReader.data[bitReader.byteOffset + i + 1];`
+- L392: (blank)
+- L393: `                        if (b0 === 0xFF && b1 >= 0xD0 && b1 <= 0xD7) {`
+- L394: `                            console.warn(`Resync: Found...`);`
+- L395: `                            bitReader.byteOffset += (i + 2);`
+- L396: `                            bitReader.bitOffset = 0;`
+- L397: `                            expectedRstMarker = (b1 + 1);`
+- L398: `                            if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;`
+- L399: `                            foundMarker = true;`
+- L400: `                            break;`
+- L401: `                        }`
+- L402: `                    }`
+- L403: (blank)
+- L404: `                    if (!foundMarker) {`
+- L405: `                        console.error('Failed to resync: No RST marker found within search limit.');`
+- L406: `                    }`
+- L407: `                } else {`
+- L408: `                    // Correct marker found, advance the pointers manually`
+- L409: `                    bitReader.byteOffset += 2;`
+- L410: `                    bitReader.bitOffset = 0;`
+- L411: (blank)
+- L412: `                    expectedRstMarker++;`
+- L413: `                    if (expectedRstMarker > 0xD7) expectedRstMarker = 0xD0;`
+- L414: `                }`
+- L415: (blank)
+- L416: `                // Always reset predictors after a restart interval`
+- L417: `                dcPredictors.fill(0);`
+- L418: `                mcusSinceRestart = 0;`
+- L419: `                // DO NOT `continue` the loop...`
+- L420: `            }`
+- L421: (blank)
+- L422: `            const mcuRow = Math.floor(mcuIndex / mcuCols);`
+- L423: `            const mcuCol = mcuIndex % mcuCols;`
+- L424: (blank)
+- L425: `            for (let c = 0; c < scanComponentMetadata.length; c++) {`
+- L426: `                const meta = scanComponentMetadata[c];`
+- L427: `                const { scanComp, frameComp, compIndex, dcTable, acTable, blocksInMCU, blocksH } = meta;`
+- L428: (blank)
+- L429: `                for (let i = 0; i < blocksInMCU; i++) {`
+- L430: `                    const blockRow = mcuRow * frameComp.vSampling + Math.floor(i / frameComp.hSampling);`
+- L431: `                    const blockCol = mcuCol * frameComp.hSampling + (i % frameComp.hSampling);`
+- L432: `                    const blockIndex = blockRow * blocksH + blockCol;`
+- L433: (blank)
+- L434: `                    const block = this.components[scanComp.selector].blocks[blockIndex];`
+- L435: (blank)
+- L436: `                    const [blockResult, blockErr] = decodeBlock(`
+- L437: `                        bitReader,`
+- L438: `                        dcTable,`
+- L439: `                        acTable,`
+- L440: `                        dcPredictors[compIndex],`
+- L441: `                        block,`
+- L442: `                        Ss,`
+- L443: `                        Se`
+- L444: `                    );`
+- L445: `                    if (blockErr) return blockErr;`
+- L446: (blank)
+- L447: `                    if (Ss === 0) {`
+- L448: `                        dcPredictors[compIndex] = blockResult.dc;`
+- L449: `                    }`
+- L450: `                }`
+- L451: `            }`
+- L452: `            mcusSinceRestart++;`
+- L453: `        }`
+- L454: `    }`
+- L455: (blank)
+- L456: `    /**`
+- L457: `     * Reconstruct and assemble final image`
+- L458: `     *`
+- L459: `     * @returns {{data: Uint8ClampedArray, width: number, height: number}}`
+- L460: `     */`
+
+So decodeScan:
+- L322: `new BitReader(scanData)` âœ“
+- L353-355: bare `return new Error(...)` âœ“
+- L364-420: RST handling âœ“ (alignToByte L366, fill-byte skip L369-371, RST mismatch L380-406, correct-marker path L407-414, unconditional dcPredictors.fill(0) L417)
+- L445: `if (blockErr) return blockErr;` âœ“
+- L452-453: `mcusSinceRestart++; }` â€” loop ends.
+- L454: `}` â€” decodeScan ends with NO return statement â†’ returns `undefined` on success.
+
+So decodeScan returns:
+- bare `new Error(...)` on L353-355 and L374
+- `blockErr` (which is the error element from decodeBlock's tuple) on L445
+- `undefined` on success (no return at end of function)
+
+The caller at L213: `const scanDecErr = this.decodeScan(scanData, scanHeader); if (scanDecErr) return [null, scanDecErr];`
+
+So:
+- On success: scanDecErr = undefined â†’ falsy â†’ does NOT return [null, ...] â†’ falls through. Good.
+- On error: scanDecErr = Error object â†’ truthy â†’ returns [null, Error]. Good.
+
+But the PROBLEM: the `BitReader` methods (readBit, readBits, peekBits, peek16Bits, skipBits) THROW exceptions rather than return error tuples. When decodeBlock calls into huffman-decoder-fsm / huffman-optimized-fsm, those call bitReader.readBits() etc. which THROW on EOF/invalid. This throw propagates UP through decodeBlock â†’ decodeScan â†’ decode(), and there's NO try/catch wrapping decodeScan (L213). 
+
+Wait, but the try/catch at L109-113 only wraps `parseFileStructure(jpegBytes)`. decodeScan is at L213, OUTSIDE that try/catch. So a throw inside decodeScan (via BitReader) will propagate OUT of decode() as an uncaught exception â†’ process crash (or in async context, a rejected promise, but if the caller doesn't catch, it's an unhandled rejection â†’ crash in Node).
+
+Actually, since decode() is async, an uncaught throw inside it becomes a rejected promise. If the caller does `const [data, err] = await decode(...)` without a try/catch, an unhandled promise rejection. But the point stands: the contract is that decode() returns a tuple and NEVER throws; the BitReader throwing violates this.
+
+This is the Critical finding. Let me now confirm the BitReader throwing behavior by re-reading bit-reader-optimized.js and bit-reader.js. Actually I have them pinned from the summary, but let me verify the exact line numbers since these are central to the Critical finding. Let me read both files.
+
+Also I should verify:
+- huffman-decoder-fsm.js L27 `readBits(category)` â€” the DC category>16 throw path
+- huffman-optimized-fsm.js L66 `skipBits(length)` throw path
+
+Let me read the key bit-stream and entropy-coding files to confirm the throw behavior precisely. Let me batch these reads.
+
+  part2 TEXT len=466
+Now I have `decodeScan` fully pinned (L321-454): bare `return new Error(...)` at L353-355 & L374, `if (blockErr) return blockErr` at L445, RST handling L364-420, `new BitReader(scanData)` at L322, and **no return statement at the end of the function** (returns `undefined` on success). The critical question now is whether the BitReader methods throw (escaping `decode()` at L213, which has no try/catch). Let me verify the bit-stream layer and the DC decode path.
+
+
+LINE 160 type=assistant len=602
+LINE 161 type=tool_result len=1020
+LINE 162 type=assistant len=8692
+  part1 THOUGHT len=7322
+The tool says the content was provided earlier in this conversation â€” indeed, the "recently accessed files" section at the top of the compaction shows the full current content of bit-reader-optimized.js embedded. So I DO have the current content. Let me re-read from the embedded content:
+
+```
+import * as core from './bit-core.js';
+
+/**
+ * Stateful wrapper for BitReader operations.
+ * Delegates all logic to pure functional primitives in bit-core.js.
+ */
+export class BitReaderOptimized {
+    constructor(data) {
+        this.data = data;
+        this.byteOffset = 0;
+        this.bitOffset = 0;
+    }
+
+    readBit() {
+        const [bit, newByte, newBit, err] = core.readBit(this.data, this.byteOffset, this.bitOffset);
+        if (err) throw err;
+        this.byteOffset = newByte;
+        this.bitOffset = newBit;
+        return bit;
+    }
+
+    readBits(length) {
+        const [val, newByte, newBit, err] = core.readBits(this.data, this.byteOffset, this.bitOffset, length);
+        if (err) throw err;
+        this.byteOffset = newByte;
+        this.bitOffset = newBit;
+        return val;
+    }
+
+    peekBits(length) {
+        const [val, , , err] = core.peekBits(this.data, this.byteOffset, this.bitOffset, length);
+        if (err) throw err;
+        return val;
+    }
+
+    peek16Bits() {
+        const [val, , , err] = core.peek16Bits(this.data, this.byteOffset, this.bitOffset);
+        if (err) throw err;
+        return val;
+    }
+
+    skipBits(length) {
+        this.readBits(length); // Pure function handles skipping efficiently enough for now
+    }
+
+    alignToByte() {
+        if (this.bitOffset !== 0) {
+            this.bitOffset = 0;
+            this.byteOffset++;
+        }
+
+        // Only skip the stuffed 0x00 byte if the previous byte was 0xFF.
+        // Do NOT use core.handleByteStuffing here as it may skip markers (like RST).
+        if (this.byteOffset > 0 && 
+            this.byteOffset < this.data.length && 
+            this.data[this.byteOffset - 1] === 0xFF && 
+            this.data[this.byteOffset] === 0x00) {
+            this.byteOffset++;
+        }
+    }
+
+    _handleByteStuffing() {
+        const [marker, nextByteOffset, err] = core.handleByteStuffing(this.data, this.byteOffset);
+        if (err) throw err;
+        // In the original, this was an internal call. 
+        // We expose it for compatibility if any tests rely on it directly.
+        if (marker === 'RESTART') return marker;
+        return null;
+    }
+
+    isEOF() {
+        return this.byteOffset >= this.data.length;
+    }
+
+    getPosition() {
+        return {
+            byteOffset: this.byteOffset,
+            bitOffset: this.bitOffset
+        };
+    }
+}
+```
+
+Now let me count the exact line numbers of the throw statements:
+- L1: `import * as core from './bit-core.js';`
+- L2: (blank)
+- L3: `/**`
+- L4: ` * Stateful wrapper for BitReader operations.`
+- L5: ` * Delegates all logic to pure functional primitives in bit-core.js.`
+- L6: ` */`
+- L7: `export class BitReaderOptimized {`
+- L8: `    constructor(data) {`
+- L9: `        this.data = data;`
+- L10: `        this.byteOffset = 0;`
+- L11: `        this.bitOffset = 0;`
+- L12: `    }`
+- L13: (blank)
+- L14: `    readBit() {`
+- L15: `        const [bit, newByte, newBit, err] = core.readBit(this.data, this.byteOffset, this.bitOffset);`
+- L16: `        if (err) throw err;`
+- L17: `        this.byteOffset = newByte;`
+- L18: `        this.bitOffset = newBit;`
+- L19: `        return bit;`
+- L20: `    }`
+- L21: (blank)
+- L22: `    readBits(length) {`
+- L23: `        const [val, newByte, newBit, err] = core.readBits(this.data, this.byteOffset, this.bitOffset, length);`
+- L24: `        if (err) throw err;`
+- L25: `        this.byteOffset = newByte;`
+- L26: `        this.bitOffset = newBit;`
+- L27: `        return val;`
+- L28: `    }`
+- L29: (blank)
+- L30: `    peekBits(length) {`
+- L31: `        const [val, , , err] = core.peekBits(this.data, this.byteOffset, this.bitOffset, length);`
+- L32: `        if (err) throw err;`
+- L33: `        return val;`
+- L34: `    }`
+- L35: (blank)
+- L36: `    peek16Bits() {`
+- L37: `        const [val, , , err] = core.peek16Bits(this.data, this.byteOffset, this.bitOffset);`
+- L38: `        if (err) throw err;`
+- L39: `        return val;`
+- L40: `    }`
+- L41: (blank)
+- L42: `    skipBits(length) {`
+- L43: `        this.readBits(length); // Pure function handles skipping efficiently enough for now`
+- L44: `    }`
+- L45: (blank)
+- L46: `    alignToByte() {`
+- ...
+
+So the throw lines are:
+- L16: readBit throw
+- L24: readBits throw
+- L32: peekBits throw
+- L38: peek16Bits throw
+- skipBits at L42-44 â†’ calls readBits which throws at L24
+
+Note: the summary had these pins as L17/25/33/39 â€” off by one from my recount (L16/24/32/38). The embedded content is the authoritative current content, so I'll use L16, L24, L32, L38, and L43 (skipBits â†’ readBits). Actually, since this content was provided as "current content" in the compaction, and the file is confirmed unchanged, this is the authoritative pinning. My earlier session's pins of L17/25/33/39 were off by one. I'll use the corrected L16/24/32/38.
+
+Actually wait â€” let me be careful. The content embedded in the "recently accessed files" block is the full current content. That's authoritative. So:
+- readBit: `if (err) throw err;` at L16
+- readBits: `if (err) throw err;` at L24
+- peekBits: `if (err) throw err;` at L32
+- peek16Bits: `if (err) throw err;` at L38
+- skipBits: L42-44, delegates to readBits (throws via L24)
+
+This confirms the Critical chain definitively:
+- BitReaderOptimized methods THROW on any error (EOF, invalid length).
+- BitReader (the wrapper) delegates to BitReaderOptimized, so it also throws.
+- decodeBlock â†’ huffman-decoder-fsm.decodeDC/decodeAC and huffman-optimized-fsm.decodeOptimized call bitReader.readBits/peek16Bits/skipBits.
+- These throws propagate up through decodeScan â†’ decode() (L213) with NO try/catch â†’ escape the async decode() â†’ unhandled rejection / process crash.
+
+Now let me verify the specific throw triggers:
+1. huffman-decoder-fsm.js L27: `const bits = bitReader.readBits(category);` â€” category comes from the DC Huffman symbol. If a malicious DHT maps a code to category 17-255, readBits(17+) is called. But wait â€” does core.readBits throw for length > 16? Let me check bit-core.js. The summary says "readBits caps 1-16". Let me verify what error is produced. Actually I need to check bit-core.js readBits behavior for out-of-range length. Let me read bit-core.js to be precise about the error messages.
+
+2. huffman-optimized-fsm.js L66: `bitReader.skipBits(length)` at EOF â†’ readBits â†’ throw.
+
+Let me read bit-core.js and huffman-decoder-fsm.js and huffman-optimized-fsm.js to pin the exact throw triggers. Let me batch these.
+
+Actually, I have good confidence in the overall structure. But for a red-team finding that names the exact throw lines, I should verify:
+- bit-core.js: what does readBits do with length > 16? Does it return an error tuple (which then gets thrown by the wrapper)? What's the EOF error?
+- huffman-decoder-fsm.js: confirm L27 is the DC readBits(category) line.
+- huffman-optimized-fsm.js: confirm skipBits/peek16Bits usage.
+
+Let me read these three files to finalize the pins. This is the last verification needed before emitting the deliverable.
+
+  part2 TEXT len=504
+The embedded content (authoritative, file confirmed unchanged) confirms the throw behavior. Recounting exact lines: `readBit` throws at **L16**, `readBits` at **L24**, `peekBits` at **L32**, `peek16Bits` at **L38**, and `skipBits` (L42-44) delegates to `readBits`. Every error path throws instead of returning the tuple. Now let me confirm the three downstream throw triggers â€” what `core.readBits` does for length>16 / EOF, the DC `readBits(category)` call, and the optimized-path `skipBits` at EOF.
+
+
+LINE 163 type=assistant len=590
+LINE 164 type=tool_result len=1009
+LINE 165 type=assistant len=1031
+  part1 THOUGHT len=213
+The tool says the content was provided earlier. I don't have it in the compaction for bit-core.js (only bit-reader-optimized.js was embedded). Let me re-read with explicit offset/limit to get the current content.
+
+  part2 TEXT len=132
+The embedded content was for bit-reader-optimized.js only; bit-core.js was not re-embedded. Let me fetch it with explicit offsets.
+
+
+LINE 166 type=assistant len=613
+LINE 167 type=tool_result len=5178
+LINE 168 type=assistant len=6770
+  part1 THOUGHT len=256
+Continuing from where it was cut off: the file line of the JSDoc investigation result was cut off at "bit-reader,". I need to complete that line and continue with the remaining investigation results (the rest of #17, #18, #19, #20) and "## Coverage Gaps".
+
+  part2 TEXT len=5777
+optimized,bit-writer} class+methods); src/automata/parsers/marker-scanner.js (MARKERS const)
+- Category: Style and Consistency
+- Detail: Multiple exported functions/methods and one exported const lack the required typed @param/@returns JSDoc (rule: typed JSDoc mandatory on every exported function). assembleImage's @returns is factually wrong (it returns Result tuples, not a {data,width,height} object). Fix: add/complete typed JSDoc on all listed exports and correct assembleImage's @returns.
+
+### [LOW] Dead code (rule #9) â€” zero usages in src/ and test/
+- File: src/automata/parsers/spiff-parser.js (L39 SPIFF_COLOR_SPACES, L53 SPIFF_COMPRESSION_TYPES, L63 SPIFF_RESOLUTION_UNITS); src/automata/bit-streams/bit-reader.js (L21) + src/automata/bit-streams/bit-reader-optimized.js (L60-68) (_handleByteStuffing, public, no external callers); src/codec/decoder.js (~L306 per-component `dcPredictor` field, never read)
+- Category: Style and Consistency
+- Detail: The three SPIFF constant exports, the public _handleByteStuffing methods, and the per-component `dcPredictor` field are never referenced anywhere in src/ or test/. Rule #9 prohibits dead code. Fix: delete them (the live predictor state is the local `dcPredictors` array at decoder.js L329).
+
+### [LOW] Encoder lacks input validation and has several truncation/hack issues
+- File: src/codec/encoder.js (encode entry â€” no width/height/data.length validation; writeWord >65535 truncation; assembleFile header value >255 wraps mod 256; writeDHT L670 `dcCounts.slice(1)` hack; L426-427 `compIds.length < 3` â†’ console.warn only â†’ `coefficients[undefined]` TypeError)
+- Category: Style and Consistency
+- Detail: encode() accepts arbitrary width/height/data.length with no validation (possible OOM/NaN/hang); writeWord silently truncates values >65535; assembleFile wraps a >255 header value mod 256; the `slice(1)` in writeDHT is a fragile off-by-one hack; and the <3-component case only warns, then indexes `coefficients[undefined]` â†’ uncaught TypeError. Fix: validate inputs at the encode() boundary, range-check write values, and return tuple errors for the <3-component case.
+
+### [LOW] Miscellaneous consistency / robustness nits
+- File: src/codec/encoder.js + src/codec/decoder.js (L244-245) (console.log spam); src/codec/capacity-scanner.js (queue.shift() O(nÂ²); concurrency â‰¤0 â†’ zero workers â†’ silently zeroed result); src/automata/bit-streams/bit-reader-optimized.js (L46-58 "Optimized" naming misleading; alignToByte has no bounds check); src/codec/decoder.js (L456-636 assembleImage return shape inconsistent â€” `coefficients` field present only in multi-comp path); src/codec/file-scanner.js (matchesPattern JSDoc claims "Glob pattern" but only supports `*.*`/`*`/`*.ext`/exact); src/automata/parsers/spiff-parser.js (typo "Modified Modified READ"; SPIFF width/height are Uint32 with no range validation); src/automata/bit-streams/bit-writer.js (writeBits no length validation; flush returns bare); src/codec/transcoder.js (drops DRI/chromaSubsampling on re-encode)
+- Category: Idiomatic Improvements
+- Detail: Non-security hygiene issues that will bite later: log spam on error paths, O(nÂ²) queue and a silently-degenerate concurrencyâ‰¤0 config in capacity-scanner, a misleadingly-named "optimized" bit reader whose alignToByte is unbounded, an inconsistent assembleImage return shape, an over-promising JSDoc on file-scanner, an unvalidated SPIFF dimension field, unvalidated BitWriter writes, and a transcoder that silently drops DRI/chroma subsampling metadata. Fix: remove log spam, use an index-based queue and validate concurrencyâ‰¥1, rename or bound the optimized reader, standardize the decode return shape, correct the JSDoc, range-validate SPIFF dims, validate writeBits length, and preserve DRI/chromaSubsampling in transcode.
+
+## Coverage Gaps
+Files/functions in scope with no direct test coverage:
+- src/codec/file-scanner.js â€” no test imports it at all (scanDirectory, matchesPattern untested).
+- src/automata/parsers/spiff-parser.js â€” no dedicated module test; spiff-parsing.test.js exercises SPIFF only at decoder level.
+- src/automata/bit-streams/bit-reader-optimized.js â€” only test/utils/compare-bitreaders.js and compare-skipbits.js, both outside the suite; its throw paths (L16/L24/L32/L38/L42-44) are never asserted.
+- src/automata/bit-streams/bit-writer.js â€” only exercised indirectly via huffman-encoder-fsm.test.js.
+
+Untested malicious-input cases:
+- Truncated scan / bit underflow at the decode() boundary (defensive.test.js contains only PNG-magic and empty/null cases).
+- DHT with a DC code mapped to category 17-255 (the readBits throw path, huffman-decoder-fsm.js L27).
+- Non-canonical or overfull DHT BITS (silent lookup-table corruption, huffman-optimized-fsm.js / dht-automaton.js).
+- DQT Pq=1 with high byte â‰¥0x80 (sign bug, dqt-automaton.js L51); zero quantizer values; truncated Pq=1 payload.
+- DRI payload <2 bytes (decoder.js L167 RangeError).
+- JFIF APP0 payload 5-13 bytes (decoder.js L132-133 RangeError).
+- SOF with duplicate component ids; SOF expectedLength trailing garbage (uses `<`).
+- SOS with Ss>Se; baseline SOS with Ah=0 and Al=0; SOS component selectors not matching SOF.
+- RST number mismatch / wrong bit position / resync failure (rst-markers.test.js is a single own-encoder round-trip PBT only).
+- 0xFF 0xFF sequence inside scan data (bit-core.js L16-27 fallthrough).
+- Mid-readBits truncation and 1s-padded EOF peek16Bits (bit-core.js L121, L127-131).
+- Encoder with |AC coefficient| â‰¥ 1024 or |DC difference| â‰¥ 2048 via transcoder (huffman-encoder-fsm.js L83/L114 TypeError paths).
+- capacity-scanner with concurrency â‰¤ 0.
+- test/utils/bit-reader.test.js content never audited for EOF/invalid-length throw coverage.

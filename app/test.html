@@ -9,6 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Ollie Test Suite</title>
+    <script>
+        window.__TEST_RUNNER__ = true;
+    </script>
     <style>
         :root {
             --bg-body: #0f0f13;
@@ -440,8 +443,8 @@
                 document.getElementById('count-warn').textContent = warnCount;
             }
 
-            // Progress bar (estimate based on known test count ~480)
-            const estimated = 480;
+            // Progress bar (estimate based on known test count ~874)
+            const estimated = 874;
             const pct = Math.min(100, (s.total / estimated) * 100);
             document.getElementById('progress-bar').style.width = pct + '%';
 
@@ -484,9 +487,9 @@
             }
         });
 
-        // ─── Import All Test Suites ───
+        // ─── Import All Test Suites (Aligned with test/runner.js) ───
 
-        // Encoder Tests
+        // 1. Algebraic & Encoder Core
         import '../test/algebraic/colorspace/rgb-to-ycbcr.test.js';
         import '../test/algebraic/mappings/blocks.test.js';
         import '../test/codec/encoder/headers.test.js';
@@ -495,21 +498,18 @@
         import '../test/algebraic/mappings/forward-zigzag.test.js';
         import '../test/automata/entropy-coding/huffman-encoder-fsm.test.js';
         import '../test/algebraic/mappings/downsampling.test.js';
-        import '../test/automata/parsers/progressive-encoding.test.js';
         import '../test/automata/parsers/spiff-generation.test.js';
         import '../test/codec/encoder.test.js';
         import '../test/codec/encoder/quality.test.js';
         import '../test/codec/encoder/subsampling-420.test.js';
-        import '../test/codec/encoder/coefficients.test.js';
-        import '../test/codec/transcoder.test.js';
-        import '../test/codec/orchestration/orchestrator.test.js';
 
-        // Decoder Tests
+        // 2. Automata & Decoder Core
         import '../test/automata/parsers/sof-automaton.test.js';
         import '../test/automata/parsers/sos-automaton.test.js';
         import '../test/automata/parsers/dht-automaton.test.js';
         import '../test/automata/parsers/dqt-automaton.test.js';
         import '../test/automata/entropy-coding/huffman-decoder-fsm.test.js';
+        import '../test/automata/entropy-coding/huffman-optimized-fsm.test.js';
         import '../test/algebraic/mappings/inverse-zigzag.test.js';
         import '../test/algebraic/quantization/inverse-quantization.test.js';
         import '../test/algebraic/discrete-cosine/inverse-dct.test.js';
@@ -518,64 +518,163 @@
         import '../test/algebraic/colorspace/ycbcr-to-rgb.test.js';
         import '../test/algebraic/mappings/upsampling.test.js';
         import '../test/algebraic/mappings/block-assembly.test.js';
-        import '../test/automata/parsers/progressive-decoding.test.js';
         import '../test/codec/decoder/rst-markers.test.js';
-        import '../test/codec/decoder/spiff-parsing.test.js';
-
-        // Utility & Bitstream Tests
-        import '../test/automata/bit-streams/bit-core.test.js';
         import '../test/utils/bit-reader.test.js';
+        import '../test/automata/bit-streams/bit-core.test.js';
+        import '../test/automata/bit-streams/bit-writer.test.js';
         import '../test/utils/marker-parser.test.js';
 
-        // Steganography Tests
-        import '../test/codec/steganography/steganography.test.js';
-        import '../test/codec/steganography/container.test.js';
+        // 3. Information Theory & Steganography
         import '../test/information-theory/steganography/chunk-manager.test.js';
-        import '../test/information-theory/steganography/f5-syndrome.test.js';
-        // Node only tests that rely on fs/path will skip their inner bodies dynamically
-        // import '../test/codec/steganography/batch-process.test.js';
+        import '../test/codec/decoder/spiff-parsing.test.js';
+        import '../test/vendor/argon2id.test.js';
+        import '../test/information-theory/cryptography/kdf-chain.test.js';
+        import '../test/information-theory/steganography/opaque-container.test.js';
+        import '../test/information-theory/steganography/stc-matrix.test.js';
+        import '../test/information-theory/steganography/juniward.test.js';
+        import '../test/information-theory/steganography/stego-engine.test.js';
+        import '../test/codec/steganography/batch-process.test.js';
         import '../test/information-theory/error-correction/rs-interleaver.test.js';
-        import '../test/codec/steganography/container-format.test.js';
+        import '../test/codec/capacity-scanner.test.js';
+        import '../test/codec/capacity-scanner.pbt.js';
 
-        // Crypto Tests
+        // 4. Cryptography, Manifest, CSS & Secret Sharing
         import '../test/information-theory/cryptography/aes-gcm.test.js';
         import '../test/information-theory/cryptography/pbkdf2.test.js';
+        import '../test/information-theory/cryptography/hmac.test.js';
+        import '../test/security/carrier-manifest.test.js';
+        import '../test/security/manifest-enforcement.test.js';
+        import '../test/security/gf-shamir.test.js';
+        import '../test/security/css-envelope.test.js';
+        import '../test/security/threshold-vault.test.js';
+        import '../test/security/gf256.test.js';
 
-        // Error Correction Tests
+        // 5. Fuzzing, Differentials & Robustness
+        import '../test/fuzz/cli-fuzz.test.js';
+        import '../test/fuzz/crypto-fuzz.test.js';
+        import '../test/security/bitreader-differential.test.js';
+        import '../test/security/ecc-edges.test.js';
+        import '../test/fuzz/parser-fuzz.test.js';
+        import '../test/fuzz/codec-mr.test.js';
+        import '../test/fuzz/vault-batch.test.js';
+        import '../test/fuzz/stego-fuzz.test.js';
+        import '../test/fuzz/steganography-mr.test.js';
+        import '../test/fuzz/csv-fuzz.test.js';
+        import '../test/fuzz/utils-fuzz.test.js';
+        import '../test/fuzz/qr-fuzz.test.js';
+        import '../test/fuzz/juniward-mr.test.js';
+
+        // 6. Test Runner, Base32, Headers, TOTP & Container
+        import '../test/utils/test-runner.test.js';
+        import '../test/utils/test-runner.pbt.js';
+        import '../test/utils/concurrency/tuple-serializer.test.js';
+        import '../test/utils/concurrency/worker-pool.test.js';
+        import '../test/codec/carrier-pool.test.js';
+        import '../test/utils/base32.test.js';
+        import '../test/security/totp.test.js';
+        import '../test/security/encrypted-container.test.js';
+
+        // 7. QR Code Suite
+        import '../test/security/qr-encoder.test.js';
+        import '../test/security/qr-capacity.test.js';
+        import '../test/security/qr-format-tolerance.test.js';
+        import '../test/security/qr-binarizer.test.js';
+        import '../test/security/qr-decoder.test.js';
+        import '../test/security/qr-fixtures.test.js';
+
+        // 8. Wire Format v4 & Cauchy EC
+        import '../test/security/cauchy-ec.test.js';
+
+        // 9. Error Correction & Galois Field
         import '../test/integration/error-correction/reed-solomon-integration.test.js';
         import '../test/information-theory/error-correction/galois-field.test.js';
         import '../test/information-theory/error-correction/reed-solomon-codec.test.js';
         import '../test/integration/error-correction/reedsolomon.test.js';
 
-        // Integration Tests
+        // 10. Codec Integration, Transcoding & Orchestration
         import '../test/codec/decoder.test.js';
         import '../test/codec/decoder/defensive.test.js';
         import '../test/integration/roundtrip.test.js';
         import '../test/integration/steganography-roundtrip.test.js';
         import '../test/scripts/auto_detection_roundtrip.test.js';
         import '../test/scripts/capacity_validation.test.js';
-        import '../test/scripts/format_detection.test.js';
-        import '../test/codec/capacity-scanner.test.js';
-        import '../test/codec/capacity-scanner.pbt.js';
+        import '../test/codec/encoder/coefficients.test.js';
+        import '../test/codec/transcoder.test.js';
+        import '../test/codec/orchestration/orchestrator.test.js';
 
-        // Security Tests
+        // 11. Security Hardening & Conformance
         import '../test/security/secure-id-generation.test.js';
+        import '../test/security/chunk-integrity.test.js';
+        import '../test/security/decoder-hardening.test.js';
+        import '../test/security/capacity-consistency.test.js';
+        import '../test/security/vault-hardening.test.js';
+        import '../test/security/totp-gate.test.js';
+        import '../test/security/url-safety.test.js';
+        import '../test/security/probe-regressions.test.js';
+        import '../test/conformance/wire-format-conformance.test.js';
+        import '../test/conformance/wire-format.pbt.js';
+        import '../test/security/ui-legacy-xss.test.js';
+        import '../test/security/drop-zone-pagination.test.js';
+        import '../test/security/drop-zone-folders.test.js';
+        import '../test/security/proportional-cauchy-ec.test.js';
 
-        // Vault Tests
+        // 12. Utilities & Vault Data Structures
+        import '../test/utils/atomic-writer.test.js';
+        import '../test/utils/compression.test.js';
+        import '../test/utils/crc32.test.js';
+        import '../test/utils/csv.test.js';
+        import '../test/utils/password-strength.test.js';
         import '../test/structures/vault/secure-record.test.js';
+        import '../test/structures/vault/csv-import.test.js';
         import '../test/structures/vault/immutable-vault.test.js';
+        import '../test/structures/vault/key-wrapping.test.js';
+        import '../test/structures/vault/revision-tracking.test.js';
+        import '../test/structures/vault/encrypted-export.test.js';
 
-        // Vault Tests (skip body in browser via isNode)
-        // import '../test/integration/vault/vault-e2e.test.js';
-        // import '../test/integration/vault/vault-e2e-crud.test.js';
-        // import '../test/integration/vault/vault-e2e-carriers.test.js';
-        // import '../test/integration/vault/vault-e2e-crypto-boundary.test.js';
-        // import '../test/integration/vault/vault-e2e-ecc.test.js';
-        // import '../test/integration/vault/vault-e2e-empty.test.js';
-        // import '../test/integration/vault/vault-e2e-multigen.test.js';
+        // 13. CLI & Vault E2E Integration
+        import '../test/scripts/cli.test.js';
+        import '../test/integration/vault/vault-e2e.test.js';
+        import '../test/integration/vault/vault-e2e-crud.test.js';
+        import '../test/integration/vault/vault-e2e-carriers.test.js';
+        import '../test/integration/vault/vault-e2e-crypto-boundary.test.js';
+        import '../test/integration/vault/vault-e2e-ecc.test.js';
+        import '../test/integration/vault/vault-e2e-empty.test.js';
+        import '../test/integration/vault/vault-e2e-multigen.test.js';
+
+        // 14. Vault UI Integration Flows
+        import '../test/integration/vault/vault-capacity-ui.test.js';
+        import '../test/integration/vault/vault-save-permission.test.js';
+        import '../test/integration/vault/vault-csv-import-ui.test.js';
+        import '../test/integration/vault/vault-totp-form.test.js';
+        import '../test/integration/vault/vault-totp-display.test.js';
+        import '../test/integration/vault/vault-qr-scan.test.js';
+        import '../test/integration/vault/vault-tierb-flow.test.js';
+        import '../test/integration/vault/vault-spread-save.test.js';
+        import '../test/structures/vault/password-rotation.test.js';
+        import '../test/information-theory/cryptography/pbkdf2-benchmark.test.js';
+        import '../test/fuzz/kdf-fuzz.test.js';
+        import '../test/integration/vault/vault-ui-redesign.test.js';
+        import '../test/integration/vault/vault-ui-polish.test.js';
+        import '../test/integration/vault/card-flow-automata.test.js';
+        import '../test/ui-xss.test.js';
+        import '../test/security/xss.test.js';
+
+        // 15. Dedicated PBT Subsystem Suites
+        import '../test/pbt/algebraic.pbt.js';
+        import '../test/pbt/automata.pbt.js';
+        import '../test/pbt/codec.pbt.js';
+        import '../test/pbt/crypto.pbt.js';
+        import '../test/pbt/ecc.pbt.js';
+        import '../test/pbt/secret-sharing.pbt.js';
+        import '../test/pbt/steganography.pbt.js';
+        import '../test/pbt/qr.pbt.js';
+        import '../test/pbt/vault.pbt.js';
+        import '../test/pbt/utils.pbt.js';
 
         // Run the registered test tree
         await executeTests();
+        // Clean up any lingering test DOM overlays/modals
+        document.querySelectorAll('.qr-overlay, .modal-overlay, #loadingOverlay').forEach(el => el.remove());
     </script>
 </body>
 

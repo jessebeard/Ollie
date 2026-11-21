@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
         reqPath = '/app' + reqPath;
     }
 
-    let filePath = path.join(ROOT, reqPath);
+    const filePath = path.join(ROOT, reqPath);
 
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
@@ -63,6 +63,7 @@ const server = http.createServer((req, res) => {
 
         res.writeHead(200, {
             'Content-Type': contentType,
+            'Content-Security-Policy': "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none';",
             'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
             'Pragma': 'no-cache',
             'Expires': '0'

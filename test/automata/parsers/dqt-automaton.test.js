@@ -1,4 +1,5 @@
 import { describe, it, expect } from '../../utils/test-runner.js';
+import { Arbitrary, assertProperty } from '../../utils/pbt.js';
 import {
     parseQuantizationTable,
     parseAllQuantizationTables,
@@ -181,5 +182,30 @@ describe('QuantizationTableParser', () => {
         const [result, resultErr] = parseQuantizationTable(data, 65);
         expect(result.id).toBe(1);
         expect(result.table[0]).toBe(10);
+    });
+
+    describe('PBT & Table Fidelity', () => {
+        it('Property: 8-bit quantization tables preserve all 64 values exactly for arbitrary table IDs 0-3', async () => {
+            await assertProperty(
+                [Arbitrary.integer(0, 3), Arbitrary.byteArray(64, 64)],
+                (tableId, tableData) => {
+                    const data = new Uint8Array(65);
+                    data[0] = tableId; // Pq = 0 (8-bit), Tq = tableId
+                    data.set(tableData, 1);
+
+                    const [result, err] = parseQuantizationTable(data, 0);
+                    expect(err).toBe(null);
+                    expect(result.id).toBe(tableId);
+                    expect(result.precision).toBe(0);
+                    expect(result.table.length).toBe(64);
+                    expect(result.nextOffset).toBe(65);
+
+                    for (let i = 0; i < 64; i++) {
+                        expect(result.table[i]).toBe(tableData[i]);
+                    }
+                },
+                50
+            );
+        });
     });
 });

@@ -1,318 +1,213 @@
-# Ollie — Pure JavaScript JPEG Codec
+# Ollie — Steganographic Password Vault
 
-**Ollie** is a lightweight, dependency-free JPEG encoder and decoder written entirely in vanilla JavaScript.  
-Its goal is twofold:
+**Ollie** hides an AES-256-GCM-encrypted password vault inside ordinary JPEG photos.
+The photos look normal, upload to any image host, and survive social-media re-encoding —
+while carrying a tamper-evident, fault-tolerant, post-quantum-resistant secret.
 
-1. **Educational** — to clearly expose each stage of the JPEG compression pipeline.  
-2. **Practical** — to provide a functional, browser-friendly JPEG codec with no external dependencies or WASM.
-
-Whether you're exploring how JPEG works under the hood or integrating a codec into a web project, Ollie aims to be clear, approachable, and hackable.
-
----
-
-## ✨ Features
-
-### Core JPEG Codec
-- **Pure JavaScript:** No native modules, no WebAssembly, no heavyweight dependencies.
-- **JPEG Encoder:** Converts raw RGBA image data → JPEG binary.
-- **JPEG Decoder:** Converts JPEG binary → raw RGBA image data.
-- **Baseline Sequential DCT:** The most widely supported JPEG variant.
-- **Progressive JPEG:** Multi-scan encoding and decoding support.
-
-### Advanced Features
-- **SPIFF Markers:** Support for APP8 SPIFF (Still Picture Interchange File Format) markers.
-- **Steganography:** Embed hidden data within JPEG files using DCT coefficient modification.
-- **Container Format:** Structured metadata format for storing encrypted data with versioning.
-- **Reed-Solomon Error Correction:** Robust error correction for embedded data.
-- **Multi-File Splitting:** Shard data across multiple JPEG files with reassembly support.
-
-### Configurable Internals
-- **Multiple IDCT Implementations:** Select between Naive, Reference, and Fast AAN (Arai-Agui-Nakajima) algorithms.
-- **Huffman Decoding Strategies:** Choose between naive Map-based or optimized 16-bit LUT decoding.
-- **Bit Reader Variants:** Swap between different BitReader implementations for performance tuning.
-- **Quantization Methods:** Configurable quantization table selection and quality levels.
-
-### Developer Experience
-- **Modular Architecture:** Each JPEG specification step is implemented as a clean, isolated module.
-- **Educational Codebase:** Designed to be readable, traceable, and easy to learn from.
-- **Comprehensive Testing:** Unit and integration tests for all components.
-- **Browser & Node.js:** Works in both environments with unified test infrastructure.
+Everything is plain JavaScript with zero runtime npm dependencies. A single, auditable,
+vendored WebAssembly binary (`src/vendor/argon2/` from OpenPGP.js) provides side-channel
+timing-attack-immune Argon2id memory-hard key derivation. Every algorithm is hand-implemented
+in readable modules with exhaustive tests, so the entire security envelope can be audited
+end-to-end by one person in an afternoon.
 
 ---
 
-## 📁 Directory Structure
+### Feature Highlights
 
-```
-src/
-  main.js                # Demo UI and entry point
-  core/
-    jpeg-encoder.js      # High-level encoder orchestrator
-    jpeg-decoder.js      # High-level decoder orchestrator
-
-    encoder/             # Encoder internals
-      dct.js
-      quantization.js
-      huffman.js
-      ... (color, RLE, zigzag)
-
-    decoder/             # Decoder internals
-      parser.js
-      idct.js
-      huffman.js
-      upsampling.js
-      ...
-
-  utils/
-    bit-reader.js
-    bit-writer.js
-
-test/                    # Unit + integration tests
-```
+- **Format v4.1 Steganography & Architecture:** Rate-distortion optimal **Syndrome-Trellis Codes (STC)** combined with **Directional J-UNIWARD** spatial Daubechies 8-tap (db8) wavelet distortion modeling, asymmetric directional cost scaling, and anti-SCA key randomization.
+- **Trap-Immune Carrier Salt (`carrierSalt`):** Layer 2 derivation from canonical component counts, quantization tables ($Q$), and carrier-invariant DC nonces, preventing chosen-carrier trap attacks while guaranteeing uniform carrier independence.
+- **Decoupled Key Derivation Chain:** Independent RFC 5869 HKDF expansion separating envelope encryption keys (`prk_env`) from steganographic embedding keys (`prk_stego`), enabling blind embedding without exposing master envelope secrets.
+- **Deflate Expansion Immunity:** 31-bit bypass in opaque container framing automatically preventing high-entropy compressed payload expansion from spilling across discrete power-of-two bucket boundaries.
+- **Binary Slice Stego-Payload Framing:** Zero-copy raw binary stripes embedded directly inside carrier envelopes, eliminating Base64 overhead in steganographic storage ($\ge 20\%$ byte footprint reduction on 1KB chunks).
+- **Rule 16 Positional Serialized Arrays (Tuples):** All wire, carrier, and export envelopes outside the raw payload (such as carrier manifests, chunk metadata, and vault exports) serialize as compact positional array tuples rather than labeled string-keyed JSON dictionary objects, eliminating semantic leakage and string key bloat, enforced by strict fail-closed unpackers.
+- **Zero Plaintext Metadata & Zero-Length Opaque Framing:** No unencrypted headers, magic bytes, length counters, or salt metadata are exposed in the carrier. Ciphertexts are padded with CSPRNG noise to discrete power-of-two buckets ($256\text{B} \dots 128\text{KB}$).
+- **Argon2id Key Derivation Chain (RFC 9106):** High-work-factor memory-hard password hashing ($t=3, m=64\text{MB}, p=1$) + RFC 5869 HKDF domain separation for AES keys, IVs, STC matrices, and distortion seeds.
+- **Multi-Carrier Storage with Threshold ($k$-of-$n$) Recovery:** Cauchy MDS erasure coding over $\text{GF}(256)$ and Shamir secret sharing: lose carriers down to the threshold and the vault still loads.
+- **Live TOTP (RFC 6238):** Live 2FA codes rendered directly on entry cards with progress countdown and click-to-copy; secrets accepted as bare Base32 or full `otpauth://` URIs.
+- **Universal CSV Import:** Direct password migration from Firefox, Chrome / Google Password Manager, Apple Passwords, KeePass, KeePassXC, Bitwarden, and LastPass exports.
+- **Tamper-Evident Carrier Manifests:** Whole-container HMAC authentication, revision counters, and atomic write-back with automatic rollback on partial write failure.
 
 ---
 
-## 🖼️ How JPEG Works (Overview)
+### Published Standards Implemented
 
-JPEG is a **lossy**, block-based image compression format.  
-Ollie implements the “baseline sequential DCT” JPEG, the most widely supported variant.
-
-Below are the major stages, explained in a way that mirrors the project’s structure.
-
-
----
-
-## 🔵 JPEG Encoding Pipeline
-```mermaid
-sequenceDiagram
-    participant RGB as "RGB Data"
-    participant Color as "Color Conversion"
-    participant Blocks as "8×8 Blocks"
-    participant Frequency as "Frequency Coefficients"
-    participant Quantized as "Quantized Coefficients"
-    participant ZigzagRLE as "Zigzag & RLE"
-    participant Huffman as "De/Encode Huffman Block"
-    participant Headers as "De/EncodeHeaders"
-    participant Bitstream as "JPEG Bitstream"
-
-    %% ---------------- ENCODING ----------------
-
-    Note over RGB: RGB Data Matrix (png)
-    RGB->>Color: RGB Data
-
-    Note over Color: Encoding Step: Color Space Conversion<br>- RGB → YCbCr<br>- Optional chroma subsampling<br>- Center shift (subtract 128)
-    Color->>Blocks: Y, Cb, Cr component data
-
-    Note over Blocks: Encoding Step: Block Splitting<br>- Separate components<br>- Divide into 8×8 MCUs<br>- Pad edges if needed
-    Blocks->>Frequency: 8×8 Spatial blocks
-
-    Note over Frequency: Encoding Step: Forward DCT<br>- Apply 2D DCT<br>- Produce 64 frequency coefficients
-    Frequency->>Quantized: DCT coefficients<br>(Frequency Blocks)
-
-    Note over Quantized: Encoding Step: Quantization<br>(compression step)<br>- Divide by quant matrix<br>- Round to nearest integer<br>- Zero high-frequency terms
-    Quantized->>ZigzagRLE: Quantized coefficients
-
-    Note over ZigzagRLE: Encoding Step: Zigzag & RLE<br>- Zigzag reorder<br>- DC differencing<br>- AC run-length encoding<br>- Insert EOB
-    ZigzagRLE->>Huffman: RLE coefficients
-
-    Note over Huffman: Encoding Step: Huffman Encoding<br>- Encode using Huffman tables<br>- Output variable-length codes
-    Huffman->>Headers: Huffman block
-    Huffman->>Headers: Huffman table
-    Color->>Headers: Color space(unimplemented)
-    Quantized->>Headers: Quantization table
-    Note over Headers: Encoding Step: Headers<br>- Write frame header<br>- Write scan header<br>- Write quantization tables<br>- Write Huffman tables
-   
-    Headers->>Bitstream: JPEG bitstream
-
-    %% ---------------- DECODING ----------------
-    Note over Bitstream: Decoding Step: Huffman Decoding
-    Bitstream->>Headers: Jpeg File
-
-    Note over Headers: Decoding Step: Headers<br>- Read frame header<br>- Read scan header<br>- Read quantization tables<br>- Read Huffman tables
-    Headers->>Huffman: Huffman table
-    Headers->>Huffman: Huffman bitstream
-
-    Note over Huffman: Sub-steps:<br>- Decode Huffman codes<br>- Recover DC/AC symbols
-    Huffman->>ZigzagRLE: Symbol sequence
-
-    Note over ZigzagRLE: Decoding Step: Zigzag & RLE<br>- Reverse DC differencing<br>- Expand AC runs<br>- Inverse zigzag
-    ZigzagRLE->>Quantized: Reordered coefficients
-    Headers->>Quantized: Quantization table
-
-    Note over Quantized: Decoding Step: Dequantization<br>(decompression step)<br>- Multiply by quant matrix<br>- Approximate original DCT values
-    Quantized->>Frequency: Dequantized blocks
-
-
-    Note over Frequency: Decoding Step: Inverse DCT<br>- Apply 2D IDCT<br>- Convert frequency → spatial
-    Frequency->>Blocks: Spatial 8×8 blocks
-
-    Note over Blocks: Decoding Step: Block Reassembly<br>- Reassemble MCUs<br>- Merge Y, Cb, Cr planes
-    Blocks->>Color: Reconstructed image
-    Headers->>Color: Color space(unimplemented)
-
-    Note over Color: Decoding Step: Color Conversion<br>- YCbCr → RGB<br>- Clamp to valid range
-    Color->>RGB: RGB Bitstream Data
-    Note over RGB: RGB Data Matrix (png)
-
-
-
-```
-### 1. **Color Space Conversion (RGB → YCbCr)**  
-JPEG separates brightness from color.  
-- **Y** = luminance (perceived brightness — the most important part)  
-- **Cb/Cr** = chroma (blue/red color difference)
-
-This separation allows JPEG to compress color more aggressively than luminance, taking advantage of human visual sensitivity.
+| Standard | What We Implement |
+|----------|------------------|
+| ITU-T T.81 / ISO/IEC 10918-1 | Baseline sequential DCT JPEG encoder and decoder |
+| FIPS 197 | AES-256-GCM authenticated encryption |
+| FIPS 180-4 | SHA-256 secure hash algorithm |
+| RFC 2104 | HMAC-SHA-256 message authentication |
+| **RFC 9106** | **Argon2id memory-hard password hashing ($t=3, m=64\text{MB}, p=1$)** |
+| **RFC 5869** | **HKDF (HMAC-SHA-256) domain separation expansion** |
+| RFC 2898 (PKCS #5 v2.1) | PBKDF2-HMAC-SHA-256 key derivation (vault internal document store) |
+| NIST SP 800-38D | GCM authenticated encryption mode |
+| **IEEE TIFS 2011** | **Syndrome-Trellis Codes (STC) dual-trellis Viterbi matrix encoding** |
+| **EURASIP 2014** | **J-UNIWARD spatial Daubechies db8 wavelet distortion modeling** |
+| RFC 4226 | HMAC-based one-time password (HOTP) |
+| **RFC 6238** | **Time-based one-time password (TOTP)** |
+| RFC 4648 | Base32 data encoding |
+| ISO/IEC 18004 | QR Code bar code symbology (encoder and decoder) |
 
 ---
 
-### 2. **(Optional) Chroma Subsampling**  
+## Contributing
 
-Most JPEGs store color at reduced resolution (e.g., **4:2:0**):  
-- Y: full resolution  
-- Cb/Cr: half resolution horizontally & vertically  
-This dramatically reduces file size with minimal perceived quality loss.
-#### ```❗ Important Note```
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions, TDD workflow,
+and how to get oriented in the codebase.
 
-##### ```    Ollie does not currently support chroma subsampling,  and decoding naively expects 4:4:4 chroma subsampling. ```
+## Security Model
 
+### Optional TOTP Gate (Tier B)
 
----
+Vault creation can enroll an optional TOTP code gate. **This is access control for the UI session,
+not extra encryption**: the secret lives inside the encrypted vault document,
+so anyone who has your master password can decrypt the vault file directly. It exists
+to deter shoulder-surfing and opportunistic access to an unlocked session.
+The enrollment dialog states this disclaimer verbatim.
 
-### 3. **8×8 Block Splitting**  
-Each Y/Cb/Cr component is divided into **8×8 blocks**.  
-All further processing occurs on these blocks individually.
+| Property | Mechanism |
+|----------|-----------|
+| Confidentiality | AES-256-GCM per entry + AES-256-GCM opaque container envelope |
+| Key Derivation | Argon2id ($t=3, m=64\text{MB}, p=1$) $\to$ HKDF-Expand (RFC 5869) with decoupled stego/envelope chains |
+| Carrier Invariance | Trap-immune `carrierSalt` (canonical $Q$ + carrier-invariant DC nonces) |
+| Steganography | Syndrome-Trellis Codes (STC, $h=8, w \le 4$, 2-bit packed trellis) + Directional J-UNIWARD |
+| Length Hiding | Zero-length framing + CSPRNG noise bucket padding ($256\text{B} \dots 128\text{KB}$) + Bit-31 Deflate bypass |
+| Carrier Framing | Native binary slice framing (raw binary stripes, zero Base64 overhead in carriers) |
+| Wire Serialization | Rule 16 Positional Array Tuples (no labeled JSON dictionaries) with fail-closed schema unpackers |
+| Tamper Detection | HMAC-SHA-256 carrier manifests (password-gated, positional tuple wire format) |
+| Loss Tolerance | Cauchy MDS erasure coding + Shamir secret sharing (any $k$ of $n$ carriers) |
+| Replay Detection | Strictly increasing revision counter bound into authenticated manifest |
+| Size-Lie Defense | Carrier-bounded framing validation before any memory allocation |
+| Post-Quantum Resistance | Symmetric-only cryptography: AES-256, SHA-256, HMAC-SHA-256, Argon2id |
 
----
+**No asymmetric cryptography is used anywhere.** RSA, ECC, and Ed25519 are all broken
+by Shor's algorithm on a sufficiently large quantum computer. Ollie restricts itself to
+symmetric primitives, which Grover's algorithm only weakens quadratically (AES-256
+retains ~128-bit quantum security). This is documented as a constitutional rule in
+[`src/specs/rules/constitution.md`](src/specs/rules/constitution.md).
 
-### 4. **Forward DCT (Spatial → Frequency Domain)**  
-The **Discrete Cosine Transform** converts pixel values into frequency coefficients.  
-- Upper-left coefficient = **DC term** = block's average brightness  
-- Remaining 63 = **AC terms**, describing increasing spatial frequencies
+### What Ollie Does NOT Protect Against
 
-Low frequencies carry most perceptual energy; high frequencies can be compressed more heavily.
-
----
-
-### 5. **Quantization (Lossy Step)**  
-Each frequency coefficient is divided by an entry in a **quantization table** and rounded.  
-- Low frequencies: small divisors → preserved detail  
-- High frequencies: larger divisors → values shrink to zero
-
-This is where JPEG achieves most of its compression.
-
----
-
-### 6. **Zigzag Ordering**  
-The 8×8 coefficients are read using a zigzag pattern that pushes low-frequency values first and groups the long tail of zeros at the end.
-
-```
-0  1  5  6 14 15 ...
-2  4  7 13 ...
-3  8 12 ...
-9 11 ...
-10 ...
-```
-
-This arrangement makes run-length encoding extremely effective.
+- A keylogger capturing your master password as you type it
+- Someone with both your password AND enough surviving carriers
+- Quantum computers running Grover's algorithm with $> 2^{128}$ logical qubits
 
 ---
 
-### 7. **Entropy Coding (Huffman + RLE)**  
-Two key tricks happen here:
+## Quick Start
 
-1. **DC differential coding**  
-   - Each block’s DC value is stored as a delta from the previous block.
-
-2. **AC run-length encoding (RLE)**  
-   - Long sequences of zeros become compact tokens.
-
-Finally, everything is Huffman-encoded into the final compressed bitstream.
-
----
-
-## 🔶 JPEG Decoding Pipeline
-
-Decoding reverses the above steps:
-
-### 1. **Parsing JPEG Markers**  
-The decoder reads the structured segments of a JPEG file:  
-`SOI`, `DQT`, `DHT`, `SOF0`, `SOS`, etc.  
-These define quantization tables, Huffman tables, sampling structure, and image dimensions.
-
----
-
-### 2. **Entropy Decoding**  
-The compressed bitstream is decoded using:  
-- DC differential decoding  
-- AC run-length expansion  
-- Huffman tables from the file
-
-Result → quantized frequency coefficients.
-
----
-
-### 3. **Inverse Zigzag**  
-Re-create the 8×8 coefficient matrix for each block.
-
----
-
-### 4. **Dequantization**  
-Multiply each coefficient by the value from the corresponding quantization table.
-
----
-
-### 5. **Inverse DCT (IDCT)**  
-Transforms each dequantized 8×8 block back into spatial pixel values.  
-Ollie exposes multiple implementations to compare performance and accuracy.
-
----
-
-### 6. **Chroma Upsampling**  
-If the JPEG uses chroma subsampling (e.g., 4:2:0), the Cb and Cr planes are upscaled to full resolution.
-
----
-
-### 7. **Color Conversion (YCbCr → RGB)**  
-The final image is reconstructed by converting each pixel back to RGB.
-
----
-
-### 8. **Block Assembly**  
-All 8×8 blocks are stitched back together to form the output image.
-
----
-
-## ▶️ Usage
-
-Open **`index.html`** in a browser to try the interactive demo:
-
-- **Encode** an uploaded image as JPEG  
-- **Decode** any JPEG file into raw pixel data  
-- Inspect intermediate stages if you're exploring how JPEG works
-
----
-
-## 🧪 Testing
-
-Ollie includes a comprehensive test suite covering all components:
-
-### Browser Testing
-Open **`test.html`** in a browser to run the full test suite with a visual interface.
-
-### Node.js Testing
-Run tests from the command line:
 ```bash
-node test/runner.js
+git clone git@github.com:jessebeard/Ollie.git
+cd Ollie
+npm test             # Full multithreaded suite: 1,130 tests across 163 files, 100% green
 ```
 
-### Test Coverage
-- **Encoder Tests:** Color space conversion, DCT, quantization, Huffman coding, progressive encoding, SPIFF generation
-- **Decoder Tests:** Frame/scan parsing, Huffman decoding, IDCT algorithms, progressive decoding, SPIFF parsing
-- **Utility Tests:** Bit readers/writers, marker parsing
-- **Steganography Tests:** Data embedding, container format, chunk management
-- **Error Correction Tests:** Reed-Solomon integration
-- **Integration Tests:** Roundtrip encoding/decoding, steganography roundtrip, format detection
-- **UI Tests:** User interface interactions
+Open `app/vault.html` in a modern browser (or serve locally via `npm run serve`) to use the visual vault.
 
+### Headless CLI (Node 22+)
+
+```bash
+# Save a vault into carrier photos:
+node scripts/cli.mjs save --fromExport vault.json --imagesDir ./photos --outDir ./stego --password "pw"
+
+# Integrity check + identity report:
+node scripts/cli.mjs verify --imagesDir ./stego --password "pw"
+
+# Recover carriers back into a portable encrypted envelope:
+node scripts/cli.mjs load --imagesDir ./stego --password "pw" --outExport restored.json
+
+# Threshold recovery mode (lose n−k carriers and still recover):
+node scripts/cli.mjs save --fromExport vault.json --imagesDir ./photos --outDir ./stego --password "pw" --threshold 2
+```
 
 ---
+
+## How It Works
+
+```mermaid
+flowchart LR
+    DOC["Vault document<br/>(JSON, AES-GCM encrypted)"]
+    SEAL["CSS envelope<br/>(random DEK + Shamir split)"]
+    EC["Cauchy erasure coding<br/>(n coded stripes)"]
+    MANIFEST["Positional Manifest Tuples<br/>(HMAC-SHA256 authenticated)"]
+    OPAQUE["Opaque Framing<br/>(Deflate bypass + CSPRNG bucket padding)"]
+    SLICE["Binary Slice Framing<br/>(zero Base64 overhead)"]
+    STC["Stego Engine<br/>(Directional J-UNIWARD + STC Trellis)"]
+    CARRIER["JPEG carrier photos"]
+
+    DOC --> SEAL --> EC --> OPAQUE --> SLICE --> STC --> CARRIER
+    MANIFEST --> SLICE
+```
+
+1. **Seal**: The vault document is encrypted under a fresh random 256-bit DEK (AES-256-GCM).
+2. **Split**: The DEK is Shamir-secret-shared across carriers over $\text{GF}(256)$.
+3. **Code**: The sealed envelope is Cauchy-erasure-coded into coded stripes distributed
+   proportionally across carriers by capacity.
+4. **Opaque Frame**: Each stripe + its key share are compressed (with Bit-31 expansion bypass), CRC-32-checked,
+   and padded with CSPRNG noise into a zero-length bucket ($256\text{B} \dots 128\text{KB}$) encrypted via AES-256-GCM.
+5. **Binary Slice Frame**: The stripe is packaged with HMAC-authenticated positional manifest tuples directly
+   into binary slice frames without Base64 encoding.
+6. **Embed**: The wire envelope is embedded into JPEG DCT AC coefficients using Syndrome-Trellis Codes
+   (STC) with distortion costs calculated via Directional J-UNIWARD spatial Daubechies db8 wavelets.
+7. **Authenticate**: Every carrier carries an authenticated manifest tuple; on load, all
+   copies must agree, verify under the password, and bind every extracted chunk.
+
+Any `threshold` carriers recover the vault. Fewer reveal nothing.
+Tampered, swapped, rolled-back, or corrupted sets fail closed.
+
+For the complete byte-level specification see [`src/specs/container-wire-format.md`](src/specs/container-wire-format.md).
+
+---
+
+## Project Structure
+
+```text
+src/
+  algebraic/            # Pure math transforms (DCT, quantization, zigzag, color)
+  automata/             # Bit-level FSMs (readers, writers, Huffman codecs, parsers)
+  codec/                # JPEG encoder, decoder, transcoder, capacity scanner, QR
+  information-theory/
+    cryptography/       # KDF chain (Argon2id + HKDF), AES-GCM, PBKDF2, HMAC, TOTP
+    error-correction/   # Reed-Solomon over GF(256), interleaver, profiles
+    secret-sharing/     # Shamir, CSS envelope, Cauchy erasure codec, GF(256)
+    steganography/      # StegoEngine, OpaqueContainer, STCMatrix, JUniward, manifests, chunks, stego-payload
+  structures/vault/     # Immutable vault model, secure records, CSV import
+  utils/                # Compression, CRC32, encoding, logger, URL safety, atomic writer
+  vendor/               # Vendored OpenPGP.js Argon2id WASM SIMD/non-SIMD engine
+  specs/                # Normative specifications, project rules, living wireframe
+app/                    # Browser UI (vault page, test runner)
+scripts/                # CLI, dev server, golden-vector generator
+test/                   # 1,130 tests: unit, integration, security, conformance, PBT, fuzz
+src/specs/WIREFRAME.md  # Complete mermaid.js architecture diagram
+```
+
+---
+
+## Auditing This Codebase
+
+Ollie is designed to be audited:
+
+1. **Read the spec first**: [`src/specs/container-wire-format.md`](src/specs/container-wire-format.md)
+   defines the exact byte layout at every layer.
+2. **Follow the data flow**: plaintext $\to$ CSS seal $\to$ Cauchy erasure code $\to$ Opaque bucket framing $\to$ Binary slice framing $\to$ STC / J-UNIWARD embed $\to$ carrier.
+3. **Check the crypto surface**: everything lives in `information-theory/cryptography/` and `src/vendor/argon2/`.
+   Primitives: Argon2id, HKDF-Expand, AES-256-GCM, HMAC-SHA256, SHA-256.
+4. **Verify the claims**: run `npm test` (1,130 assertions across 163 test files).
+5. **Inspect the WASM binary**: `src/vendor/argon2/` contains the unmodified OpenPGP.js Argon2id WASM binary alongside its original MIT license, inlined as base64 to ensure zero-network offline operation.
+
+---
+
+## Testing
+
+```bash
+npm test               # Full multithreaded suite: 1,130 tests across 163 files
+PBT_SEED=N npm test   # Reproducible property-based runs
+npm run lint           # ESLint
+npm run typecheck      # Validates JSDoc type annotations
+```
+
+---
+
+## License
+
+ISC

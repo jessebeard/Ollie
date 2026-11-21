@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FileScanner - Handles directory scanning using File System Access API
  */
 export class FileScanner {
@@ -8,12 +8,13 @@ export class FileScanner {
      * @returns {Promise<Array<FileSystemFileHandle>>}
      */
     static async scanDirectory(pattern = '*.*') {
-        if (typeof window === 'undefined' || !window.showDirectoryPicker) {
+        const pickerHost = /** @type {any} */ (window);
+        if (typeof window === 'undefined' || !pickerHost.showDirectoryPicker) {
             throw new Error('File System Access API not supported in this environment');
         }
 
         try {
-            const dirHandle = await window.showDirectoryPicker();
+            const dirHandle = await pickerHost.showDirectoryPicker();
             const files = [];
 
             for await (const entry of dirHandle.values()) {
